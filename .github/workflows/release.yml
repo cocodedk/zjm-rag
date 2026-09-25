@@ -43,14 +43,24 @@ jobs:
           EXACT: ${{ inputs.version }}
         run: |
           set -euo pipefail
+          [ "$GITHUB_REF" = refs/heads/main ] || { echo "::error::release only from main"; exit 1; }
           git fetch --force --tags origin
           semver='^v[0-9]+\.[0-9]+\.[0-9]+$'
+          # Every release, drafts included; a failing gh call fails the step instead of reading as "none".
+          releases=$(gh release list --limit 1000 --json tagName,isDraft)
+          state_of() { jq -r --arg t "$1" 'map(select(.tagName == $t)) | if length == 0 then "none" elif .[0].isDraft then "draft" else "published" end' <<< "$releases"; }
           # A retry after the tag was pushed reuses that tag instead of bumping again.
           here=$(git tag --points-at HEAD | grep -E "$semver" | sort -V | tail -1 || true)
           if [ -n "$here" ]; then
             tag=$here
           else
             latest=$(git tag --list 'v*' | grep -E "$semver" | sort -V | tail -1 || true)
+            if [ -z "$latest" ] && [ -z "$EXACT" ]; then
+              echo "::error::no vX.Y.Z tag yet: give the first release an exact version"; exit 1
+            fi
+            if [ -n "$latest" ] && [ "$(state_of "$latest")" != published ]; then
+              echo "::error::$latest is tagged but not published: re-run this workflow on its commit to finish it"; exit 1
+            fi
             IFS=. read -r major minor patch <<< "${latest#v}"
             major=${major:-0}; minor=${minor:-0}; patch=${patch:-0}
             case "$BUMP" in
@@ -69,7 +79,7 @@ jobs:
               echo "::error::$tag already exists on another commit"; exit 1
             fi
           fi
-          state=$(gh release view "$tag" --json isDraft -q 'if .isDraft then "draft" else "published" end' 2>/dev/null || echo none)
+          state=$(state_of "$tag")
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
           echo "state=$state" >> "$GITHUB_OUTPUT"
