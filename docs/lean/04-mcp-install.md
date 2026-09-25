@@ -12,7 +12,7 @@ Agents get zjm-rag as MCP tools, and a person installs everything with one comma
   `serve(stdin, stdout, *, store=DEFAULT_STORE, runner=None, jev=None)` so tests drive it with
   `io.StringIO`. CLI: `zjm mcp [--store PATH]`.
 - Handles `initialize` (reply `protocolVersion` echoing the client's, `capabilities: {"tools": {}}`,
-  `serverInfo: {"name": "zjm-rag", "version": <package version>}`), `notifications/initialized`
+  `serverInfo: {"name": "zjm-rag", "version": <package version>}`, where the version is `importlib.metadata.version("zjm-rag")`, or `"0.0.0+unknown"` when the package is not installed; no version constant in the code), `notifications/initialized`
   (no reply), `tools/list`, `tools/call`, `ping`. Unknown method → error `-32601`; bad params →
   `-32602`; unparsable line → `-32700`. Notifications never get a reply.
 - Tools, each with a one-sentence description and a JSON Schema `inputSchema` whose properties
