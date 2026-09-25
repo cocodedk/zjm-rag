@@ -1,3 +1,7 @@
+---
+lean_status: stopped
+lean_worktree: /tmp/graph-ujv_xxnp/task-04-mcp-install
+---
 # 04 — MCP server and one-shot install
 
 ## Goal
@@ -36,8 +40,12 @@ Agents get zjm-rag as MCP tools, and a person installs everything with one comma
   3. Install the package: `uv tool install --force git+https://github.com/cocodedk/zjm-rag` when
      `uv` exists, else `pipx install --force git+https://github.com/cocodedk/zjm-rag` when `pipx`
      exists, else `python3 -m pip install --user git+https://github.com/cocodedk/zjm-rag`.
-  4. Run `zjm doctor` and print its output; warn (do not fail) when `OPENROUTER_API_KEY` or
-     `claude` is missing, saying what each is for.
+  4. Check the result (settled; this is the whole rule): stop with exit `1` and a message on stderr
+     when `command -v zjm` or `command -v zg` fails after the install (saying the install
+     directory, e.g. `~/.local/bin`, may be missing from `PATH`). Otherwise run `zjm doctor`, print
+     its output and **ignore its exit code**: a missing `OPENROUTER_API_KEY` or `claude` is only a
+     warning line saying what each is for, and the script exits `0`. In dry run the two post-install
+     `command -v` checks are skipped and `+ zjm doctor` is printed.
 - The Python check is `python3 -c 'import sys; sys.exit(sys.version_info < (3, 10))'`; tool presence
   is `command -v <tool>`. These two probes always run, also in dry run.
 - `ZJM_INSTALL_DRY_RUN=1` runs no installing command: each command from steps 2–4 is printed on its
@@ -54,7 +62,7 @@ requirements (`zg`, `OPENROUTER_API_KEY`, optional `claude`). Version bump to `0
 
 ## Acceptance tests
 
-`python3 -m unittest discover -s tests -q` runs **exactly 31 tests** (25 earlier plus these 6), all
+`python3 -m unittest discover -s tests -q` runs **exactly 32 tests** (25 earlier plus these 7), all
 passing with an empty `HOME` and no network:
 
 - `tests/test_mcp.py`:
@@ -67,6 +75,10 @@ passing with an empty `HOME` and no network:
   5. `test_prefers_uv_and_installs_zg` — stubs `python3`, `npm`, `uv`; output lists
      `npm install -g @zvec/zvec-grep` and `uv tool install --force git+https://github.com/cocodedk/zjm-rag`.
   6. `test_pip_fallback` — stubs only `python3` and `zg`; output lists the `pip install --user` line.
+  7. `test_fails_when_zjm_missing` — not dry run, stubs `python3`, `zg` and a `uv` that installs
+     nothing: exit `1`, stderr mentions `PATH`.
+
+These seven (with the four MCP tests above) are the complete required test set for this spec.
 
 ## Jev request shape (pinned)
 
