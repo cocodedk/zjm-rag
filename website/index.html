@@ -92,7 +92,7 @@
       <li class="sent" style="--p:.96;--i:0"><b>0.96</b><code>agent-linters/README.md</code></li>
       <li class="sent" style="--p:.81;--i:1"><b>0.81</b><code>agent-linters/bin/lintp</code></li>
       <li class="sent" style="--p:.58;--i:2"><b>0.58</b><code>agent-linters/llms.txt</code></li>
-      <li class="cut-note">Threshold 0.5. The best three accepted files go to the LLM; the rest come back as rejected.</li>
+      <li class="cut-note">Threshold 0.5: files below it come back as rejected. The best three accepted files go to the LLM.</li>
       <li style="--p:.22"><b>0.22</b><code>agent-linters/shell/linters.fish</code></li>
       <li style="--p:.14"><b>0.14</b><code>agent-linters/website/index.html</code></li>
       <li style="--p:.09"><b>0.09</b><code>agent-linters/install.sh</code></li>
@@ -106,7 +106,7 @@
 
 <section aria-labelledby="how">
   <h2 id="how">Three steps, each one narrower</h2>
-  <p class="intro">Search casts a wide net, and a judge sorts the catch. Only the files the judge accepts reach the model, so it reads a few whole files instead of a pile of loose snippets.</p>
+  <p class="intro">Search casts a wide net, and a judge sorts the catch. Only the files the judge accepts reach the model, so it reads the files themselves, up to 20,000 characters each, instead of a pile of loose snippets.</p>
   <div class="steps">
     <div>
       <div class="ticks" style="--n:40"></div>
@@ -118,7 +118,7 @@
       <div class="ticks" style="--n:8;--c:var(--ink)"></div>
       <p class="count">8 files, each with a probability</p>
       <h3>Jev judges</h3>
-      <p>One request to Jev, the OpenRouter Decisions API, asks the same question of every file: does this one contain what the answer needs? Jev reads only the snippets and returns a probability per file. Files at 0.5 or above are accepted. The rest come back as rejected, so none disappears without a trace.</p>
+      <p>One request to Jev, the OpenRouter Decisions API, asks the same question of every file: does this one contain what the answer needs? Jev judges each file from its path and snippets and returns a probability. Files at 0.5 or above are accepted. The rest come back as rejected, so none disappears without a trace.</p>
     </div>
     <div>
       <div class="ticks" style="--n:3;--c:#e0b800"></div>
@@ -134,8 +134,8 @@
   <p class="intro">Search is local, but judging and answering are not. Point it at folders you would be fine pasting into a chat with those services.</p>
   <table class="flow">
     <tr><th scope="row">zg</th><td>Runs on your machine, against an index of a copy of your folders.</td></tr>
-    <tr><th scope="row">Jev</th><td>Gets the question and up to two snippets from each of up to 8 files, sent to OpenRouter.</td></tr>
-    <tr><th scope="row"><code>claude</code></th><td>Gets the question and the first 20,000 characters of each file it answers from, three at most, sent to Anthropic.</td></tr>
+    <tr><th scope="row">Jev</th><td>Gets the question, plus the path and up to two snippets of each of up to 8 files, sent to OpenRouter.</td></tr>
+    <tr><th scope="row"><code>claude</code></th><td>Gets the question, plus the path and first 20,000 characters of each file it answers from, three at most, sent to Anthropic.</td></tr>
   </table>
 </section>
 

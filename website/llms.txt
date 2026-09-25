@@ -2,7 +2,7 @@
 
 > A small open-source RAG tool for local folders. zg (zvec-grep) finds candidate files, Jev (the OpenRouter Decisions API) judges which of them contain the answer, and an LLM answers from those files only, citing their paths.
 
-The Python library `zjm_rag` is in: stdlib only, Python 3.10+, with `index`, `find` and `ask`. `index` copies source folders into a store and builds the zg index there. `find` asks zg for up to 40 hits, groups them into at most 8 files, has Jev score each file, and splits them at a threshold (0.5 by default) into accepted and rejected. `ask` sends the best three accepted files to the `claude` CLI and returns the answer with the paths it used; when no file passes, no LLM is called. zg runs locally; snippets go to OpenRouter (`OPENROUTER_API_KEY`) and the chosen files' text goes to the LLM provider.
+The Python library `zjm_rag` is in: stdlib only, Python 3.10+, with `index`, `find` and `ask`. `index` copies source folders into a store and builds the zg index there. `find` asks zg for up to 40 hits, groups them into at most 8 files, has Jev score each file from its path and snippets, and splits them at a threshold (0.5 by default) into accepted and rejected. `ask` sends the best three accepted files to the `claude` CLI and returns the answer with the paths it used; when no file passes, no LLM is called. zg runs locally; snippets go to OpenRouter (`OPENROUTER_API_KEY`) and the chosen files' text goes to the LLM provider.
 
 A `zjm` command with `--json`, a local HTTP JSON API (`zjm serve`) and an MCP server with a one-line installer are planned, each specified in `docs/lean/` and built one pull request per spec.
 
