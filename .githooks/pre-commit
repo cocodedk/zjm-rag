@@ -1,0 +1,61 @@
+#!/bin/sh
+# zjm-rag pre-commit hook: fast checks on staged files, then the unittest suite.
+#   1. reject an unfilled owner placeholder or a leaked dev-machine home path
+#   2. `sh -n` every staged shell file
+#   3. `ruff check` (syntax errors, undefined names; same rules as CI) on staged
+#      Python, only if ruff is on PATH
+#   4. the unittest suite (stdlib, fakes only, well under a second)
+#
+# The lean loop commits with `git commit-tree`, which runs no hooks; PR CI is its gate.
+# Install with ./scripts/install-hooks.sh. Bypass with `git commit --no-verify`.
+set -eu
+
+fail=0
+note() { printf 'pre-commit: %s\n' "$1" >&2; }
+
+cd "$(git rev-parse --show-toplevel)"
+
+staged=$(mktemp)
+trap 'rm -f "$staged"' EXIT
+git diff --cached --name-only --diff-filter=ACMR > "$staged"
+[ -s "$staged" ] || exit 0
+
+# Needles are split so this hook's own source never contains what it scans for.
+owner_placeholder='<OWNE''R>'
+leaked_home='/home/age''nt'
+
+while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    blob=$(git show ":$f" 2>/dev/null) || continue
+    if printf '%s\n' "$blob" | grep -a -qF "$owner_placeholder"; then
+        note "staged file '$f' still has an unfilled $owner_placeholder placeholder"
+        fail=1
+    fi
+    if printf '%s\n' "$blob" | grep -a -qF "$leaked_home"; then
+        note "staged file '$f' contains a hardcoded $leaked_home path"
+        fail=1
+    fi
+    case "$f" in
+        *.sh) sh -n "$f" || { note "sh -n failed: $f"; fail=1; } ;;
+        *.py) ;;
+        *)
+            case "$(head -n1 -- "$f" 2>/dev/null || true)" in
+                '#!/bin/sh' | '#!/usr/bin/env sh')
+                    sh -n "$f" || { note "sh -n failed: $f"; fail=1; } ;;
+            esac
+            ;;
+    esac
+done < "$staged"
+
+if grep -q '\.py$' "$staged"; then
+    if command -v ruff >/dev/null 2>&1; then
+        # shellcheck disable=SC2046  # one path per line, no spaces in this repo's paths
+        ruff check --isolated --select E9,F63,F7,F82 $(grep '\.py$' "$staged") || fail=1
+    else
+        note "skip: ruff not on PATH (install: uv tool install ruff)"
+    fi
+fi
+
+python3 -m unittest discover -s tests -q || fail=1
+
+exit $fail

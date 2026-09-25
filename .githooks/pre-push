@@ -1,0 +1,48 @@
+#!/bin/sh
+# zjm-rag pre-push hook: owner-lock the destination + block force-push/deletion
+# of protected branches. Install with ./scripts/install-hooks.sh.
+# Bypass (legitimate emergencies only): git push --no-verify.
+set -eu
+
+# ── Part 1: owner-lock the push URL ──────────────────────────────────────────
+# git invokes pre-push as: pre-push <remote-name> <remote-url>
+remote_url="${2:-}"
+
+case "$remote_url" in
+  https://github.com/cocodedk/*|git@github.com:cocodedk/*|ssh://git@github.com/cocodedk/*) ;;
+  *)
+    echo "pre-push: refusing — push URL is not under github.com/cocodedk" >&2
+    echo "  remote: ${1:-?}" >&2
+    echo "  url:    $remote_url" >&2
+    exit 1
+    ;;
+esac
+
+# ── Part 2: block force-push and deletion of protected branches ──────────────
+# git passes one line per ref on stdin: <local_ref> <local_sha> <remote_ref> <remote_sha>
+# Bypass with `git push --no-verify` for legitimate emergencies.
+ZERO='0000000000000000000000000000000000000000'
+
+# git feeds four whitespace-separated fields per ref on stdin and they are positional, so
+# all four must be named even though local_ref is not one we test.
+# shellcheck disable=SC2034
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/master|refs/heads/trunk|refs/heads/production|refs/heads/prod|refs/heads/release) ;;
+    *) continue ;;
+  esac
+  branch="${remote_ref#refs/heads/}"
+
+  if [ "$local_sha" = "$ZERO" ]; then
+    echo "pre-push: blocked deletion of protected branch '$branch'" >&2
+    echo "          bypass: git push --no-verify" >&2
+    exit 1
+  fi
+
+  if [ "$remote_sha" != "$ZERO" ] && \
+     ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+    echo "pre-push: blocked non-fast-forward push to protected branch '$branch'" >&2
+    echo "          bypass: git push --no-verify" >&2
+    exit 1
+  fi
+done

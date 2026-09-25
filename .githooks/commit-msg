@@ -1,0 +1,13 @@
+#!/bin/sh
+# zjm-rag commit-msg hook: enforce Conventional Commits on the subject line.
+# Install with ./scripts/install-hooks.sh. Bypass with `git commit --no-verify`.
+set -eu
+
+MSG=$(head -n1 "$1")
+
+if ! echo "$MSG" | grep -qE '^(feat|fix|chore|docs|style|refactor|test|ci|build|perf|revert)(\(.+\))?: .+'; then
+  echo "ERROR: Commit message must follow Conventional Commits." >&2
+  echo "  Example: feat: add user login" >&2
+  echo "  Types: feat|fix|chore|docs|style|refactor|test|ci|build|perf|revert" >&2
+  exit 1
+fi

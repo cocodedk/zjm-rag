@@ -1,0 +1,9 @@
+version: 2
+updates:
+  # The package is stdlib-only (no dependencies to watch); the only thing Dependabot can
+  # usefully keep current here is the GitHub Actions pinned in the workflows.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

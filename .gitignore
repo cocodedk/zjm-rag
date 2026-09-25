@@ -1,3 +1,11 @@
 __pycache__/
 .zvec-grep/
 scratchpad/
+*.pyc
+*.egg-info/
+/build/
+/dist/
+.venv/
+.ruff_cache/
+.mypy_cache/
+.DS_Store
