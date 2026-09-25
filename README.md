@@ -24,39 +24,31 @@ their paths.
 
 ## Status
 
-This repo is at the proof-of-concept stage: `rag.py` is a single script. The library
-(`zjm_rag`), the `zjm` command line with `--json`, a local HTTP JSON API and an MCP server with a
-one-line installer are being built from the specs in [docs/lean/](docs/lean/), one pull request
-per spec.
+The library (`zjm_rag`) is in. The `zjm` command line with `--json`, a local HTTP JSON API and an
+MCP server with a one-line installer are being built from the specs in [docs/lean/](docs/lean/),
+one pull request per spec.
 
-## Usage (proof of concept)
+## Install
 
-Requirements:
+    pip install .
 
-- Python 3.10+
-- `zg` on `PATH` (`npm install -g @zvec/zvec-grep`)
-- the jev-decisions script, by default at `~/.claude/skills/jev-decisions/scripts/jev.py`
-  (override with `RAG_JEV`)
-- the `claude` CLI, for answers
+Needs the `zg` binary on `PATH`, `OPENROUTER_API_KEY` for ranking, and `claude` for answers.
 
-The script expects an already-indexed corpus. By default that is `/tmp/zjm-rag/corpus` (override
-with `RAG_CORPUS`, or move the whole scratch area with `RAG_SCRATCH`), with zg's home at
-`/tmp/zjm-rag/zghome`. Copy the folders you want searched into the corpus and index it there:
+## Use
 
-```sh
-mkdir -p /tmp/zjm-rag/corpus && cp -r ~/projects/some-repo /tmp/zjm-rag/corpus/
-cd /tmp/zjm-rag/corpus && ZVEC_GREP_HOME=/tmp/zjm-rag/zghome zg index . --mode direct --hidden
+```python
+import os, zjm_rag
+
+zjm_rag.index([os.path.expanduser("~/projects/agent-linters")])        # copies into zjm_rag.DEFAULT_STORE and indexes
+hits = zjm_rag.find("which linter checks CSS files")   # {"accepted": [...], "rejected": [...], ...}
+reply = zjm_rag.ask("which linter checks CSS files", answer_language="da")
+print(reply["answer"], reply["files"])
 ```
 
-Then ask:
-
-```sh
-python3 rag.py "which linter checks CSS files"             # rank, then answer from the top 3
-python3 rag.py --no-answer "which linter checks CSS files" # rank only
-```
-
-It prints each candidate file with Jev's probability, best first, then the answer. The proof of
-concept has no threshold yet: it answers from the three best-ranked files.
+- `index(sources, multilingual=True)` for non-English queries; changing the model needs `rebuild=True`.
+- `find(query, min_score=0.5, sort="score"|"zg"|"mtime"|"path", rank=False, file_types=["py"])`.
+- Every call takes `store=`, plus injectable `runner=` and `jev=` for tests.
+- Errors raise `zjm_rag.ZjmError`.
 
 ## Build from source
 
@@ -73,7 +65,7 @@ zg, Jev or an LLM. See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Architecture
 
 ```
-rag.py              proof of concept: find (zg), rank (Jev), answer (claude)
+zjm_rag/            library: index, find (zg), rank (Jev), ask (claude)
 tests/              unittest suite and the zg output fixture
 docs/lean/          specs for the library, CLI, HTTP API, MCP server and installer
 profile-python.md   gate profile the lean loop builds against
