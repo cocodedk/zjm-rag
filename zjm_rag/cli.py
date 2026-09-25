@@ -35,6 +35,7 @@ def _parser():
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--store", default=str(core.DEFAULT_STORE))
+    sub.add_parser("mcp").add_argument("--store", default=str(core.DEFAULT_STORE))
     return parser
 
 
@@ -84,6 +85,9 @@ def main(argv=None, *, runner=None, jev=None):
     fakes = {k: v for k, v in {"runner": runner, "jev": jev}.items() if v is not None}
     if args.cmd == "serve":
         return _serve(args, fakes)
+    if args.cmd == "mcp":
+        from .mcp import serve
+        return serve(sys.stdin, sys.stdout, store=args.store, **fakes)
     try:
         result = _run(args, fakes)
     except (ZjmError, ValueError) as e:
