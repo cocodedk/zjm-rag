@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from zjm_rag import ZjmError, index
 
@@ -87,6 +88,18 @@ class IndexTest(unittest.TestCase):
         self.assertEqual(runner.calls, [])
         index([self.src], store=self.store, multilingual=True, rebuild=True, runner=runner)
         self.assertEqual(runner.calls[0][0][-1], "--rebuild")
+
+    def test_foreign_store_refused(self):
+        self.store.mkdir()
+        runner = FakeRunner()
+        with mock.patch("os.getuid", return_value=self.store.stat().st_uid + 1):
+            with self.assertRaisesRegex(ZjmError, "owned by another user"):
+                index([self.src], store=self.store, runner=runner)
+        self.assertEqual(list(self.store.iterdir()), [])
+        self.assertEqual(runner.calls, [])
+        fresh = self.tmp / "fresh"
+        index([self.src], store=fresh, runner=FakeRunner())
+        self.assertEqual(fresh.stat().st_mode & 0o777, 0o700)
 
 
 if __name__ == "__main__":

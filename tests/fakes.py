@@ -33,5 +33,9 @@ class FakeRunner:
 
 def fake_jev(scores):
     def jev(payload):
+        for q in payload["questions"].values():
+            assert set(q) == {"type", "instructions", "criteria"}, q
+            assert q["type"] == "noul" and q["instructions"], q
+            assert set(q["criteria"]) == {"true", "false"}, q
         return {"answers": {k: {"type": "noul", "noul": s} for k, s in zip(payload["questions"], scores)}}
     return jev
