@@ -24,7 +24,7 @@ their paths.
 
 ## Status
 
-The library (`zjm_rag`) is in. The `zjm` command line with `--json`, a local HTTP JSON API and an
+The library (`zjm_rag`) and the `zjm` command line with `--json` are in. A local HTTP JSON API and an
 MCP server with a one-line installer are being built from the specs in [docs/lean/](docs/lean/),
 one pull request per spec.
 
@@ -49,6 +49,18 @@ print(reply["answer"], reply["files"])
 - `find(query, min_score=0.5, sort="score"|"zg"|"mtime"|"path", rank=False, file_types=["py"])`.
 - Every call takes `store=`, plus injectable `runner=` and `jev=` for tests.
 - Errors raise `zjm_rag.ZjmError`.
+
+The same operations on the command line (`zjm` or `python3 -m zjm_rag`):
+
+```sh
+zjm index ~/projects/agent-linters [--multilingual] [--embedding MODEL] [--rebuild]
+zjm find "which linter checks CSS files" [--limit N] [--type py]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank]
+zjm ask "which linter checks CSS files" --lang da [--top-k 3]
+zjm doctor                                   # zg, claude, OPENROUTER_API_KEY, store
+```
+
+Every subcommand takes `--store PATH` and `--json`, which prints the library's return value as one
+JSON object (errors as `{"error": "..."}`). Exit codes: `0` ok, `1` error or failed `doctor`, `2` usage.
 
 ## Build from source
 
