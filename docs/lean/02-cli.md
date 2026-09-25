@@ -32,6 +32,9 @@ process gets the same operations, with machine-readable output.
   - Errors go to stderr as `zjm: <message>`.
 - Exit codes: `0` success (including a `find` with nothing accepted), `1` `ZjmError`/`ValueError`,
   `2` usage error (argparse's own), `doctor` exits `1` when `ok` is false.
+- Usage errors (unknown subcommand or flag, missing argument, bad `--sort` value) are argparse's
+  own, even with `--json`: argparse's usage message on stderr, nothing on stdout, exit `2`. The
+  `--json` error object is only for errors raised after parsing (`ZjmError`, `ValueError`).
 
 ## Acceptance tests
 
