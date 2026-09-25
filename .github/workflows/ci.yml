@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Read-only checks, so a run made stale by a newer push to the same PR can be killed.
+# Runs on main are never cancelled.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.13']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # No `cache: pip`: the package has no dependencies and no lock file to key a cache on.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      # Same sandbox as the lean loop's gate (profile-python.md): an empty HOME, and the
+      # tests inject fakes for zg, Jev and the LLM, so nothing here touches the network.
+      # unittest exits 0 on "Ran 0 tests" under 3.10, so an empty discovery is failed here.
+      - name: unittest
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HOME="$RUNNER_TEMP/empty-home"
+          mkdir -p "$HOME"
+          python -m unittest discover -s tests -q 2>&1 | tee "$RUNNER_TEMP/unittest.log"
+          if grep -q '^Ran 0 tests' "$RUNNER_TEMP/unittest.log"; then
+            echo "FAIL: no tests were discovered"; exit 1
+          fi
+
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      # Syntax errors and undefined names only. The loop's own gate runs the suite, not
+      # ruff, so a style rule here would turn its PRs red for something it never checks.
+      # Pinned so a ruff release cannot change what this job enforces.
+      - run: pip install ruff==0.16.2
+      - run: ruff check --select E9,F63,F7,F82 .
+
+  # The one check branch protection requires (scripts/setup-repo.sh). A matrix reports
+  # as "test (3.10)" / "test (3.13)", so protection names this fan-in instead.
+  # `if: always()` is load-bearing: without it a failed dependency SKIPS this job, the
+  # required check is never reported, and the PR sits pending instead of failing.
+  verify:
+    name: verify
+    needs: [test, lint]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every job to have succeeded
+        run: |
+          set -eu
+          results="${{ join(needs.*.result, ' ') }}"
+          echo "job results: $results"
+          for result in $results; do
+            [ "$result" = success ] || { echo "FAIL: a required job reported '$result'"; exit 1; }
+          done
