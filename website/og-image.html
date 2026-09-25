@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<!-- Render template for og.png (1200x630), not a page. Re-render after any change:
+     google-chrome-stable --headless --disable-gpu --no-sandbox --hide-scrollbars \
+       --window-size=1200,630 --virtual-time-budget=8000 \
+       --screenshot=website/og.png "file://$PWD/website/og-image.html" -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>zjm-rag OG image</title>
+<link href="https://fonts.googleapis.com/css2?family=Recursive:wght,CASL,MONO@300..800,0..1,0..1&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background: #eef2f3; color: #13242b; font-family: "Recursive", sans-serif;
+    display: grid; grid-template-columns: 500px 1fr; gap: 48px; padding: 64px 64px 56px; box-sizing: border-box;
+  }
+  .left { display: flex; flex-direction: column; }
+  .name { font-size: 30px; font-weight: 700; font-variation-settings: "MONO" 1; }
+  h1 { margin: 34px 0 0; font-size: 70px; line-height: 1.02; font-weight: 800; letter-spacing: -.03em; font-variation-settings: "CASL" 1; }
+  .sub { margin: 26px 0 0; font-size: 24px; line-height: 1.4; color: #3d525a; }
+  .by { margin-top: auto; font-size: 20px; color: #56696f; }
+  .by b { color: #13242b; font-weight: 650; }
+  .run { align-self: center; background: #fbfdfd; border: 1.5px solid #c9d4d7; border-radius: 10px; padding: 26px 26px 20px; }
+  ol { list-style: none; margin: 0; padding: 0; font-variation-settings: "MONO" 1; font-size: 18px; white-space: nowrap; }
+  li { display: grid; grid-template-columns: 52px 1fr; gap: 0 12px; padding: 5px 0; color: #56696f; }
+  li::after { content: ""; grid-column: 2; height: 4px; margin-top: 5px; border-radius: 2px; width: calc(var(--p) * 100%); background: #c9d4d7; }
+  li b { font-weight: 500; text-align: right; }
+  .sent { color: #13242b; }
+  .sent::after { background: #13242b; }
+  .sent span { justify-self: start; padding: 0 4px; background: linear-gradient(100deg, transparent 1%, #ffe15a 3% 97%, transparent 99%) no-repeat 0 55% / 100% 80%; }
+  .cut { display: block; border-top: 1.5px dashed #56696f; margin: 6px 0 4px; padding: 0; height: 0; }
+  .cut::after { content: none; }
+</style>
+</head>
+<body>
+  <div class="left">
+    <div class="name">zjm-rag</div>
+    <h1>Find the file that holds the answer</h1>
+    <p class="sub">zg finds candidate files, Jev judges which ones hold the answer, and an LLM answers from those files only, citing their paths.</p>
+    <p class="by">Open source, by <b>Babak Bandpey</b> at <b>cocode.dk</b></p>
+  </div>
+  <div class="run">
+    <ol>
+      <li class="sent" style="--p:.96"><b>0.96</b><span>agent-linters/README.md</span></li>
+      <li class="sent" style="--p:.81"><b>0.81</b><span>agent-linters/bin/lintp</span></li>
+      <li class="sent" style="--p:.58"><b>0.58</b><span>agent-linters/llms.txt</span></li>
+      <li class="cut"></li>
+      <li style="--p:.22"><b>0.22</b><span>agent-linters/shell/linters.fish</span></li>
+      <li style="--p:.14"><b>0.14</b><span>agent-linters/website/index.html</span></li>
+      <li style="--p:.09"><b>0.09</b><span>agent-linters/install.sh</span></li>
+      <li style="--p:.03"><b>0.03</b><span>message-test-plugin/CONTRIBUTING.md</span></li>
+    </ol>
+  </div>
+</body>
+</html>

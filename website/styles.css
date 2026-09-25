@@ -1,0 +1,141 @@
+/* zjm-rag site. One idea: a highlighter over the files that hold the answer.
+   Recursive carries everything; its MONO axis sets paths and commands, its CASL axis
+   loosens the headlines. The Persian page swaps the text face for Vazirmatn (rtl.css). */
+:root {
+  --paper: #eef2f3;
+  --sheet: #fbfdfd;
+  --ink: #13242b;
+  --muted: #56696f;
+  --rule: #c9d4d7;
+  --petrol: #0d5c63;
+  --mark: #ffe15a;
+  --text: "Recursive", system-ui, sans-serif;
+  --wrap: 1120px;
+  --gutter: 20px;
+  color-scheme: light;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 400 1.0625rem/1.6 var(--text); font-variation-settings: "CASL" 0, "MONO" 0;
+}
+a { color: var(--petrol); text-underline-offset: .18em; }
+a:hover { color: var(--ink); }
+:focus-visible { outline: 3px solid var(--petrol); outline-offset: 3px; border-radius: 2px; }
+code, pre, .mono { font-family: "Recursive", ui-monospace, monospace; font-variation-settings: "MONO" 1, "CASL" 0; }
+code { font-size: .92em; }
+p code, li code, td code { background: #dde6e8; padding: .05em .3em; border-radius: 3px; white-space: nowrap; }
+
+.wrap { width: 100%; max-width: var(--wrap); margin: 0 auto; padding-inline: var(--gutter); }
+/* The cocode.dk frame lines up with this column; keep the gutters in step. */
+cocode-head, cocode-foot { --cocode-max: var(--wrap); --cocode-gutter: var(--gutter); }
+
+h1, h2, h3 { line-height: 1.08; margin: 0; font-variation-settings: "CASL" 1, "MONO" 0; }
+h1 { font-size: clamp(2.5rem, 9vw, 4.6rem); font-weight: 800; letter-spacing: -.03em; max-width: 11ch; }
+h2 { font-size: clamp(1.6rem, 4.5vw, 2.3rem); font-weight: 750; letter-spacing: -.02em; max-width: 22ch; }
+h3 { font-size: 1.25rem; font-weight: 700; }
+
+/* ---------- hero ---------- */
+.hero { display: grid; gap: 40px; padding: 40px 0 64px; }
+.lede { font-size: 1.2rem; max-width: 34em; margin: 22px 0 0; }
+.hero-note { color: var(--muted); max-width: 34em; margin: 14px 0 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.btn {
+  display: inline-flex; align-items: center; min-height: 48px; padding: 0 20px;
+  border: 2px solid var(--ink); border-radius: 4px; font-weight: 650;
+  text-decoration: none; color: var(--ink);
+}
+.btn-primary { background: var(--ink); color: var(--paper); }
+.btn:hover { background: var(--mark); color: var(--ink); }
+
+/* The run panel: what rag.py prints, with the files it sends on marked. */
+.run { margin: 0; background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 20px 18px 16px; }
+.ask { margin: 0 0 16px; font-size: .88rem; white-space: pre-wrap; word-break: break-word; }
+.ask span { color: var(--muted); }
+.ranked { list-style: none; margin: 0; padding: 0; font-size: .8rem; }
+.ranked li { display: grid; grid-template-columns: 3.2em 1fr; gap: 0 10px; padding: 5px 0; }
+.ranked b { font-weight: 500; text-align: end; }
+.ranked code { font-size: 1em; overflow-wrap: break-word; justify-self: start; padding: 0 3px; background: none; white-space: normal; }
+.ranked li::after {
+  content: ""; grid-column: 2; height: 3px; margin-top: 4px; border-radius: 2px;
+  width: calc(var(--p) * 100%); background: var(--rule);
+}
+.ranked .sent::after { background: var(--ink); }
+.ranked li:not(.sent) { color: var(--muted); }
+.ranked .sent code {
+  background: linear-gradient(100deg, transparent 1%, var(--mark) 3% 97%, transparent 99%) no-repeat 0 55% / 100% 78%;
+  animation: stroke .5s ease-out both; animation-delay: calc(var(--i) * .22s + .35s);
+}
+@keyframes stroke { from { background-size: 0 78%; } }
+/* The line rag.py draws implicitly: everything below it stays out of the LLM's prompt. */
+.ranked .cut-note {
+  display: block; margin: 4px 0 6px; padding: 6px 0 2px; padding-inline-start: calc(3.2em + 10px);
+  border-top: 1px dashed var(--muted); font: 500 .8rem var(--text); color: var(--muted);
+}
+.ranked .cut-note::after { content: none; }
+.answer { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--rule); font-size: .95rem; }
+.run figcaption { margin-top: 14px; font-size: .82rem; color: var(--muted); }
+
+/* ---------- sections ---------- */
+section { padding: 56px 0; border-top: 1px solid var(--rule); }
+.intro { max-width: 40em; margin: 14px 0 0; }
+.steps { display: grid; gap: 36px; margin-top: 36px; }
+.steps p { margin: 10px 0 0; max-width: 32em; }
+/* One tick per file (or hit) still in play: 20, then 8, then 3. */
+.ticks {
+  height: 14px; margin-bottom: 16px; width: calc(var(--n) * 12px - 4px);
+  background: repeating-linear-gradient(90deg, var(--c, var(--muted)) 0 8px, transparent 8px 12px);
+}
+.count { font-weight: 600; color: var(--muted); margin: 0 0 6px; font-size: .95rem; }
+
+.flow { width: 100%; border-collapse: collapse; margin-top: 28px; font-size: .98rem; }
+.flow th, .flow td { text-align: start; vertical-align: top; padding: 12px 12px 12px 0; border-bottom: 1px solid var(--rule); }
+.flow th { font-weight: 650; white-space: nowrap; padding-inline-end: 20px; }
+
+.status { display: grid; gap: 32px; margin-top: 32px; }
+.status ul { margin: 12px 0 0; padding-inline-start: 1.2em; }
+.status li { margin: 0 0 12px; }
+.status li::marker { color: var(--petrol); }
+.spec { display: block; font-size: .9rem; }
+
+.req { margin: 16px 0 0; padding-inline-start: 1.2em; max-width: 44em; }
+.req li { margin-bottom: 8px; }
+.cmd-label { font-weight: 650; margin: 28px 0 8px; }
+pre.cmd {
+  margin: 0; padding: 16px 18px; background: var(--ink); color: #e4ecee; border-radius: 6px;
+  font-size: .86rem; line-height: 1.55; overflow-x: auto;
+}
+pre.cmd span { color: #8fa9b0; }
+
+.site-foot { padding: 28px 0 8px; color: var(--muted); font-size: .92rem; border-top: 1px solid var(--rule); }
+.site-foot p { margin: 0; }
+
+/* ---------- Persian (right to left) ---------- */
+[dir="rtl"] body, [dir="rtl"] .btn, [dir="rtl"] .cut-note { font-family: "Vazirmatn", var(--text); }
+[dir="rtl"] h1, [dir="rtl"] h2, [dir="rtl"] h3 { font-family: "Vazirmatn", var(--text); letter-spacing: 0; line-height: 1.35; }
+[dir="rtl"] h1 { max-width: 12em; font-size: clamp(2.2rem, 7.5vw, 3.4rem); }
+[dir="rtl"] h2 { max-width: 20em; }
+[dir="rtl"] body { line-height: 1.85; }
+/* Latin commands, flags and paths keep their own order inside Persian sentences. */
+[dir="rtl"] code { direction: ltr; unicode-bidi: isolate; }
+[dir="rtl"] pre.cmd { direction: ltr; text-align: left; }
+.run [dir="rtl"].cut-note { padding-inline-start: 0; text-align: right; }
+.run figcaption[dir="rtl"] { font-family: "Vazirmatn", var(--text); line-height: 1.8; }
+[dir="rtl"] .run .answer { font-family: var(--text); }
+
+@media (min-width: 768px) {
+  :root { --gutter: 32px; }
+  .hero { padding: 56px 0 80px; }
+  .run { padding: 26px 26px 20px; }
+  .ranked { font-size: .86rem; }
+  .steps { grid-template-columns: repeat(3, 1fr); gap: 32px; }
+  .status { grid-template-columns: 1fr 1.4fr; gap: 48px; }
+  section { padding: 72px 0; }
+}
+@media (min-width: 1000px) {
+  .hero { grid-template-columns: 1fr 1.05fr; align-items: center; gap: 56px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ranked .sent code { animation: none; }
+}
