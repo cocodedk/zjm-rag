@@ -22,17 +22,15 @@ their paths.
    default) with the instruction to answer from those files only and cite the path. When no file
    passes the threshold, no LLM is called.
 
-## Status
-
-The library (`zjm_rag`), the `zjm` command line with `--json` and the local HTTP JSON API
-(`zjm serve`) are in. An MCP server with a one-line installer is being built from the spec in
-[docs/lean/](docs/lean/).
-
 ## Install
 
-    pip install .
+    curl -fsSL https://raw.githubusercontent.com/cocodedk/zjm-rag/main/install.sh | sh
 
-Needs the `zg` binary on `PATH`, `OPENROUTER_API_KEY` for ranking, and `claude` for answers.
+It checks for Python 3.10+, installs `zg` with npm when missing, installs the package with `uv`,
+`pipx` or `pip --user`, and runs `zjm doctor`.
+
+Requirements: the `zg` binary on `PATH`, `OPENROUTER_API_KEY` for Jev ranking, and optionally
+`claude` for answers.
 
 ## Use
 
@@ -72,6 +70,12 @@ curl -s localhost:8765/find -d '{"query": "which linter checks CSS files", "file
 `GET /health` returns the `doctor` dict; `POST /index`, `/find` and `/ask` take the library's keyword
 arguments as a JSON body (`store` is the server's and cannot be set) and return its result. Errors are
 `{"error": "..."}`: `400` bad body, `404`, `405`, `413` over 1 MiB, `422` from the library.
+
+For agents, as MCP tools over stdio (`zjm_index`, `zjm_find`, `zjm_ask`, `zjm_doctor`):
+
+```sh
+claude mcp add zjm -- zjm mcp          # add --store PATH after `zjm mcp` for another store
+```
 
 ## Build from source
 
