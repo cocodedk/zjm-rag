@@ -46,7 +46,7 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "zjm-rag",
-  "description": "A small open-source RAG tool for local folders. zg (zvec-grep) finds candidate files, Jev judges which of them contain the answer, and an LLM answers from those files only, citing their paths. The Python library is in; a CLI, an HTTP API and an MCP server are planned.",
+  "description": "A small open-source RAG tool for local folders. zg (zvec-grep) finds candidate files, Jev judges which of them contain the answer, and an LLM answers from those files only, citing their paths. The Python library and the zjm command line are in; an HTTP API and an MCP server are planned.",
   "url": "https://rag.cocode.dk/",
   "downloadUrl": "https://github.com/cocodedk/zjm-rag",
   "applicationCategory": "DeveloperApplication",
@@ -80,10 +80,10 @@
   <header>
     <h1>Find the file that holds the answer</h1>
     <p class="lede">zjm-rag is RAG over local files. zg searches your folders, Jev reads what comes back and judges which files actually contain the answer, and an LLM answers from those files alone, citing their paths.</p>
-    <p class="hero-note">The Python library is in: <code>zjm_rag</code>, with <code>index</code>, <code>find</code> and <code>ask</code>. A command line, an HTTP API and an MCP server are written up as specs and being built next.</p>
+    <p class="hero-note">The <code>zjm_rag</code> library and the <code>zjm</code> command are in, with <code>--json</code> output for scripts. An HTTP API and an MCP server are written up as specs and being built next.</p>
     <div class="actions">
       <a class="btn btn-primary" href="https://github.com/cocodedk/zjm-rag">Read the source on GitHub</a>
-      <a class="btn" href="#run">Try the library</a>
+      <a class="btn" href="#run">Install and try it</a>
     </div>
   </header>
 
@@ -147,6 +147,7 @@
       <h3>Today</h3>
       <ul data-state="available">
         <li data-interface="library">The <code>zjm_rag</code> library, standard library only: <code>index</code>, <code>find</code> and <code>ask</code>.</li>
+        <li data-interface="cli">The <code>zjm</code> command runs the same operations from a shell, plus <code>zjm doctor</code>. <code>--json</code> prints the result as one JSON object. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md">Command-line spec</a></li>
         <li><code>index</code> copies your folders into a store (a temp directory by default) and indexes the copy, so your projects stay untouched. <code>multilingual=True</code> picks a model for non-English content.</li>
         <li><code>find</code> splits files at a threshold into accepted and rejected, and sorts them by score, zg rank, modified time or path.</li>
         <li>The tests use fakes and never call zg, Jev or an LLM.</li>
@@ -155,7 +156,6 @@
     <div>
       <h3>Planned, one pull request per spec</h3>
       <ul data-state="planned">
-        <li data-interface="cli">A <code>zjm</code> command with <code>--json</code> output and a <code>zjm doctor</code> check. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md">Command-line spec</a></li>
         <li data-interface="http"><code>zjm serve</code>, a JSON API on <code>127.0.0.1</code> for apps in any language. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md">HTTP spec</a></li>
         <li data-interface="mcp"><code>zjm mcp</code>, an MCP server for agents, and a one-line install script. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md">MCP and install spec</a></li>
       </ul>
@@ -164,7 +164,7 @@
 </section>
 
 <section id="run" aria-labelledby="try">
-  <h2 id="try">Try the library</h2>
+  <h2 id="try">Install and try it</h2>
   <ul class="req" data-requirements>
     <li>Python 3.10 or newer. The package has no dependencies.</li>
     <li><code>zg</code> on your <code>PATH</code>: <code>npm install -g @zvec/zvec-grep</code></li>
@@ -174,9 +174,12 @@
   <p class="cmd-label">Install it from a clone</p>
 <pre class="cmd" data-install data-state="available">git clone https://github.com/cocodedk/zjm-rag.git && cd zjm-rag
 pip install .</pre>
-  <p class="cmd-label">Index a folder, then ask</p>
+  <p class="cmd-label">Index a folder, then ask, from the shell or from Python</p>
+<pre class="cmd" data-example="cli">zjm index ~/projects/some-repo              <span># copy, then index the copy</span>
+zjm find "which linter checks CSS files"    <span># accepted and rejected files</span>
+zjm ask "which linter checks CSS files"     <span># the answer and its sources</span>
+zjm doctor                                  <span># checks zg, claude and the API key</span></pre>
 <pre class="cmd" data-example="library">import os, zjm_rag
-
 zjm_rag.index([os.path.expanduser("~/projects/some-repo")])   <span># copy, then index the copy</span>
 hits = zjm_rag.find("which linter checks CSS files")          <span># accepted and rejected files</span>
 reply = zjm_rag.ask("which linter checks CSS files")

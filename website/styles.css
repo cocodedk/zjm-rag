@@ -107,6 +107,7 @@ pre.cmd {
   font-size: .86rem; line-height: 1.55; overflow-x: auto;
 }
 pre.cmd span { color: #8fa9b0; }
+pre.cmd + pre.cmd { margin-top: 12px; }
 
 .site-foot { padding: 28px 0 8px; color: var(--muted); font-size: .92rem; border-top: 1px solid var(--rule); }
 .site-foot p { margin: 0; }

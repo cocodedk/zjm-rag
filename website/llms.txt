@@ -4,7 +4,7 @@
 
 The Python library `zjm_rag` is in: stdlib only, Python 3.10+, with `index`, `find` and `ask`. `index` copies source folders into a store and builds the zg index there. `find` asks zg for up to 40 hits, groups them into at most 8 files, has Jev score each file from its path and snippets, and splits them at a threshold (0.5 by default) into accepted and rejected. `ask` sends the best three accepted files to the `claude` CLI and returns the answer with the paths it used; when no file passes, no LLM is called. zg runs locally; snippets go to OpenRouter (`OPENROUTER_API_KEY`) and the chosen files' text goes to the LLM provider.
 
-A `zjm` command with `--json`, a local HTTP JSON API (`zjm serve`) and an MCP server with a one-line installer are planned, each specified in `docs/lean/` and built one pull request per spec.
+The `zjm` command runs the same operations from a shell (`zjm index`, `find`, `ask`, `doctor`), and `--json` prints the library's result as one JSON object. A local HTTP JSON API (`zjm serve`) and an MCP server with a one-line installer are planned, each specified in `docs/lean/` and built one pull request per spec.
 
 ## WebMCP tools
 
@@ -24,7 +24,7 @@ This site has WebMCP tools. Both pages, [/](https://rag.cocode.dk/) and [/fa/](h
 ## Specs
 
 - [01 Library](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/01-library.md): `index`, `find`, `ask`, threshold and sort options (built)
-- [02 CLI](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md): the `zjm` command with `--json` and `zjm doctor` (planned)
+- [02 CLI](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md): the `zjm` command with `--json` and `zjm doctor` (built)
 - [03 HTTP](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md): `zjm serve`, a JSON API on 127.0.0.1 (planned)
 - [04 MCP and install](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md): `zjm mcp` over stdio and `install.sh` (planned)
 
