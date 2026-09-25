@@ -18,6 +18,10 @@ Agents get zjm-rag as MCP tools, and a person installs everything with one comma
 - Tools, each with a one-sentence description and a JSON Schema `inputSchema` whose properties
   mirror the HTTP bodies from spec 03 (`additionalProperties: false`):
   `zjm_index`, `zjm_find`, `zjm_ask`, `zjm_doctor`.
+  `zjm_doctor` takes no arguments (empty `properties`). Arguments are type-checked exactly like the
+  HTTP bodies in spec 03; a failed check is a `tools/call` result with `isError: true`, not a
+  JSON-RPC error. A `store` argument is not accepted; the server's `--store` is used.
+- `initialize` replies with the client's `protocolVersion` when it is a string, else `"2025-06-18"`.
 - `tools/call` result: `{"content": [{"type": "text", "text": <JSON of the library result>}], "structuredContent": <the result>}`;
   a `ZjmError`/`ValueError` gives the same shape with `"isError": true` and `{"error": msg}`.
 - Nothing but JSON-RPC is written to stdout; logs go to stderr.
@@ -34,7 +38,11 @@ Agents get zjm-rag as MCP tools, and a person installs everything with one comma
      exists, else `python3 -m pip install --user git+https://github.com/cocodedk/zjm-rag`.
   4. Run `zjm doctor` and print its output; warn (do not fail) when `OPENROUTER_API_KEY` or
      `claude` is missing, saying what each is for.
-- `ZJM_INSTALL_DRY_RUN=1` prints every command it would run without running any; the tests use this.
+- The Python check is `python3 -c 'import sys; sys.exit(sys.version_info < (3, 10))'`; tool presence
+  is `command -v <tool>`. These two probes always run, also in dry run.
+- `ZJM_INSTALL_DRY_RUN=1` runs no installing command: each command from steps 2–4 is printed on its
+  own line as `+ <command>` instead of being run (step 4 prints `+ zjm doctor`); the tests use this.
+- Exit `0` on success, `1` on the first failing step, with the message on stderr.
 - The installed `zjm` must work from the wheel alone: no file outside the `zjm_rag` package is read at runtime.
 
 ### README

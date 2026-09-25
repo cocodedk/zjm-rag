@@ -12,7 +12,7 @@ Let an app written in any language call zjm-rag over HTTP on the same machine.
 - CLI: `zjm serve [--host H] [--port P] [--store PATH]`, prints `listening on http://H:P` and serves
   until interrupted. Default host `127.0.0.1`; binding elsewhere needs an explicit `--host`.
 - Endpoints, JSON in and out, `Content-Type: application/json`:
-  - `GET /health` → the `doctor` dict from spec 02; `200`.
+  - `GET /health` → the `doctor` dict from spec 02 (built by the same function the CLI uses); always `200`, even when `ok` is false.
   - `POST /index` body `{"sources": [...], "multilingual"?, "embedding"?, "rebuild"?}` → `index()` result.
   - `POST /find` body `{"query": str, "limit"?, "file_types"?, "min_score"?, "sort"?, "rank"?}` → `find()` result.
   - `POST /ask` body `{"query": str, "top_k"?, "answer_language"?, plus any /find field}` → `ask()` result.
@@ -22,6 +22,10 @@ Let an app written in any language call zjm-rag over HTTP on the same machine.
   `sources`, wrong JSON types or invalid JSON → `400 {"error": "<message>"}`. `ZjmError` and
   `ValueError` from the library → `422 {"error": ...}`. Unknown path → `404`, wrong method → `405`.
   Bodies over 1 MiB → `413`.
+- Body values are passed to the library as given after a type check: `sources`/`file_types` lists of
+  strings, `limit`/`top_k` positive ints (a JSON bool is not an int), `min_score` a number in [0, 1],
+  `rank`/`multilingual`/`rebuild` bools, strings elsewhere. A failed check is `400`.
+- Every response, including errors, is a JSON object with `Content-Type: application/json`.
 - Version bump to `0.3.0`.
 
 ## Acceptance tests
