@@ -82,10 +82,10 @@ section { padding: 56px 0; border-top: 1px solid var(--rule); }
 .intro { max-width: 40em; margin: 14px 0 0; }
 .steps { display: grid; gap: 36px; margin-top: 36px; }
 .steps p { margin: 10px 0 0; max-width: 32em; }
-/* One tick per file (or hit) still in play: 20, then 8, then 3. */
+/* One tick per hit or file still in play: 40, then 8, then 3. */
 .ticks {
-  height: 14px; margin-bottom: 16px; width: calc(var(--n) * 12px - 4px);
-  background: repeating-linear-gradient(90deg, var(--c, var(--muted)) 0 8px, transparent 8px 12px);
+  height: 14px; margin-bottom: 16px; width: calc(var(--n) * 8px - 3px); max-width: 100%;
+  background: repeating-linear-gradient(90deg, var(--c, var(--muted)) 0 5px, transparent 5px 8px);
 }
 .count { font-weight: 600; color: var(--muted); margin: 0 0 6px; font-size: .95rem; }
 
