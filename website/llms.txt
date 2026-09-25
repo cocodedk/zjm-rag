@@ -4,14 +4,16 @@
 
 The Python library `zjm_rag` is in: stdlib only, Python 3.10+, with `index`, `find` and `ask`. `index` copies source folders into a store and builds the zg index there. `find` asks zg for up to 40 hits, groups them into at most 8 files, has Jev score each file from its path and snippets, and splits them at a threshold (0.5 by default) into accepted and rejected. `ask` sends the best three accepted files to the `claude` CLI and returns the answer with the paths it used; when no file passes, no LLM is called. zg runs locally; snippets go to OpenRouter (`OPENROUTER_API_KEY`) and the chosen files' text goes to the LLM provider.
 
-The `zjm` command runs the same operations from a shell (`zjm index`, `find`, `ask`, `doctor`), and `--json` prints the library's result as one JSON object. A local HTTP JSON API (`zjm serve`) and an MCP server with a one-line installer are planned, each specified in `docs/lean/` and built one pull request per spec.
+The `zjm` command runs the same operations from a shell (`zjm index`, `find`, `ask`, `doctor`), and `--json` prints the library's result as one JSON object. `zjm serve` is a local HTTP JSON API on 127.0.0.1:8765 (`GET /health`, `POST /index`, `/find`, `/ask`), and `zjm mcp` is an MCP server over stdio with the tools `zjm_index`, `zjm_find`, `zjm_ask` and `zjm_doctor` (`claude mcp add zjm -- zjm mcp`).
+
+Install with one line: `curl -fsSL https://raw.githubusercontent.com/cocodedk/zjm-rag/main/install.sh | sh`. It checks for Python 3.10+, installs zg with npm when missing, installs the package with uv, pipx or pip --user, and runs `zjm doctor`.
 
 ## WebMCP tools
 
 This site has WebMCP tools. Both pages, [/](https://rag.cocode.dk/) and [/fa/](https://rag.cocode.dk/fa/), declare them through `document.modelContext.registerTool` (module: `/webmcp.js`). All three are read-only, take no input, read the page at call time, answer in the page language and make no requests.
 
 - `describe`: Returns what this zjm-rag page is about, its language, its sections and the other tools, in the page language.
-- `get_install_command`: Returns the command that installs the zjm_rag Python library today, its requirements, and whether the one-line installer is available yet; it runs nothing.
+- `get_install_command`: Returns the one-line command that installs zjm-rag, whether it is available, and its requirements; it runs nothing.
 - `list_interfaces`: Lists the four ways to call zjm-rag (Python library, CLI, HTTP JSON API, MCP server), each with whether it is available or planned, a summary, its spec link and an example if there is one.
 
 ## Docs
@@ -25,8 +27,8 @@ This site has WebMCP tools. Both pages, [/](https://rag.cocode.dk/) and [/fa/](h
 
 - [01 Library](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/01-library.md): `index`, `find`, `ask`, threshold and sort options (built)
 - [02 CLI](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md): the `zjm` command with `--json` and `zjm doctor` (built)
-- [03 HTTP](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md): `zjm serve`, a JSON API on 127.0.0.1 (planned)
-- [04 MCP and install](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md): `zjm mcp` over stdio and `install.sh` (planned)
+- [03 HTTP](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md): `zjm serve`, a JSON API on 127.0.0.1 (built)
+- [04 MCP and install](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md): `zjm mcp` over stdio and `install.sh` (built)
 
 ## Optional
 
