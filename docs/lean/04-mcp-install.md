@@ -60,6 +60,20 @@ passing with an empty `HOME` and no network:
      `npm install -g @zvec/zvec-grep` and `uv tool install --force git+https://github.com/cocodedk/zjm-rag`.
   6. `test_pip_fallback` — stubs only `python3` and `zg`; output lists the `pip install --user` line.
 
+## Jev request shape (pinned)
+
+Nothing in this spec builds a Jev request; it goes through `zjm_rag.find`. Do not change the payload
+in `zjm_rag/core.py` or the client in `zjm_rag/jev.py`. The live API rejects any other shape with
+HTTP 400, and the fake Jev in the tests will not catch it. For reference, each `noul` question is exactly:
+
+```python
+{"type": "noul",
+ "instructions": "Does file fK (<path>) contain the information needed to answer the question? ...",
+ "criteria": {"true": "The file holds the answer.", "false": "The file does not hold the answer."}}
+```
+
+Fakes used in this spec's tests must accept only that shape.
+
 ## Out of scope
 
 Publishing to PyPI, Homebrew, Windows installer, auto-configuring MCP clients.

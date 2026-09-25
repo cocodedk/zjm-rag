@@ -47,6 +47,20 @@ with fakes and captures stdout/stderr with `contextlib.redirect_stdout`/`redirec
 5. `test_error_exit_and_json` — `find` on an empty store: exit 1, stdout `{"error": ...}` with `--json`.
 6. `test_doctor_hides_key` — with `OPENROUTER_API_KEY=secret-value`, output never contains `secret-value`.
 
+## Jev request shape (pinned)
+
+Nothing in this spec builds a Jev request; it goes through `zjm_rag.find`. Do not change the payload
+in `zjm_rag/core.py` or the client in `zjm_rag/jev.py`. The live API rejects any other shape with
+HTTP 400, and the fake Jev in the tests will not catch it. For reference, each `noul` question is exactly:
+
+```python
+{"type": "noul",
+ "instructions": "Does file fK (<path>) contain the information needed to answer the question? ...",
+ "criteria": {"true": "The file holds the answer.", "false": "The file does not hold the answer."}}
+```
+
+Fakes used in this spec's tests must accept only that shape.
+
 ## Out of scope
 
 HTTP and MCP servers, install script. Changing library behaviour from spec 01.

@@ -37,6 +37,20 @@ fakes in a background thread and call it with `urllib.request` on `127.0.0.1` on
 5. `test_library_error_is_422` — find on an empty store.
 6. `test_404_405_413`.
 
+## Jev request shape (pinned)
+
+Nothing in this spec builds a Jev request; it goes through `zjm_rag.find`. Do not change the payload
+in `zjm_rag/core.py` or the client in `zjm_rag/jev.py`. The live API rejects any other shape with
+HTTP 400, and the fake Jev in the tests will not catch it. For reference, each `noul` question is exactly:
+
+```python
+{"type": "noul",
+ "instructions": "Does file fK (<path>) contain the information needed to answer the question? ...",
+ "criteria": {"true": "The file holds the answer.", "false": "The file does not hold the answer."}}
+```
+
+Fakes used in this spec's tests must accept only that shape.
+
 ## Out of scope
 
 Authentication, TLS, CORS, streaming. MCP and install script (spec 04).
