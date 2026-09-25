@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /og-image.html
+
+Sitemap: https://rag.cocode.dk/sitemap.xml

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- SEO keywords:
+     primary:   RAG over local files
+     secondary: find the file with the answer, LLM answers with cited file paths, zvec-grep RAG
+     intent:    informational (what it is, how it works), navigational (the repo)
+-->
+<title>zjm-rag: RAG over local files that cites the file it used</title>
+<meta name="description" content="zjm-rag is RAG over local files: zg finds candidate files, Jev judges which ones hold the answer, and an LLM answers from them only, citing each path.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://rag.cocode.dk/">
+<link rel="alternate" hreflang="en" href="https://rag.cocode.dk/">
+<link rel="alternate" hreflang="fa" href="https://rag.cocode.dk/fa/">
+<link rel="alternate" hreflang="x-default" href="https://rag.cocode.dk/">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="zjm-rag">
+<meta property="og:title" content="zjm-rag: find the file that holds the answer">
+<meta property="og:description" content="zg searches your folders, Jev judges which files actually hold the answer, and an LLM answers from those files only, with the paths cited. Open source, early.">
+<meta property="og:url" content="https://rag.cocode.dk/">
+<meta property="og:image" content="https://rag.cocode.dk/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The headline Find the file that holds the answer, beside a list of eight file paths with scores, the top three marked with a yellow highlighter.">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="fa_IR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="zjm-rag: find the file that holds the answer">
+<meta name="twitter:description" content="zg searches your folders, Jev judges which files hold the answer, and an LLM answers from those files only, with the paths cited.">
+<meta name="twitter:image" content="https://rag.cocode.dk/og.png">
+<meta name="twitter:image:alt" content="Eight file paths with scores, the top three marked with a yellow highlighter.">
+
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Recursive:wght,CASL,MONO@300..800,0..1,0..1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="https://brand.cocode.dk/v1.css">
+<script type="module" src="https://brand.cocode.dk/v1.js"></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "zjm-rag",
+  "description": "A small open-source RAG tool for local folders. zg (zvec-grep) finds candidate files, Jev judges which of them contain the answer, and an LLM answers from those files only, citing their paths. Proof of concept.",
+  "url": "https://rag.cocode.dk/",
+  "downloadUrl": "https://github.com/cocodedk/zjm-rag",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Linux, macOS",
+  "programmingLanguage": "Python",
+  "inLanguage": "en",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": {
+    "@type": "Person",
+    "name": "Babak Bandpey",
+    "url": "https://cocode.dk",
+    "sameAs": ["https://linkedin.com/in/babakbandpey", "https://github.com/cocodedk"]
+  },
+  "codeRepository": "https://github.com/cocodedk/zjm-rag",
+  "license": "https://opensource.org/licenses/MIT"
+}
+</script>
+</head>
+<body>
+
+<!-- The cocode.dk family frame. Without JavaScript its children show instead. -->
+<cocode-head project="zjm-rag" accent="#0d5c63" on-accent="#ffffff">
+  <a href="https://cocode.dk">cocode.dk</a>
+  <span class="on">EN</span>
+  <a href="fa/" hreflang="fa">FA</a>
+</cocode-head>
+
+<main class="wrap">
+
+<div class="hero">
+  <header>
+    <h1>Find the file that holds the answer</h1>
+    <p class="lede">zjm-rag is RAG over local files. zg searches your folders, Jev reads what comes back and judges which files actually contain the answer, and an LLM answers from those files alone, citing their paths.</p>
+    <p class="hero-note">It is a proof of concept for now: one Python script, <code>rag.py</code>. A library, a command line, an HTTP API and an MCP server are written up as specs and being built next.</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="https://github.com/cocodedk/zjm-rag">Read the source on GitHub</a>
+      <a class="btn" href="#run">Try the proof of concept</a>
+    </div>
+  </header>
+
+  <figure class="run">
+    <pre class="ask"><span>$</span> python3 rag.py "which linter checks CSS files"</pre>
+    <ol class="ranked">
+      <li class="sent" style="--p:.96;--i:0"><b>0.96</b><code>agent-linters/README.md</code></li>
+      <li class="sent" style="--p:.81;--i:1"><b>0.81</b><code>agent-linters/bin/lintp</code></li>
+      <li class="sent" style="--p:.58;--i:2"><b>0.58</b><code>agent-linters/llms.txt</code></li>
+      <li class="cut-note">The three best go to the LLM. The rest stay out of the prompt.</li>
+      <li style="--p:.22"><b>0.22</b><code>agent-linters/shell/linters.fish</code></li>
+      <li style="--p:.14"><b>0.14</b><code>agent-linters/website/index.html</code></li>
+      <li style="--p:.09"><b>0.09</b><code>agent-linters/install.sh</code></li>
+      <li style="--p:.03"><b>0.03</b><code>message-test-plugin/CONTRIBUTING.md</code></li>
+      <li style="--p:.02"><b>0.02</b><code>message-test-plugin/scripts/validate-plugin.py</code></li>
+    </ol>
+    <p class="answer">Biome checks <code>.css</code> and <code>.scss</code> files. It is listed in the linter table in <code>agent-linters/README.md</code>.</p>
+    <figcaption>An illustration, not a recorded run. The paths come from the repo's test fixture; the scores are made up to show the shape of the output.</figcaption>
+  </figure>
+</div>
+
+<section aria-labelledby="how">
+  <h2 id="how">Three steps, each one narrower</h2>
+  <p class="intro">Search casts a wide net, and a judge sorts the catch. Only the files that pass reach the model, so it reads a few whole files instead of a pile of loose snippets.</p>
+  <div class="steps">
+    <div>
+      <div class="ticks" style="--n:20"></div>
+      <p class="count">20 hits, grouped into at most 8 files</p>
+      <h3>zg finds</h3>
+      <p>A hybrid search, keyword and semantic, over a local <a href="https://www.npmjs.com/package/@zvec/zvec-grep">zg</a> index. The script takes the first 20 hits and groups them by file, keeping short snippets from each.</p>
+    </div>
+    <div>
+      <div class="ticks" style="--n:8;--c:var(--ink)"></div>
+      <p class="count">8 files, each with a probability</p>
+      <h3>Jev judges</h3>
+      <p>One request to Jev, the OpenRouter Decisions API, asks the same question of every file: does this one contain what the answer needs? Jev reads only the snippets and returns a probability per file. All of them are printed, best first.</p>
+    </div>
+    <div>
+      <div class="ticks" style="--n:3;--c:#e0b800"></div>
+      <p class="count">3 files, one answer</p>
+      <h3>The LLM answers</h3>
+      <p>The three best-ranked files go to the <code>claude</code> CLI with one instruction: answer from these files only, cite the path, and say so if they don't hold the answer.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="leaves">
+  <h2 id="leaves">What leaves your machine</h2>
+  <p class="intro">Search is local, but judging and answering are not. Point it at folders you would be fine pasting into a chat with those services.</p>
+  <table class="flow">
+    <tr><th scope="row">zg</th><td>Runs on your machine, against an index of a copy of your folders.</td></tr>
+    <tr><th scope="row">Jev</th><td>Gets the question and up to two snippets from each of the 8 files, sent to OpenRouter.</td></tr>
+    <tr><th scope="row"><code>claude</code></th><td>Gets the question and the first 20,000 characters of each of the 3 chosen files, sent to Anthropic.</td></tr>
+  </table>
+</section>
+
+<section aria-labelledby="status">
+  <h2 id="status">What exists today, and what is planned</h2>
+  <div class="status">
+    <div>
+      <h3>Today</h3>
+      <ul>
+        <li><code>rag.py</code> does all three steps in one script. <code>--no-answer</code> stops after the ranking.</li>
+        <li>It answers from the three best-ranked files. There is no threshold yet.</li>
+        <li>A unittest suite checks the zg output parser against a fixture, without calling zg, Jev or an LLM.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Planned, one pull request per spec</h3>
+      <ul>
+        <li>A <code>zjm_rag</code> library with <code>index</code>, <code>find</code> and <code>ask</code>. A threshold (0.5 by default) splits files into accepted and rejected, and no file is dropped without being reported. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/01-library.md">Library spec</a></li>
+        <li>A <code>zjm</code> command with <code>--json</code> output and a <code>zjm doctor</code> check. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md">Command-line spec</a></li>
+        <li><code>zjm serve</code>, a JSON API on <code>127.0.0.1</code> for apps in any language. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md">HTTP spec</a></li>
+        <li><code>zjm mcp</code>, an MCP server for agents, and a one-line install script. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md">MCP and install spec</a></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="run" aria-labelledby="try">
+  <h2 id="try">Try the proof of concept</h2>
+  <ul class="req">
+    <li>Python 3.10 or newer. The script uses only the standard library.</li>
+    <li><code>zg</code> on your <code>PATH</code>: <code>npm install -g @zvec/zvec-grep</code></li>
+    <li>A jev-decisions helper script to call Jev. It is not in this repo, so point <code>RAG_JEV</code> at your copy. The library spec replaces it with a built-in client.</li>
+    <li>The <code>claude</code> CLI, for the answer step.</li>
+  </ul>
+  <p class="cmd-label">Copy the folders you want searched and index the copy</p>
+<pre class="cmd">mkdir -p /tmp/zjm-rag/corpus && cp -r ~/projects/some-repo /tmp/zjm-rag/corpus/
+cd /tmp/zjm-rag/corpus && ZVEC_GREP_HOME=/tmp/zjm-rag/zghome zg index . --mode direct --hidden</pre>
+  <p class="cmd-label">Then ask, from a clone of the repo</p>
+<pre class="cmd">git clone https://github.com/cocodedk/zjm-rag.git && cd zjm-rag
+python3 rag.py "which linter checks CSS files"              <span># rank, then answer</span>
+python3 rag.py --no-answer "which linter checks CSS files"  <span># rank only</span></pre>
+</section>
+
+<footer class="site-foot">
+  <p>MIT licensed. The README has the details: <a href="https://github.com/cocodedk/zjm-rag#readme">zjm-rag on GitHub</a>.</p>
+</footer>
+
+</main>
+
+<cocode-foot repo="cocodedk/zjm-rag">
+  <a href="https://cocode.dk">cocode.dk</a>
+</cocode-foot>
+</body>
+</html>

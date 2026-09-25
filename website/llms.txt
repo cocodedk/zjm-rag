@@ -1,0 +1,27 @@
+# zjm-rag
+
+> A small open-source RAG tool for local folders. zg (zvec-grep) finds candidate files, Jev (the OpenRouter Decisions API) judges which of them contain the answer, and an LLM answers from those files only, citing their paths.
+
+It is a proof of concept today: one Python script, `rag.py`, stdlib only, Python 3.10+. It prints every candidate file with Jev's probability, best first, then answers from the three best-ranked files through the `claude` CLI. There is no threshold yet, and `--no-answer` stops after the ranking. zg runs locally; snippets go to OpenRouter and the chosen files' text goes to the LLM provider.
+
+A library (`zjm_rag`), a `zjm` command with `--json`, a local HTTP JSON API (`zjm serve`) and an MCP server with a one-line installer are planned, each specified in `docs/lean/` and built one pull request per spec.
+
+## Docs
+
+- [README](https://github.com/cocodedk/zjm-rag/blob/main/README.md): what it does, requirements, how to index a corpus and ask
+- [rag.py](https://github.com/cocodedk/zjm-rag/blob/main/rag.py): the proof-of-concept script
+- [Website (English)](https://rag.cocode.dk/): how it works and what exists today
+- [Website (Persian)](https://rag.cocode.dk/fa/): the same page in Persian
+
+## Specs (planned)
+
+- [01 Library](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/01-library.md): `index`, `find`, `ask`, threshold and sort options
+- [02 CLI](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md): the `zjm` command with `--json` and `zjm doctor`
+- [03 HTTP](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md): `zjm serve`, a JSON API on 127.0.0.1
+- [04 MCP and install](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md): `zjm mcp` over stdio and `install.sh`
+
+## Optional
+
+- [CONTRIBUTING](https://github.com/cocodedk/zjm-rag/blob/main/CONTRIBUTING.md): hooks, tests, commit conventions
+- [SECURITY](https://github.com/cocodedk/zjm-rag/blob/main/SECURITY.md): how to report a vulnerability
+- [LICENSE](https://github.com/cocodedk/zjm-rag/blob/main/LICENSE): MIT
