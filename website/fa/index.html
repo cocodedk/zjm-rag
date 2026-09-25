@@ -46,7 +46,7 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "zjm-rag",
-  "description": "ابزاری کوچک و متن‌باز برای RAG روی پوشه‌های محلی. zg (zvec-grep) فایل‌های نامزد را پیدا می‌کند، Jev می‌سنجد کدام‌یک پاسخ را در خود دارند و یک LLM فقط از روی همان فایل‌ها با ذکر مسیرشان جواب می‌دهد. کتابخانهٔ پایتون آماده است و خط فرمان، API روی HTTP و سرور MCP در برنامه‌اند.",
+  "description": "ابزاری کوچک و متن‌باز برای RAG روی پوشه‌های محلی. zg (zvec-grep) فایل‌های نامزد را پیدا می‌کند، Jev می‌سنجد کدام‌یک پاسخ را در خود دارند و یک LLM فقط از روی همان فایل‌ها با ذکر مسیرشان جواب می‌دهد. کتابخانهٔ پایتون و فرمان zjm آماده‌اند و API روی HTTP و سرور MCP در برنامه‌اند.",
   "url": "https://rag.cocode.dk/fa/",
   "downloadUrl": "https://github.com/cocodedk/zjm-rag",
   "applicationCategory": "DeveloperApplication",
@@ -80,10 +80,10 @@
   <header>
     <h1>فایلی را پیدا کنید که پاسخ در آن است</h1>
     <p class="lede">zjm-rag یعنی RAG روی فایل‌های خودتان. zg پوشه‌هایتان را می‌گردد، Jev نتیجه‌ها را می‌خواند و می‌سنجد کدام فایل‌ها واقعاً پاسخ را در خود دارند، و بعد یک LLM فقط از روی همان فایل‌ها جواب می‌دهد و مسیرشان را هم می‌آورد.</p>
-    <p class="hero-note">کتابخانهٔ پایتون آماده است: <code>zjm_rag</code>، با <code>index</code>، <code>find</code> و <code>ask</code>. خط فرمان، API روی HTTP و سرور MCP مشخصاتشان نوشته شده و قدم بعدی ساختن آن‌هاست.</p>
+    <p class="hero-note">کتابخانهٔ <code>zjm_rag</code> و فرمان <code>zjm</code> آماده‌اند، با خروجی <code>--json</code> برای اسکریپت‌ها. API روی HTTP و سرور MCP مشخصاتشان نوشته شده و قدم بعدی ساختن آن‌هاست.</p>
     <div class="actions">
       <a class="btn btn-primary" href="https://github.com/cocodedk/zjm-rag">کد منبع در GitHub</a>
-      <a class="btn" href="#run">کتابخانه را امتحان کنید</a>
+      <a class="btn" href="#run">نصب کنید و امتحانش کنید</a>
     </div>
   </header>
 
@@ -147,6 +147,7 @@
       <h3>امروز</h3>
       <ul data-state="available">
         <li data-interface="library">کتابخانهٔ <code>zjm_rag</code>، فقط با کتابخانهٔ استاندارد پایتون: <code>index</code>، <code>find</code> و <code>ask</code>.</li>
+        <li data-interface="cli">فرمان <code>zjm</code> همین کارها را از خط فرمان انجام می‌دهد، به‌علاوهٔ <code>zjm doctor</code>. با <code>--json</code> نتیجه به شکل یک شیء JSON چاپ می‌شود. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md">مشخصات خط فرمان</a></li>
         <li><code>index</code> پوشه‌هایتان را در یک پوشهٔ جدا (به‌طور پیش‌فرض در پوشهٔ موقت سیستم) کپی می‌کند و از کپی نمایه می‌سازد، پس به پروژه‌هایتان دست نمی‌زند. <code>multilingual=True</code> مدلی برای محتوای غیرانگلیسی انتخاب می‌کند.</li>
         <li><code>find</code> فایل‌ها را با یک آستانه به پذیرفته و ردشده تقسیم می‌کند و بر اساس امتیاز، رتبهٔ zg، زمان تغییر یا مسیر مرتب می‌کند.</li>
         <li>تست‌ها با نسخه‌های ساختگی کار می‌کنند و هیچ‌وقت zg، Jev یا LLM را صدا نمی‌زنند.</li>
@@ -155,7 +156,6 @@
     <div>
       <h3>در برنامه، برای هر مشخصه یک pull request</h3>
       <ul data-state="planned">
-        <li data-interface="cli">فرمان <code>zjm</code> با خروجی <code>--json</code> و بررسی <code>zjm doctor</code>. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md">مشخصات خط فرمان</a></li>
         <li data-interface="http"><code>zjm serve</code>، یک API از نوع JSON روی <code>127.0.0.1</code> برای برنامه‌هایی به هر زبانی. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md">مشخصات HTTP</a></li>
         <li data-interface="mcp"><code>zjm mcp</code>، یک سرور MCP برای عامل‌های هوش مصنوعی، و یک اسکریپت نصب یک‌خطی. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md">مشخصات MCP و نصب</a></li>
       </ul>
@@ -164,7 +164,7 @@
 </section>
 
 <section id="run" aria-labelledby="try">
-  <h2 id="try">کتابخانه را امتحان کنید</h2>
+  <h2 id="try">نصب کنید و امتحانش کنید</h2>
   <ul class="req" data-requirements>
     <li>پایتون ۳٫۱۰ یا جدیدتر. بسته هیچ وابستگی‌ای ندارد.</li>
     <li><code>zg</code> روی <code>PATH</code>: <code>npm install -g @zvec/zvec-grep</code></li>
@@ -174,9 +174,12 @@
   <p class="cmd-label">از یک کلون مخزن نصبش کنید</p>
 <pre class="cmd" data-install data-state="available">git clone https://github.com/cocodedk/zjm-rag.git && cd zjm-rag
 pip install .</pre>
-  <p class="cmd-label">یک پوشه را نمایه کنید، بعد بپرسید</p>
+  <p class="cmd-label">یک پوشه را نمایه کنید، بعد بپرسید، از خط فرمان یا از پایتون</p>
+<pre class="cmd" data-example="cli">zjm index ~/projects/some-repo              <span># copy, then index the copy</span>
+zjm find "which linter checks CSS files"    <span># accepted and rejected files</span>
+zjm ask "which linter checks CSS files"     <span># the answer and its sources</span>
+zjm doctor                                  <span># checks zg, claude and the API key</span></pre>
 <pre class="cmd" data-example="library">import os, zjm_rag
-
 zjm_rag.index([os.path.expanduser("~/projects/some-repo")])   <span># copy, then index the copy</span>
 hits = zjm_rag.find("which linter checks CSS files")          <span># accepted and rejected files</span>
 reply = zjm_rag.ask("which linter checks CSS files")
