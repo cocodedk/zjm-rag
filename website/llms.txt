@@ -6,6 +6,14 @@ The Python library `zjm_rag` is in: stdlib only, Python 3.10+, with `index`, `fi
 
 A `zjm` command with `--json`, a local HTTP JSON API (`zjm serve`) and an MCP server with a one-line installer are planned, each specified in `docs/lean/` and built one pull request per spec.
 
+## WebMCP tools
+
+This site has WebMCP tools. Both pages, [/](https://rag.cocode.dk/) and [/fa/](https://rag.cocode.dk/fa/), declare them through `document.modelContext.registerTool` (module: `/webmcp.js`). All three are read-only, take no input, read the page at call time, answer in the page language and make no requests.
+
+- `describe`: Returns what this zjm-rag page is about, its language, its sections and the other tools, in the page language.
+- `get_install_command`: Returns the command that installs the zjm_rag Python library today, its requirements, and whether the one-line installer is available yet; it runs nothing.
+- `list_interfaces`: Lists the four ways to call zjm-rag (Python library, CLI, HTTP JSON API, MCP server), each with whether it is available or planned, a summary, its spec link and an example if there is one.
+
 ## Docs
 
 - [README](https://github.com/cocodedk/zjm-rag/blob/main/README.md): what it does, requirements, install and usage

@@ -40,6 +40,7 @@
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="https://brand.cocode.dk/v1.css">
 <script type="module" src="https://brand.cocode.dk/v1.js"></script>
+<script type="module" src="webmcp.js"></script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -144,8 +145,8 @@
   <div class="status">
     <div>
       <h3>Today</h3>
-      <ul>
-        <li>The <code>zjm_rag</code> library, standard library only: <code>index</code>, <code>find</code> and <code>ask</code>.</li>
+      <ul data-state="available">
+        <li data-interface="library">The <code>zjm_rag</code> library, standard library only: <code>index</code>, <code>find</code> and <code>ask</code>.</li>
         <li><code>index</code> copies your folders into a store (a temp directory by default) and indexes the copy, so your projects stay untouched. <code>multilingual=True</code> picks a model for non-English content.</li>
         <li><code>find</code> splits files at a threshold into accepted and rejected, and sorts them by score, zg rank, modified time or path.</li>
         <li>The tests use fakes and never call zg, Jev or an LLM.</li>
@@ -153,10 +154,10 @@
     </div>
     <div>
       <h3>Planned, one pull request per spec</h3>
-      <ul>
-        <li>A <code>zjm</code> command with <code>--json</code> output and a <code>zjm doctor</code> check. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md">Command-line spec</a></li>
-        <li><code>zjm serve</code>, a JSON API on <code>127.0.0.1</code> for apps in any language. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md">HTTP spec</a></li>
-        <li><code>zjm mcp</code>, an MCP server for agents, and a one-line install script. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md">MCP and install spec</a></li>
+      <ul data-state="planned">
+        <li data-interface="cli">A <code>zjm</code> command with <code>--json</code> output and a <code>zjm doctor</code> check. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md">Command-line spec</a></li>
+        <li data-interface="http"><code>zjm serve</code>, a JSON API on <code>127.0.0.1</code> for apps in any language. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md">HTTP spec</a></li>
+        <li data-interface="mcp"><code>zjm mcp</code>, an MCP server for agents, and a one-line install script. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md">MCP and install spec</a></li>
       </ul>
     </div>
   </div>
@@ -164,17 +165,17 @@
 
 <section id="run" aria-labelledby="try">
   <h2 id="try">Try the library</h2>
-  <ul class="req">
+  <ul class="req" data-requirements>
     <li>Python 3.10 or newer. The package has no dependencies.</li>
     <li><code>zg</code> on your <code>PATH</code>: <code>npm install -g @zvec/zvec-grep</code></li>
     <li><code>OPENROUTER_API_KEY</code> set in your environment, for Jev's ranking.</li>
     <li>The <code>claude</code> CLI, for answers.</li>
   </ul>
   <p class="cmd-label">Install it from a clone</p>
-<pre class="cmd">git clone https://github.com/cocodedk/zjm-rag.git && cd zjm-rag
+<pre class="cmd" data-install data-state="available">git clone https://github.com/cocodedk/zjm-rag.git && cd zjm-rag
 pip install .</pre>
   <p class="cmd-label">Index a folder, then ask</p>
-<pre class="cmd">import os, zjm_rag
+<pre class="cmd" data-example="library">import os, zjm_rag
 
 zjm_rag.index([os.path.expanduser("~/projects/some-repo")])   <span># copy, then index the copy</span>
 hits = zjm_rag.find("which linter checks CSS files")          <span># accepted and rejected files</span>
