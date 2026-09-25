@@ -35,7 +35,7 @@ process gets the same operations, with machine-readable output.
 
 ## Acceptance tests
 
-`python3 -m unittest discover -s tests -q` runs **exactly 18 tests** (the 12 from spec 01 plus these
+`python3 -m unittest discover -s tests -q` runs **exactly 19 tests** (the 13 from spec 01 plus these
 6 in `tests/test_cli.py`), all passing with an empty `HOME` and no network. Each calls `main([...])`
 with fakes and captures stdout/stderr with `contextlib.redirect_stdout`/`redirect_stderr`:
 

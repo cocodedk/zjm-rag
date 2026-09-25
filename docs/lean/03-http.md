@@ -26,7 +26,7 @@ Let an app written in any language call zjm-rag over HTTP on the same machine.
 
 ## Acceptance tests
 
-`python3 -m unittest discover -s tests -q` runs **exactly 24 tests** (18 earlier plus these 6 in
+`python3 -m unittest discover -s tests -q` runs **exactly 25 tests** (19 earlier plus these 6 in
 `tests/test_http.py`), all passing with an empty `HOME`. Tests start `make_server(port=0, ...)` with
 fakes in a background thread and call it with `urllib.request` on `127.0.0.1` only:
 

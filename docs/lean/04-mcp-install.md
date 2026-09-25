@@ -46,7 +46,7 @@ requirements (`zg`, `OPENROUTER_API_KEY`, optional `claude`). Version bump to `0
 
 ## Acceptance tests
 
-`python3 -m unittest discover -s tests -q` runs **exactly 30 tests** (24 earlier plus these 6), all
+`python3 -m unittest discover -s tests -q` runs **exactly 31 tests** (25 earlier plus these 6), all
 passing with an empty `HOME` and no network:
 
 - `tests/test_mcp.py`:
