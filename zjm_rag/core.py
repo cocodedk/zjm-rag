@@ -119,6 +119,13 @@ def find(query, *, store=DEFAULT_STORE, limit=8, file_types=None, min_score=0.5,
     return {"query": query, "min_score": min_score, "sort": sort, "accepted": accepted, "rejected": rejected}
 
 
+def doctor(store=DEFAULT_STORE):
+    """The checks `zjm doctor` and `GET /health` report, without calling any tool."""
+    checks = {"zg": bool(shutil.which("zg")), "claude": bool(shutil.which("claude")),
+              "openrouter_key": bool(os.environ.get("OPENROUTER_API_KEY")), "store": Path(store).exists()}
+    return {"ok": checks["zg"] and checks["openrouter_key"], "checks": checks}
+
+
 def ask(query, *, store=DEFAULT_STORE, top_k=3, answer_language=None, llm_command=None, runner=zg.run,
         jev=jev_client.post, **find_kwargs):
     """Answer `query` from the top accepted files with an LLM."""

@@ -1,10 +1,7 @@
 """zjm: the library on the command line, with --json."""
 import argparse
 import json
-import os
-import shutil
 import sys
-from pathlib import Path
 
 from . import core
 from .errors import ZjmError
@@ -34,18 +31,30 @@ def _parser():
             p.add_argument("--sort", choices=list(core.SORTS))
         p.add_argument("--no-rank", action="store_true")
     sub.add_parser("doctor", parents=[common])
+    p = sub.add_parser("serve")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--store", default=str(core.DEFAULT_STORE))
     return parser
 
 
-def _doctor(store):
-    checks = {"zg": bool(shutil.which("zg")), "claude": bool(shutil.which("claude")),
-              "openrouter_key": bool(os.environ.get("OPENROUTER_API_KEY")), "store": Path(store).exists()}
-    return {"ok": checks["zg"] and checks["openrouter_key"], "checks": checks}
+def _serve(args, fakes):
+    from .http import make_server
+    server = make_server(args.host, args.port, store=args.store, **fakes)
+    host, port = server.server_address[:2]
+    print(f"listening on http://{host}:{port}", flush=True)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+    return 0
 
 
 def _run(args, fakes):
     if args.cmd == "doctor":
-        return _doctor(args.store)
+        return core.doctor(args.store)
     if args.cmd == "index":
         fakes.pop("jev", None)
         return core.index(args.sources, store=args.store, multilingual=args.multilingual,
@@ -73,6 +82,8 @@ def main(argv=None, *, runner=None, jev=None):
     except SystemExit as e:
         return e.code
     fakes = {k: v for k, v in {"runner": runner, "jev": jev}.items() if v is not None}
+    if args.cmd == "serve":
+        return _serve(args, fakes)
     try:
         result = _run(args, fakes)
     except (ZjmError, ValueError) as e:
