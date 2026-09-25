@@ -1,6 +1,7 @@
 ---
-lean_status: stopped
+lean_status: pr_open
 lean_worktree: /tmp/graph-ujv_xxnp/task-04-mcp-install
+lean_pr: https://github.com/cocodedk/zjm-rag/pull/8
 ---
 # 04 — MCP server and one-shot install
 

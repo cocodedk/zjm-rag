@@ -9,6 +9,10 @@ on:
         type: choice
         default: patch
         options: [patch, minor, major]
+      version:
+        description: Exact X.Y.Z instead of a bump (must be newer than the latest tag)
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -36,6 +40,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BUMP: ${{ inputs.bump }}
+          EXACT: ${{ inputs.version }}
         run: |
           set -euo pipefail
           git fetch --force --tags origin
@@ -54,6 +59,12 @@ jobs:
               *)     patch=$((patch+1)) ;;
             esac
             tag="v$major.$minor.$patch"
+            if [ -n "$EXACT" ]; then
+              [[ "v$EXACT" =~ $semver ]] || { echo "::error::version must be X.Y.Z"; exit 1; }
+              newest=$(printf '%s\n' "${latest:-v0.0.0}" "v$EXACT" | sort -V | tail -1)
+              { [ "$newest" = "v$EXACT" ] && [ "v$EXACT" != "$latest" ]; } || { echo "::error::v$EXACT is not newer than $latest"; exit 1; }
+              tag="v$EXACT"
+            fi
             if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
               echo "::error::$tag already exists on another commit"; exit 1
             fi

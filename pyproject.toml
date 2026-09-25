@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "zjm-rag"
-version = "0.4.0"
+dynamic = ["version"]
 description = "Find the file that holds the answer: zg finds, Jev ranks, an LLM answers."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,3 +16,7 @@ zjm = "zjm_rag.cli:main"
 
 [tool.setuptools]
 packages = ["zjm_rag"]
+
+[tool.setuptools_scm]
+# The version comes from the latest vX.Y.Z git tag; the release workflow stamps it.
+fallback_version = "0.0.0"

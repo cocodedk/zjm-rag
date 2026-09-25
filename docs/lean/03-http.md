@@ -1,3 +1,7 @@
+---
+lean_status: pr_open
+lean_pr: https://github.com/cocodedk/zjm-rag/pull/7
+---
 # 03 — local HTTP JSON API: `zjm serve`
 
 ## Goal
