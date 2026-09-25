@@ -24,9 +24,9 @@ their paths.
 
 ## Status
 
-The library (`zjm_rag`) and the `zjm` command line with `--json` are in. A local HTTP JSON API and an
-MCP server with a one-line installer are being built from the specs in [docs/lean/](docs/lean/),
-one pull request per spec.
+The library (`zjm_rag`), the `zjm` command line with `--json` and the local HTTP JSON API
+(`zjm serve`) are in. An MCP server with a one-line installer is being built from the spec in
+[docs/lean/](docs/lean/).
 
 ## Install
 
@@ -61,6 +61,17 @@ zjm doctor                                   # zg, claude, OPENROUTER_API_KEY, s
 
 Every subcommand takes `--store PATH` and `--json`, which prints the library's return value as one
 JSON object (errors as `{"error": "..."}`). Exit codes: `0` ok, `1` error or failed `doctor`, `2` usage.
+
+From any language on the same machine, over HTTP:
+
+```sh
+zjm serve [--host 127.0.0.1] [--port 8765] [--store PATH]
+curl -s localhost:8765/find -d '{"query": "which linter checks CSS files", "file_types": ["py"]}'
+```
+
+`GET /health` returns the `doctor` dict; `POST /index`, `/find` and `/ask` take the library's keyword
+arguments as a JSON body (`store` is the server's and cannot be set) and return its result. Errors are
+`{"error": "..."}`: `400` bad body, `404`, `405`, `413` over 1 MiB, `422` from the library.
 
 ## Build from source
 
