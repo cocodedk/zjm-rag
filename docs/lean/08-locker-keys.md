@@ -145,3 +145,23 @@ No real age runs in tests.
 - Encrypting locker names or sizes.
 - Migrating spec 06 lockers.
 - Performance work for large lockers: the whole locker is decrypted per request by design.
+
+## Amendment: encryption is optional per locker (owner, 2026-09-26)
+
+- `key` on `locker_create` is **optional**:
+  - With a key, the locker is encrypted as described above.
+  - Without one, it is a plain spec 06 locker directory `<home>/lockers/<name>/`, and it stays
+    plain. There is no conversion between the two kinds.
+- For every other operation, `key` (or the locker's entry in `keys`) is required exactly when the
+  locker is encrypted:
+  - A missing key for an encrypted locker raises `ZjmError("locker <name> needs its key")`.
+  - A key given for a plain locker raises `ZjmError("locker <name> is not encrypted")`.
+  - Both errors are raised before any runner call.
+- `locker_create` refuses a name that already exists in either form.
+- `locker_list` adds `"encrypted": bool` to each entry. It keeps spec 06's `files` count for plain
+  lockers and omits it for encrypted ones.
+- `find` and `ask` can mix both kinds of locker in one call.
+- **Tests:** exactly **63**. The one extra test is `tests/test_sealed.py::test_plain_and_encrypted_mix`:
+  - a plain and an encrypted locker are both searched in one `find`
+  - each of the two wrong-key errors above is raised
+  - `locker_list` shows the `encrypted` flag
