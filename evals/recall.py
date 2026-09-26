@@ -4,7 +4,7 @@ It runs the real zg (and, with --jev, the real Jev) over evals/corpus plus a gen
 runbook. The answer model is never called: its prompt is captured instead. This is not part of
 the unit suite, because it needs zg and, with --jev, the network.
 
-    python3 evals/recall.py [--limit N] [--min-score S] [--jev] [--multilingual] [--verbose]
+    python3 evals/recall.py [--limit N] [--min-score S] [--jev] [--multilingual | --embedding M] [--verbose]
 
 Per question it reports whether the expected file was a candidate, whether the text that answers
 the question ("must") was in that file's evidence, whether the file was accepted, and whether the
@@ -59,6 +59,7 @@ def main():
     ap.add_argument("--min-score", type=float, default=0.5)
     ap.add_argument("--jev", action="store_true", help="rank with the real Jev (network, costs)")
     ap.add_argument("--multilingual", action="store_true")
+    ap.add_argument("--embedding", help="any zg local model, e.g. local/multilingual-e5-small")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
     golden = json.loads((ROOT / "golden.json").read_text())
@@ -74,7 +75,8 @@ def main():
         cfg = tmp / "config.json"
         cfg.write_text(json.dumps({"allow": [str(src)], "home": str(tmp / "home"),
                                    "egress": {"rank": args.jev, "answer": True}}))
-        zjm_rag.locker_create("eval", plain=True, multilingual=args.multilingual, config=str(cfg))
+        zjm_rag.locker_create("eval", plain=True, multilingual=args.multilingual, embedding=args.embedding,
+                              config=str(cfg))
         zjm_rag.file_add("eval", [str(src)], config=str(cfg))
 
         prompts = []
