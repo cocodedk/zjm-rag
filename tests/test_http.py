@@ -60,7 +60,7 @@ class HttpTest(unittest.TestCase):
             thread.join(5)
         self.assertEqual(code, 200)
         self.assertEqual(set(r), {"ok", "checks", "config", "home", "egress", "lockers"})
-        self.assertEqual(set(r["checks"]), {"zg", "claude", "openrouter_key"})
+        self.assertEqual(set(r["checks"]), {"zg", "age", "claude", "openrouter_key"})
         self.assertEqual(servers[1], 0)
 
     def test_find_roundtrip(self):

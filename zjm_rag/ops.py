@@ -8,6 +8,7 @@ from . import zg
 
 _STR = {"type": "string"}
 _STR_ARR = {"type": "array", "items": {"type": "string"}}
+_KEYS = {"type": "object", "additionalProperties": {"type": "string"}}
 
 
 def _wrap(func, *, needs_runner=False, needs_jev=False):
@@ -21,38 +22,43 @@ def _wrap(func, *, needs_runner=False, needs_jev=False):
     return call
 
 
-_FIND_PROPS = {"query": _STR, "lockers": {**_STR_ARR, "minItems": 1}, "limit": {"type": "integer", "minimum": 1},
+_FIND_PROPS = {"query": _STR, "lockers": {**_STR_ARR, "minItems": 1}, "keys": _KEYS,
+              "limit": {"type": "integer", "minimum": 1},
               "file_types": _STR_ARR, "min_score": {"type": "number", "minimum": 0, "maximum": 1},
               "sort": {"type": "string", "enum": list(search.SORTS)}, "rank": {"type": "boolean"}}
 _ASK_PROPS = {**_FIND_PROPS, "top_k": {"type": "integer", "minimum": 1}, "answer_language": _STR}
 
 OPS = {
-    "locker_create": (_wrap(lockers.locker_create),
-                      {"type": "object", "properties": {"name": _STR, "multilingual": {"type": "boolean"},
-                                                        "embedding": _STR},
+    "locker_create": (_wrap(lockers.locker_create, needs_runner=True),
+                      {"type": "object", "properties": {"name": _STR, "key": _STR,
+                                                        "multilingual": {"type": "boolean"}, "embedding": _STR},
                        "required": ["name"], "additionalProperties": False},
-                      "Create a named locker with a fixed embedding model."),
+                      "Create a named locker, plain or (with a key) encrypted, with a fixed embedding model."),
     "locker_list": (_wrap(lockers.locker_list),
                     {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
-                    "List lockers with their file counts and total sizes."),
-    "locker_drop": (_wrap(lockers.locker_drop),
-                    {"type": "object", "properties": {"name": _STR}, "required": ["name"],
+                    "List lockers, each with whether it is encrypted, and its size."),
+    "locker_drop": (_wrap(lockers.locker_drop, needs_runner=True),
+                    {"type": "object", "properties": {"name": _STR, "key": _STR}, "required": ["name"],
                      "additionalProperties": False},
                     "Delete a locker and everything in it."),
+    "locker_encrypt": (_wrap(lockers.locker_encrypt, needs_runner=True),
+                       {"type": "object", "properties": {"name": _STR, "key": _STR},
+                        "required": ["name", "key"], "additionalProperties": False},
+                       "Seal a plain locker into an encrypted one; this cannot be undone."),
     "file_add": (_wrap(files.file_add, needs_runner=True),
-                {"type": "object", "properties": {"locker": _STR, "paths": _STR_ARR},
+                {"type": "object", "properties": {"locker": _STR, "key": _STR, "paths": _STR_ARR},
                  "required": ["locker", "paths"], "additionalProperties": False},
                 "Copy files or directories into a locker and index them."),
     "file_put": (_wrap(files.file_put, needs_runner=True),
-                {"type": "object", "properties": {"locker": _STR, "name": _STR, "text": _STR},
+                {"type": "object", "properties": {"locker": _STR, "key": _STR, "name": _STR, "text": _STR},
                  "required": ["locker", "name", "text"], "additionalProperties": False},
                 "Write text as a file in a locker and index it."),
     "file_remove": (_wrap(files.file_remove, needs_runner=True),
-                   {"type": "object", "properties": {"locker": _STR, "names": _STR_ARR},
+                   {"type": "object", "properties": {"locker": _STR, "key": _STR, "names": _STR_ARR},
                     "required": ["locker", "names"], "additionalProperties": False},
                    "Remove files or directory prefixes from a locker."),
-    "file_list": (_wrap(files.file_list),
-                 {"type": "object", "properties": {"locker": _STR}, "required": ["locker"],
+    "file_list": (_wrap(files.file_list, needs_runner=True),
+                 {"type": "object", "properties": {"locker": _STR, "key": _STR}, "required": ["locker"],
                   "additionalProperties": False},
                  "List the files in a locker."),
     "find": (_wrap(search.find, needs_runner=True, needs_jev=True),
@@ -65,7 +71,7 @@ OPS = {
            "Answer a question with an LLM from the top accepted files across lockers."),
     "doctor": (_wrap(core.doctor),
               {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
-              "Report whether zg, claude, OPENROUTER_API_KEY and lockers are present."),
+              "Report whether zg, age, claude, OPENROUTER_API_KEY and lockers are present."),
 }
 
 
@@ -83,6 +89,9 @@ def _type_ok(value, spec):
         ok = isinstance(value, list) and all(_type_ok(x, spec["items"]) for x in value)
         if ok and "minItems" in spec:
             ok = len(value) >= spec["minItems"]
+    elif t == "object":
+        ok = isinstance(value, dict) and all(isinstance(k, str) for k in value) and \
+            all(_type_ok(v, spec["additionalProperties"]) for v in value.values())
     else:
         ok = True
     if ok and t in ("integer", "number") and "minimum" in spec:

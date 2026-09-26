@@ -5,9 +5,15 @@ def human(cmd, r):
     if cmd == "locker-create":
         return [f"created {r['name']} ({r['embedding']})"]
     if cmd == "locker-list":
-        return [f"{l['name']}  {l['files']} files  {l['bytes']} bytes  ({l['embedding']})" for l in r["lockers"]]
+        lines = []
+        for l in r["lockers"]:
+            tag = "encrypted" if l["encrypted"] else f"{l['files']} files"
+            lines.append(f"{l['name']}  {tag}  {l['bytes']} bytes")
+        return lines
     if cmd == "locker-drop":
         return [f"dropped {r['name']} ({r['files']} files)"]
+    if cmd == "locker-encrypt":
+        return [f"encrypted {r['name']}"]
     if cmd == "file-add":
         lines = [f"added {n}" for n in r["added"]] + [f"replaced {n}" for n in r["replaced"]]
         if r["excluded"]:

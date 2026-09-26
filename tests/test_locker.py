@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from fakes import FakeRunner, make_config
+from fakes import TEST_KEY, FakeRunner, make_config
 from zjm_rag import ZjmError, find, locker_create, locker_drop, locker_list
 from zjm_rag import files as files_mod
 from zjm_rag import lockers as lockers_mod
@@ -80,29 +80,39 @@ class LockerTest(unittest.TestCase):
         (src / "a.md").write_text("a")
         (src / "b.md").write_text("b")
         cfg = make_config(self, allow=[tmp.name])
-        locker_create("lib", config=cfg)
-        files_mod.file_add("lib", [str(src)], config=cfg, runner=FakeRunner())
+        locker_create("lib", TEST_KEY, config=cfg, runner=FakeRunner())
+        files_mod.file_add("lib", [str(src)], key=TEST_KEY, config=cfg, runner=FakeRunner())
         (src / "a.md").unlink()
-        r = files_mod.file_add("lib", [str(src)], config=cfg, runner=FakeRunner())
+        r = files_mod.file_add("lib", [str(src)], key=TEST_KEY, config=cfg, runner=FakeRunner())
         self.assertEqual(r["replaced"], ["docs"])
-        ldir = lockers_mod.locker_dir(cfg, "lib")
-        manifest = lockers_mod.read_manifest(ldir)
-        self.assertNotIn("docs/a.md", manifest["files"])
-        self.assertFalse((ldir / "corpus" / "docs" / "a.md").exists())
+        listed = files_mod.file_list("lib", key=TEST_KEY, config=cfg, runner=FakeRunner())
+        names = [f["name"] for f in listed["files"]]
+        self.assertNotIn("docs/a.md", names)
+        self.assertIn("docs/b.md", names)
+
         (src / "c.md").write_text("c")
-        bad_runner = FakeRunner()
+        age_path = lockers_mod.home_dirs(cfg)[1] / "lib.age"
+        before = age_path.read_bytes()
 
         def failing(argv, *, cwd, env, input):
-            if argv[0] == "zg":
+            if argv[0] == "zg" and argv[1] == "index":
                 return 1, "", "boom"
-            return bad_runner(argv, cwd=cwd, env=env, input=input)
+            return FakeRunner()(argv, cwd=cwd, env=env, input=input)
 
         with self.assertRaises(ZjmError):
-            files_mod.file_add("lib", [str(src)], config=cfg, runner=failing)
-        manifest2 = lockers_mod.read_manifest(ldir)
-        self.assertFalse(manifest2["indexed"])
-        with self.assertRaisesRegex(ZjmError, "not indexed"):
-            find("q", ["lib"], config=cfg, runner=FakeRunner(), jev=lambda p: {"answers": {}})
+            files_mod.file_add("lib", [str(src)], key=TEST_KEY, config=cfg, runner=failing)
+
+        # settled detail 8/9: a failed write never touches the sealed locker; find still works.
+        self.assertEqual(age_path.read_bytes(), before)
+
+        def query_runner(argv, *, cwd, env, input):
+            if argv[0] == "zg" and argv[1] == "query":
+                return 0, "hits: 1\n\n#1 matchedBy=fts docs/b.md:1-1\nsource:\n1\tb\n", ""
+            return FakeRunner()(argv, cwd=cwd, env=env, input=input)
+
+        found = find("q", ["lib"], keys={"lib": TEST_KEY}, config=cfg, runner=query_runner,
+                     jev=lambda p: {"answers": {k: {"noul": 0.9} for k in p["questions"]}})
+        self.assertEqual([h["path"] for h in found["accepted"]], ["docs/b.md"])
 
     def test_file_put_rules(self):
         cfg = make_config(self)

@@ -4,6 +4,7 @@ import json
 import os
 import sys
 
+from . import cli_keys
 from . import config as config_module
 from . import search
 from .cli_human import human as _human
@@ -23,6 +24,7 @@ def _parser():
     p = sub.add_parser("locker-create")
     _common(p)
     p.add_argument("name")
+    p.add_argument("--key-file", metavar="PATH")
     p.add_argument("--multilingual", action="store_true")
     p.add_argument("--embedding", metavar="MODEL")
 
@@ -31,31 +33,42 @@ def _parser():
     p = sub.add_parser("locker-drop")
     _common(p)
     p.add_argument("name")
+    p.add_argument("--key-file", metavar="PATH")
+
+    p = sub.add_parser("locker-encrypt")
+    _common(p)
+    p.add_argument("name")
+    p.add_argument("--key-file", metavar="PATH", required=True)
 
     p = sub.add_parser("file-add")
     _common(p)
     p.add_argument("locker")
+    p.add_argument("--key-file", metavar="PATH")
     p.add_argument("paths", nargs="+", metavar="PATH")
 
     p = sub.add_parser("file-put")
     _common(p)
     p.add_argument("locker")
+    p.add_argument("--key-file", metavar="PATH")
     p.add_argument("name")
 
     p = sub.add_parser("file-remove")
     _common(p)
     p.add_argument("locker")
+    p.add_argument("--key-file", metavar="PATH")
     p.add_argument("names", nargs="+", metavar="NAME")
 
     p = sub.add_parser("file-list")
     _common(p)
     p.add_argument("locker")
+    p.add_argument("--key-file", metavar="PATH")
 
     for name in ("find", "ask"):
         p = sub.add_parser(name)
         _common(p)
         p.add_argument("query")
         p.add_argument("-l", "--locker", action="append", dest="lockers", required=True, metavar="LOCKER")
+        p.add_argument("--key-file", metavar="PATH")
         p.add_argument("--limit", type=int, default=8)
         p.add_argument("--type", action="append", dest="types", metavar="T")
         p.add_argument("--min-score", type=float, default=0.5)
@@ -89,6 +102,8 @@ def _args_to_body(cmd, args):
     if cmd in ("locker-list", "doctor"):
         return {}
     if cmd == "locker-drop":
+        return {"name": args.name}
+    if cmd == "locker-encrypt":
         return {"name": args.name}
     if cmd == "file-add":
         return {"locker": args.locker, "paths": args.paths}
@@ -149,8 +164,14 @@ def main(argv=None, *, runner=None, jev=None):
         cfg = config_module.resolve(args.config)
         return serve(sys.stdin, sys.stdout, config=cfg, runner=runner, jev=jev)
 
+    key_file = getattr(args, "key_file", None)
+    usage_err = cli_keys.usage_error(args.cmd, key_file)
+    if usage_err:
+        print(f"zjm: {usage_err}", file=sys.stderr)
+        return 2
     op = args.cmd.replace("-", "_")
     body = _args_to_body(args.cmd, args)
+    cli_keys.add_to_body(args.cmd, key_file, body)
     error = check(op, body)
     if error:
         print(f"zjm: {error}", file=sys.stderr)
