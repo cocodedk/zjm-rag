@@ -40,7 +40,7 @@ class CliTest(unittest.TestCase):
         src.mkdir()
         (src / "a.md").write_text("x")
         cfg_path = config_file({"allow": [tmp.name], "home": str(Path(tmp.name) / "home")}, tmp.name)
-        code, out, _ = run(["locker-create", "lib", "--config", cfg_path], runner=FakeRunner())
+        code, out, _ = run(["locker-create", "lib", "--plain", "--config", cfg_path], runner=FakeRunner())
         self.assertEqual(code, 0)
         code, out, _ = run(["file-add", "lib", str(src), "--config", cfg_path, "--json"], runner=FakeRunner())
         self.assertEqual(code, 0)

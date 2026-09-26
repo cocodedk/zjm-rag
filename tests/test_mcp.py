@@ -48,7 +48,7 @@ class McpTest(unittest.TestCase):
         self.assertNotIn("isError", r["result"])
 
         runner = FakeRunner()
-        create, ask, doc, doc_args = rpc(call(2, "zjm_locker_create", {"name": "lib2", "multilingual": True}),
+        create, ask, doc, doc_args = rpc(call(2, "zjm_locker_create", {"name": "lib2", "multilingual": True, "plain": True}),
                                          call(3, "zjm_ask", {"query": "q", "lockers": ["lib"], "top_k": 1,
                                                              "answer_language": "da"}),
                                          call(4, "zjm_doctor", {}), call(5, "zjm_doctor", {"x": 1}),

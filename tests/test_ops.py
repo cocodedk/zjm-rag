@@ -43,7 +43,7 @@ class OpsTest(unittest.TestCase):
     def test_file_ops_over_http_and_mcp(self):
         cfg = make_config(self)
         from zjm_rag import locker_create
-        locker_create("lib", config=cfg)
+        locker_create("lib", plain=True, config=cfg)
         server = make_server(port=0, config=cfg, runner=FakeRunner())
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.server_close)

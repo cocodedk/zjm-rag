@@ -41,9 +41,9 @@ class ContainerTest(unittest.TestCase):
     def test_unbaked_embedding_refused_in_container(self):
         cfg = make_config(self)
         with mock.patch.dict(os.environ, {"ZJM_IN_CONTAINER": "1"}):
-            locker_create("lib", config=cfg)
+            locker_create("lib", plain=True, config=cfg)
             with self.assertRaisesRegex(ZjmError, "not baked into the container"):
-                locker_create("other", embedding="local/some-other-model", config=cfg)
+                locker_create("other", embedding="local/some-other-model", plain=True, config=cfg)
 
         bad_cfg = make_config(self, embedding="local/some-other-model")
         with mock.patch.dict(os.environ, {"ZJM_IN_CONTAINER": "1"}):

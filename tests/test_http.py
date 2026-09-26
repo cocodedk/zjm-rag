@@ -75,7 +75,7 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(set(r), {"query", "min_score", "sort", "accepted", "rejected"})
         self.assertEqual((r["min_score"], r["sort"]), (0.7, "path"))
         self.assertEqual([h["path"] for h in r["accepted"]], ["proj/a.py", "proj/b.md"])
-        code, r = self.call("/locker_create", {"name": "lib2", "multilingual": True})
+        code, r = self.call("/locker_create", {"name": "lib2", "multilingual": True, "plain": True})
         self.assertEqual(code, 200)
         self.assertEqual(r["name"], "lib2")
 
