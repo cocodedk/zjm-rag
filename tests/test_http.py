@@ -71,8 +71,9 @@ class HttpTest(unittest.TestCase):
         code, r = self.call("/find", {"query": "q", "lockers": ["lib"], "min_score": 0.7, "sort": "path",
                                       "file_types": ["py"]})
         self.assertEqual(code, 200)
-        self.assertEqual(runner.calls[0][0][-2:], ["-t", "py"])
-        self.assertEqual(set(r), {"query", "min_score", "sort", "accepted", "rejected"})
+        self.assertEqual(runner.calls[0][0][-4:], ["-t", "py", "--", "q"])
+        self.assertEqual(set(r), {"query", "min_score", "sort", "accepted", "rejected", "translations",
+                                  "translate_error"})
         self.assertEqual((r["min_score"], r["sort"]), (0.7, "path"))
         self.assertEqual([h["path"] for h in r["accepted"]], ["proj/a.py", "proj/b.md"])
         code, r = self.call("/locker_create", {"name": "lib2", "multilingual": True, "plain": True})

@@ -4,12 +4,14 @@ import os
 
 from .errors import ZjmError
 
-ALLOWED_KEYS = {"home", "allow", "deny", "exclude", "egress", "embedding", "llm"}
-EGRESS_KEYS = {"rank", "answer"}
+ALLOWED_KEYS = {"home", "allow", "deny", "exclude", "egress", "embedding", "llm", "languages", "translate_model"}
+EGRESS_KEYS = {"rank", "answer", "translate"}
 DEFAULT_EMBEDDING = "local/potion-code-16m-v2"
 MULTILINGUAL_EMBEDDING = "local/potion-multilingual-128m"
 BAKED_EMBEDDINGS = {DEFAULT_EMBEDDING, MULTILINGUAL_EMBEDDING}
 DEFAULT_LLM = "deepseek/deepseek-v4-flash"
+DEFAULT_LANGUAGES = ["English", "German", "Danish", "Norwegian", "Swedish"]
+DEFAULT_TRANSLATE_MODEL = "upstage/solar-mini4"
 
 
 def check_embedding_baked(model):
@@ -57,6 +59,10 @@ def _is_str_list(v):
     return isinstance(v, list) and all(isinstance(x, str) for x in v)
 
 
+def _is_nonempty_str_list(v):
+    return isinstance(v, list) and all(isinstance(x, str) and x for x in v)
+
+
 def _validate(raw, used_path):
     if not isinstance(raw, dict):
         raise ZjmError(f"config file {used_path} must be a JSON object")
@@ -74,6 +80,9 @@ def _validate(raw, used_path):
         check_embedding_baked(raw["embedding"])
     if "llm" in raw and not (isinstance(raw["llm"], str) and raw["llm"]):
         raise ZjmError(f'llm is an OpenRouter model id now, e.g. "deepseek/deepseek-v4-flash", in {used_path}')
+    _check_type(raw, "languages", _is_nonempty_str_list, "a list of non-empty strings", used_path)
+    if "translate_model" in raw and not (isinstance(raw["translate_model"], str) and raw["translate_model"]):
+        _type_error("translate_model", used_path, "a non-empty string")
     egress = raw.get("egress", {})
     if not isinstance(egress, dict):
         _type_error("egress", used_path, "an object")
@@ -130,8 +139,11 @@ def load(path=None, *, cwd=None, environ=None):
         "allow": [resolve(p) for p in raw.get("allow", [])],
         "deny": [resolve(p) for p in raw.get("deny", [])],
         "exclude": list(raw.get("exclude", [])),
-        "egress": {"rank": bool(egress_raw.get("rank", False)), "answer": bool(egress_raw.get("answer", False))},
+        "egress": {"rank": bool(egress_raw.get("rank", False)), "answer": bool(egress_raw.get("answer", False)),
+                  "translate": bool(egress_raw.get("translate", False))},
         "embedding": raw.get("embedding", DEFAULT_EMBEDDING),
         "llm": raw.get("llm", DEFAULT_LLM),
+        "languages": list(raw.get("languages", DEFAULT_LANGUAGES)),
+        "translate_model": raw.get("translate_model", DEFAULT_TRANSLATE_MODEL),
         "path": used_path,
     }

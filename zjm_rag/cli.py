@@ -76,8 +76,9 @@ def _parser():
         if name == "find":
             p.add_argument("--sort", choices=list(search.SORTS))
         p.add_argument("--no-rank", action="store_true")
+        p.add_argument("--no-translate", action="store_true")
         if name == "ask":
-            p.add_argument("--top-k", type=int, default=8)
+            p.add_argument("--top-k", type=int)
             p.add_argument("--lang")
 
     _common(sub.add_parser("doctor"))
@@ -121,10 +122,13 @@ def _args_to_body(cmd, args):
         body["file_types"] = args.types
     if args.no_rank:
         body["rank"] = False
+    if args.no_translate:
+        body["translate"] = False
     if cmd == "find" and args.sort:
         body["sort"] = args.sort
     if cmd == "ask":
-        body["top_k"] = args.top_k
+        if args.top_k is not None:
+            body["top_k"] = args.top_k
         if args.lang:
             body["answer_language"] = args.lang
     return body

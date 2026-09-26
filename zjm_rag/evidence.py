@@ -12,10 +12,14 @@ JEV_CHARS = 12000
 ASK_CHARS = 200000
 
 
-def select_candidates(hits, manifest_files, limit):
-    """(ordered candidate paths, {path: [hits]}): the first `limit` distinct hit paths that are
-    manifest keys, each carrying every hit on it, in zg order."""
-    order, by_path = [], {}
+def select_candidates(hits, manifest_files, limit, *, by_path=None):
+    """(new candidate paths introduced by `hits`, {path: [hits]}): the first `limit` distinct hit
+    paths that are manifest keys, each carrying every hit on it, in zg order. Passing in a
+    `by_path` from an earlier call (spec 10) merges this call's hits into any path that is already
+    a key there too, without adding it to the returned order a second time (a candidate's passages
+    come from all its hits, in every query)."""
+    by_path = {} if by_path is None else by_path
+    order = []
     for hit in hits:
         path = hit["path"]
         if path not in manifest_files:
@@ -67,16 +71,23 @@ def _whole_text(path, text):
     return text if size <= 4 * ASK_CHARS else None
 
 
-def read_candidates(hits, manifest_files, corpus_dir, limit, *, want_text):
-    """{path: {"passages": [...], "whole": str|None}} for each candidate, read once here."""
+def read_candidates(hits, manifest_files, corpus_dir, limit, *, want_text, translated_hits=None):
+    """{path: {"passages": [...], "whole": str|None, "via": "query"|"translation"}} for each
+    candidate, read once here. `translated_hits` (spec 10), when given, can add up to `limit` more
+    candidates after the original's, and merges into any shared candidate's passages too."""
     order, by_path = select_candidates(hits, manifest_files, limit)
+    via = {path: "query" for path in order}
+    if translated_hits:
+        order2, by_path = select_candidates(translated_hits, manifest_files, limit, by_path=by_path)
+        order = order + order2
+        via.update({path: "translation" for path in order2})
     records = {}
     for path in order:
         full = corpus_dir / path
         with open(full, encoding="utf-8", errors="replace", newline="") as f:
             text = f.read()
         records[path] = {"passages": build_passages(by_path[path], text.split("\n")),
-                          "whole": _whole_text(full, text) if want_text else None}
+                          "whole": _whole_text(full, text) if want_text else None, "via": via[path]}
     return records
 
 

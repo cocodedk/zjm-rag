@@ -2,10 +2,12 @@
 
 
 def _where(hit):
-    """`<locker>/<path>[:<start>-<end>]`, using the first passage when there is one."""
+    """`<locker>/<path>[:<start>-<end>]`, using the first passage when there is one; a hit found
+    only through a translation (spec 10) gets a trailing "  (translation)"."""
     label = f"{hit['locker']}/{hit['path']}"
     passages = hit.get("passages") or []
-    return f"{label}:{passages[0]['start']}-{passages[0]['end']}" if passages else label
+    where = f"{label}:{passages[0]['start']}-{passages[0]['end']}" if passages else label
+    return f"{where}  (translation)" if hit.get("via") == "translation" else where
 
 
 def human(cmd, r):
@@ -40,6 +42,7 @@ def human(cmd, r):
     lines = [f"{'ok' if ok else 'missing'} {name}" for name, ok in r["checks"].items()]
     lines.append(f"config {r['config'] or '(built-in defaults)'}")
     lines.append(f"home {r['home']}")
-    lines.append(f"egress rank={r['egress']['rank']} answer={r['egress']['answer']}")
+    lines.append(f"egress rank={r['egress']['rank']} answer={r['egress']['answer']} "
+                f"translate={r['egress']['translate']}")
     lines.append(f"lockers {r['lockers']}")
     return lines

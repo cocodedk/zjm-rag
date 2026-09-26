@@ -24,8 +24,8 @@ class FindTest(unittest.TestCase):
             return fake_jev([0.9, 0.2, 0.5])(payload)
 
         r = find("q", ["lib"], file_types=["py", "md"], runner=runner, jev=jev, config=self.cfg)
-        self.assertEqual(runner.calls[0][0], ["zg", "query", "q", "--preview", "none", "--limit", "40",
-                                              "--mode", "direct", "-t", "py", "-t", "md"])
+        self.assertEqual(runner.calls[0][0], ["zg", "query", "--preview", "none", "--limit", "40",
+                                              "--mode", "direct", "-t", "py", "-t", "md", "--", "q"])
         self.assertEqual(list(payloads[0]["questions"]), ["f1", "f2", "f3"])
         self.assertEqual(payloads[0]["state"]["evidence"][0]["path"], "lib/proj/b.md")
         self.assertEqual(payloads[0]["questions"]["f1"]["instructions"],

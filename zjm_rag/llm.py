@@ -19,13 +19,17 @@ def _open(req, timeout):
     return urllib.request.build_opener(_NoRedirect).open(req, timeout=timeout)
 
 
-def post(model, messages, *, timeout=120):
-    """POST one chat completion; returns the answer text, or raises ZjmError."""
+def post(model, messages, *, timeout=120, reasoning=True):
+    """POST one chat completion; returns the answer text, or raises ZjmError. `reasoning=False`
+    (used for translating, spec 10) adds "reasoning": {"enabled": false} to the body; otherwise
+    the body is unchanged."""
     key = os.environ.get("OPENROUTER_API_KEY")
     if not key:
         raise ZjmError("OPENROUTER_API_KEY is not set")
-    body = json.dumps({"model": model, "messages": messages,
-                       "provider": {"data_collection": "deny"}}).encode()
+    payload = {"model": model, "messages": messages, "provider": {"data_collection": "deny"}}
+    if not reasoning:
+        payload["reasoning"] = {"enabled": False}
+    body = json.dumps(payload).encode()
     req = urllib.request.Request(URL, data=body, method="POST", headers={
         "Authorization": f"Bearer {key}", "Content-Type": "application/json"})
     try:

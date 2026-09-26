@@ -22,5 +22,5 @@ def doctor(*, config=None, runner=None, jev=None):
     checks = {"zg": bool(shutil.which("zg")), "age": bool(shutil.which("age")),
               "openrouter_key": bool(os.environ.get("OPENROUTER_API_KEY"))}
     ok = (checks["zg"] and checks["age"]
-         and (checks["openrouter_key"] or not (egress["rank"] or egress["answer"])))
+         and (checks["openrouter_key"] or not (egress["rank"] or egress["answer"] or egress["translate"])))
     return {"ok": ok, "checks": checks, "config": cfg["path"], "home": cfg["home"], "egress": egress, "lockers": n}

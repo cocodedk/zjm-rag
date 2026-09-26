@@ -76,6 +76,14 @@ class LauncherTest(unittest.TestCase):
         r3 = self.run_launcher(["find", "q", "-l", "lib"])
         self.assertIn("-e OPENROUTER_API_KEY", r3.stdout)
 
+    def test_translate_only_egress(self):
+        self.write_config({"rank": False, "answer": False, "translate": True})
+        r = self.run_launcher(["find", "q", "-l", "lib"])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        line = r.stdout.strip()
+        self.assertNotIn("--network none", line)
+        self.assertIn("-e OPENROUTER_API_KEY", line)
+
     def test_serve_offline_refused_and_bad_sources(self):
         self.write_config({"rank": False, "answer": False})
         r = self.run_launcher(["serve"])
