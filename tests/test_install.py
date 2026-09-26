@@ -1,13 +1,12 @@
 """install.sh in dry run, with a PATH of stub scripts; the only test that starts a subprocess (sh)."""
-import os
 import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parent.parent / "install.sh"
-REPO = "git+https://github.com/cocodedk/zjm-rag"
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPT = ROOT / "install.sh"
 
 
 class InstallTest(unittest.TestCase):
@@ -29,26 +28,21 @@ class InstallTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         return r.stdout.splitlines()
 
-    def test_prefers_uv_and_installs_zg(self):
-        out = self.install("python3", "npm", "uv")
-        self.assertIn("+ npm install -g @zvec/zvec-grep", out)
-        self.assertIn(f"+ uv tool install --force {REPO}", out)
-        self.assertIn("+ zjm doctor", out)
-        self.assertFalse(any("pip" in line for line in out))
+    def test_builds_from_local_checkout_and_installs_launcher(self):
+        out = self.install("docker", "python3")
+        self.assertIn(f"+ docker build -t zjm-rag:latest {ROOT}", out)
+        self.assertTrue(any(line.startswith("+ cp ") and line.endswith("/bin/zjm") for line in out))
+        self.assertTrue(any(line.startswith("+ chmod +x ") for line in out))
 
-    def test_pip_fallback(self):
-        out = self.install("python3", "zg")
-        self.assertIn(f"+ python3 -m pip install --user {REPO}", out)
-        self.assertFalse(any("npm" in line for line in out))
-        self.assertTrue(any("OPENROUTER_API_KEY" in line for line in out))
-        out = self.install("python3", "zg", "pipx")
-        self.assertIn(f"+ pipx install --force {REPO}", out)
-        self.assertFalse(any("pip install --user" in line for line in out))
-
-    def test_fails_when_zjm_missing(self):
-        r = self.run_script("python3", "zg", "uv", dry_run=False)
+    def test_fails_without_docker(self):
+        r = self.run_script("python3")
         self.assertEqual(r.returncode, 1)
-        self.assertIn("PATH", r.stderr)
+        self.assertIn("docker", r.stderr)
+
+    def test_fails_without_python3(self):
+        r = self.run_script("docker")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("python3", r.stderr)
 
 
 if __name__ == "__main__":

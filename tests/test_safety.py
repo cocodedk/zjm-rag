@@ -137,8 +137,9 @@ class SafetyTest(unittest.TestCase):
         locker_create("lib", config=cfg_on)
         find("q", ["lib"], rank=True, runner=FakeRunner(), jev=fake_jev([0.9, 0.8, 0.1]), config=cfg_on)
         ask("q", ["lib"], runner=FakeRunner(), jev=fake_jev([0.9, 0.8, 0.1]), config=cfg_on)
-        code, out, err = _run_cli(["find", "q", "-l", "lib", "--config", cfg_off["path"]], runner=FakeRunner(),
-                                  jev=jev_fail)
+        with mock.patch.dict(os.environ, {"ZJM_IN_CONTAINER": "1"}):
+            code, out, err = _run_cli(["find", "q", "-l", "lib", "--config", cfg_off["path"]], runner=FakeRunner(),
+                                      jev=jev_fail)
         self.assertEqual(code, 0)
 
     def test_llm_cannot_act(self):
@@ -174,7 +175,8 @@ class SafetyTest(unittest.TestCase):
         self.assertEqual(_req(base, "/health"), 200)
         with self.assertRaises(ValueError):
             make_server(host="0.0.0.0")
-        code, out, err = _run_cli(["serve", "--host", "0.0.0.0"])
+        with mock.patch.dict(os.environ, {"ZJM_IN_CONTAINER": "1"}):
+            code, out, err = _run_cli(["serve", "--host", "evil.example"])
         self.assertEqual(code, 2)
 
     def test_doctor_reports_config(self):

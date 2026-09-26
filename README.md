@@ -28,13 +28,19 @@ users, chats, organizations or tenants — the app decides who may use which loc
 
 ## Install
 
+zjm runs only inside its hardened container — never natively on the host.
+
     curl -fsSL https://raw.githubusercontent.com/cocodedk/zjm-rag/main/install.sh | sh
 
-It checks for Python 3.10+, installs `zg` with npm when missing, installs the package with `uv`,
-`pipx` or `pip --user`, and runs `zjm doctor`.
+It checks for `docker` and `python3`, builds the `zjm-rag:latest` image, and puts the `zjm`
+launcher (a POSIX `sh` script) on `~/.local/bin`. From then on, `zjm ...` on the host runs
+`docker run` with the container locked down: `--read-only`, `--cap-drop=ALL`,
+`--security-opt=no-new-privileges`, a `2g` memory cap, a `256`-pid limit, persistent data in the
+`zjm-data` Docker volume, and `--network none` unless the config turns `egress` on.
 
-Requirements: the `zg` binary on `PATH`; `OPENROUTER_API_KEY` for Jev ranking and `claude` for
-answers are needed only once `egress.rank`/`egress.answer` are turned on in the config.
+Requirements: `docker` and `python3` on the host; `OPENROUTER_API_KEY` for Jev ranking and
+`ANTHROPIC_API_KEY` for answers are needed only once `egress.rank`/`egress.answer` are turned on
+in the config, and are passed through by name, never by value.
 
 ## Use
 
@@ -84,11 +90,11 @@ Every subcommand takes `--config PATH` and `--json`, which prints the library's 
 one JSON object (errors as `{"error": "..."}`). Exit codes: `0` ok, `1` error or failed `doctor`,
 `2` usage.
 
-From any language on the same machine, over HTTP (loopback only):
+Over HTTP (needs `egress` on; the launcher publishes it to loopback only):
 
 ```sh
-zjm serve [--host 127.0.0.1] [--port 8765] [--config PATH]
-curl -s localhost:8765/file_add -d '{"locker": "linters", "paths": ["/home/you/projects/agent-linters"]}'
+zjm serve   # the launcher publishes 127.0.0.1:${ZJM_PORT:-8765} -> the container's :8765
+curl -s localhost:8765/file_add -d '{"locker": "linters", "paths": ["/sources/agent-linters"]}'
 curl -s localhost:8765/find -d '{"query": "which linter checks CSS files", "lockers": ["linters"]}'
 ```
 
@@ -125,14 +131,23 @@ zjm reads one JSON config file. The first of these that exists wins (files are n
 | `llm` | non-empty list of strings (argv) | a no-tools `claude -p` invocation |
 
 A relative `home`/`allow`/`deny` entry resolves against the config file's own directory; `~`
-expands from `$HOME`. Example config for local testing:
+expands from `$HOME`. In the container, `home` is fixed to `/data` (the `zjm-data` volume) and
+`allow` names `/sources/<name>` paths — the mount points the launcher creates from `ZJM_SOURCES`.
+`embedding` must be one of the two models baked into the image:
+`local/potion-code-16m-v2` or `local/potion-multilingual-128m`.
+
+Example config for the launcher (`$XDG_CONFIG_HOME/zjm/config.json`, or `$ZJM_HOST_CONFIG`):
 
 ```json
 {
-  "allow": ["/home/you/projects/agent-linters"],
+  "allow": ["/sources/agent-linters"],
+  "home": "/data",
   "egress": {"rank": true, "answer": true}
 }
 ```
+
+Set `ZJM_SOURCES` to a colon-separated list of host folders to mount, one becomes
+`/sources/<basename>`: `ZJM_SOURCES=/home/you/projects/agent-linters zjm file-add linters /sources/agent-linters`.
 
 ## Safety
 
@@ -146,8 +161,12 @@ expands from `$HOME`. Example config for local testing:
   `egress.rank`; answering (the LLM) needs `egress.answer`. The answer LLM runs with no tools, no
   MCP servers, a fresh empty `cwd`, and a filtered environment (no `OPENROUTER_API_KEY`).
 - `zjm serve` binds to `127.0.0.1`, `localhost` or `::1` only, and checks `Host`/`Origin` on every
-  request.
+  request (in the container, `0.0.0.0` is also accepted, since the launcher publishes only to
+  the host's loopback interface).
 - The app, not zjm, decides who may use which locker and which lockers a question may search.
+- **The container is the only supported way to run zjm.** It runs read-only, as a non-root user,
+  with no Linux capabilities, `--network none` unless `egress` is on, and persistent data confined
+  to the `zjm-data` volume.
 
 ## Build from source
 

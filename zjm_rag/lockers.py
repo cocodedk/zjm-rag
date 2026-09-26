@@ -12,7 +12,7 @@ from . import zg
 from .errors import ZjmError
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
-MULTILINGUAL_MODEL = "local/potion-multilingual-128m"
+MULTILINGUAL_MODEL = config_module.MULTILINGUAL_EMBEDDING
 
 
 def check_name(name):
@@ -98,6 +98,7 @@ def locker_create(name, multilingual=False, embedding=None, *, config=None, runn
     model = embedding or (MULTILINGUAL_MODEL if multilingual else cfg["embedding"])
     if not model.startswith("local/"):
         raise ZjmError(f"embedding {model!r} is not local; a remote model would send file contents out")
+    config_module.check_embedding_baked(model)
     with lock(cfg, exclusive=True) as lockers_dir:
         ldir = lockers_dir / name
         if manifest_path(ldir).exists():

@@ -7,7 +7,15 @@ from .errors import ZjmError
 ALLOWED_KEYS = {"home", "allow", "deny", "exclude", "egress", "embedding", "llm"}
 EGRESS_KEYS = {"rank", "answer"}
 DEFAULT_EMBEDDING = "local/potion-code-16m-v2"
+MULTILINGUAL_EMBEDDING = "local/potion-multilingual-128m"
+BAKED_EMBEDDINGS = {DEFAULT_EMBEDDING, MULTILINGUAL_EMBEDDING}
 DEFAULT_LLM = ["claude", "-p", "--tools", "", "--strict-mcp-config", "--model", "sonnet", "--effort", "medium"]
+
+
+def check_embedding_baked(model):
+    """In the container, only the two baked models may be used; anywhere else this is a no-op."""
+    if os.environ.get("ZJM_IN_CONTAINER") == "1" and model not in BAKED_EMBEDDINGS:
+        raise ZjmError(f"embedding {model!r} is not baked into the container; use one of {sorted(BAKED_EMBEDDINGS)}")
 
 
 def _default_home(environ):
@@ -62,6 +70,8 @@ def _validate(raw, used_path):
     _check_type(raw, "embedding", lambda v: isinstance(v, str), "a string", used_path)
     if "embedding" in raw and not raw["embedding"].startswith("local/"):
         raise ZjmError(f"embedding must start with local/ in {used_path}")
+    if "embedding" in raw:
+        check_embedding_baked(raw["embedding"])
     _check_type(raw, "llm", lambda v: _is_str_list(v) and len(v) > 0, "a non-empty list of strings", used_path)
     egress = raw.get("egress", {})
     if not isinstance(egress, dict):

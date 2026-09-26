@@ -1,0 +1,93 @@
+#!/bin/sh
+# zjm launcher: runs zjm-rag only inside its hardened container. See docs/lean/07-container.md.
+# ZJM_LAUNCH_DRY_RUN=1 prints the docker argv on one line, prefixed with "+ ", instead of running it.
+set -u
+
+die() {
+  echo "zjm: $*" >&2
+  exit 1
+}
+
+launcher_first="${1:-}"
+
+host_config="${ZJM_HOST_CONFIG:-}"
+if [ -z "$host_config" ]; then
+  host_config="${XDG_CONFIG_HOME:-$HOME/.config}/zjm/config.json"
+fi
+[ -f "$host_config" ] || die "host config not found: $host_config"
+
+egress=$(python3 -c '
+import json, sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as f:
+        raw = json.load(f)
+except (OSError, ValueError):
+    raw = {}
+e = raw.get("egress", {}) if isinstance(raw, dict) else {}
+e = e if isinstance(e, dict) else {}
+print("1" if e.get("rank") is True else "0")
+print("1" if e.get("answer") is True else "0")
+' "$host_config") || die "cannot read egress from $host_config"
+# Split the two-line python output without touching "$@" (positional params stay the caller's).
+nl='
+'
+egress_rank=${egress%%"$nl"*}
+egress_answer=${egress#*"$nl"}
+
+network_args=
+[ "$egress_rank" = 0 ] && [ "$egress_answer" = 0 ] && network_args="--network none"
+
+env_args=
+[ "$egress_rank" = 1 ] && env_args="$env_args -e OPENROUTER_API_KEY"
+[ "$egress_answer" = 1 ] && env_args="$env_args -e ANTHROPIC_API_KEY"
+
+source_args=
+seen=" "
+old_ifs=$IFS
+IFS=:
+for dir in ${ZJM_SOURCES:-}; do
+  IFS=$old_ifs
+  [ -n "$dir" ] || continue
+  [ -d "$dir" ] || die "source directory not found: $dir"
+  base=${dir##*/}
+  case "$seen" in
+    *" $base "*) die "duplicate source basename: $base" ;;
+  esac
+  seen="$seen$base "
+  source_args="$source_args -v $dir:/sources/$base:ro"
+  IFS=:
+done
+IFS=$old_ifs
+
+image="${ZJM_IMAGE:-zjm-rag:latest}"
+
+port_args=
+if [ "$launcher_first" = serve ]; then
+  [ -n "$network_args" ] && die "HTTP needs egress on, or use MCP"
+  port_args="-p 127.0.0.1:${ZJM_PORT:-8765}:8765"
+  set -- serve --host 0.0.0.0 --port 8765
+fi
+
+# Prepend the fixed docker flags to "$@" (the container command), keeping each argument distinct.
+set -- docker run --rm -i \
+  --user 10001:10001 \
+  --read-only \
+  --tmpfs /tmp:rw,size=256m,mode=1777 \
+  --cap-drop=ALL \
+  --security-opt=no-new-privileges \
+  --memory=2g \
+  --pids-limit=256 \
+  -v zjm-data:/data \
+  -v "$host_config":/etc/zjm/config.json:ro \
+  $source_args \
+  $network_args \
+  $env_args \
+  $port_args \
+  "$image" \
+  "$@"
+
+if [ "${ZJM_LAUNCH_DRY_RUN:-}" = 1 ]; then
+  echo "+ $*"
+else
+  exec "$@"
+fi

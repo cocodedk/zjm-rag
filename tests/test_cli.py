@@ -26,6 +26,9 @@ def config_file(cfg_dict, tmp_dir):
 
 class CliTest(unittest.TestCase):
     def setUp(self):
+        patcher = mock.patch.dict(os.environ, {"ZJM_IN_CONTAINER": "1"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.cfg = make_config(self)
         make_locker(self, self.cfg, "lib")
         self.config_path = self.cfg["path"]
@@ -94,7 +97,8 @@ class CliTest(unittest.TestCase):
         self.assertEqual(human[0], 0)
         self.assertTrue(human[1].startswith("ok zg\nok claude\nok openrouter_key\n"))
         self.assertNotIn("secret-value", out + err + human[1] + human[2])
-        with mock.patch.dict(os.environ, {}, clear=True), mock.patch("shutil.which", return_value=None):
+        with mock.patch.dict(os.environ, {"ZJM_IN_CONTAINER": "1"}, clear=True), \
+                mock.patch("shutil.which", return_value=None):
             code, out, _ = run(["doctor", "--config", self.config_path])
         self.assertEqual((code, out.splitlines()[0]), (1, "missing zg"))
 
