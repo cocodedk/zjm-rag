@@ -1,5 +1,6 @@
 import contextlib
 import io
+import json
 import os
 import tempfile
 import threading
@@ -9,7 +10,7 @@ import urllib.request
 from pathlib import Path
 from unittest import mock
 
-from fakes import FakeRunner, fake_jev, make_config, make_locker
+from fakes import FakeRunner, fake_jev, fake_llm, make_config, make_locker
 from zjm_rag import ZjmError, ask, doctor, find, locker_create
 from zjm_rag import files as files_mod
 from zjm_rag.cli import main
@@ -136,7 +137,7 @@ class SafetyTest(unittest.TestCase):
         cfg_on = make_config(self, egress={"rank": True, "answer": True})
         locker_create("lib", plain=True, config=cfg_on)
         find("q", ["lib"], rank=True, runner=FakeRunner(), jev=fake_jev([0.9, 0.8, 0.1]), config=cfg_on)
-        ask("q", ["lib"], runner=FakeRunner(), jev=fake_jev([0.9, 0.8, 0.1]), config=cfg_on)
+        ask("q", ["lib"], runner=FakeRunner(), jev=fake_jev([0.9, 0.8, 0.1]), llm=fake_llm(), config=cfg_on)
         with mock.patch.dict(os.environ, {"ZJM_IN_CONTAINER": "1"}):
             code, out, err = _run_cli(["find", "q", "-l", "lib", "--config", cfg_off["path"]], runner=FakeRunner(),
                                       jev=jev_fail)
@@ -145,21 +146,15 @@ class SafetyTest(unittest.TestCase):
     def test_llm_cannot_act(self):
         cfg = make_config(self, egress={"rank": True, "answer": True})
         make_locker(self, cfg, "lib")
-        captured = {}
-
-        class Runner(FakeRunner):
-            def __call__(self, argv, *, cwd, env, input):
-                if argv[0] not in ("zg", "git"):
-                    captured.update(argv=argv, cwd=cwd, env=env)
-                return super().__call__(argv, cwd=cwd, env=env, input=input)
-
-        ask("q", ["lib"], runner=Runner(), jev=fake_jev([0.9, 0.8, 0.1]), config=cfg)
-        argv = captured["argv"]
-        self.assertIn("--tools", argv)
-        self.assertIn("--strict-mcp-config", argv)
-        self.assertEqual(argv[argv.index("--tools") + 1], "")
-        self.assertFalse(Path(captured["cwd"]).is_relative_to(Path(cfg["home"])))
-        self.assertNotIn("OPENROUTER_API_KEY", captured["env"])
+        runner = FakeRunner()
+        llm = fake_llm("ok")
+        with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-should-not-leak"}):
+            ask("q", ["lib"], runner=runner, jev=fake_jev([0.9, 0.8, 0.1]), llm=llm, config=cfg)
+        self.assertEqual(len(llm.calls), 1)
+        self.assertTrue(runner.calls)
+        self.assertTrue(all(c[0][0] in ("zg", "git") for c in runner.calls))
+        _model, messages = llm.calls[0]
+        self.assertNotIn("sk-should-not-leak", json.dumps(messages))
 
     def test_http_guard(self):
         cfg = make_config(self)
@@ -182,7 +177,8 @@ class SafetyTest(unittest.TestCase):
     def test_doctor_reports_config(self):
         cfg = make_config(self, egress={"rank": False, "answer": True})
         locker_create("lib", plain=True, config=cfg)
-        with mock.patch.dict(os.environ, {}, clear=True), mock.patch("shutil.which", return_value="/usr/bin/x"):
+        with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "x"}, clear=True), \
+                mock.patch("shutil.which", return_value="/usr/bin/x"):
             r = doctor(config=cfg)
         self.assertEqual((r["config"], r["home"], r["egress"], r["lockers"]),
                          (cfg["path"], cfg["home"], cfg["egress"], 1))

@@ -129,6 +129,30 @@ question where `cand` is yes, `evid` and `ctx` must be yes too. With `--jev`, th
 3. Keep the smallest values that reach the best score.
 4. Record the table in this spec under "Results".
 
+## Results (2026-09-26, this repo's corpus + generated runbook, 38 questions)
+
+Ranking off, every combination of `ZG_HITS` and `WIDEN` scores identically:
+
+| `ZG_HITS` | `WIDEN` | cand | evid | acc | ctx |
+|---|---|---|---|---|---|
+| 40 | 0 | 34/38 | 34/38 | 34/38 | 34/38 |
+| 100 | 0 | 34/38 | 34/38 | 34/38 | 34/38 |
+| 40 | 3 | 34/38 | 34/38 | 34/38 | 34/38 |
+| 100 | 3 | 34/38 | 34/38 | 34/38 | 34/38 |
+
+Kept: `ZG_HITS = 40`, `WIDEN = 0` — the smallest values, since no larger value found or kept more.
+The gate holds at these values: every `cand: yes` question is also `evid: yes` and `ctx: yes`; the
+4 `NO` rows are the cross-meaning questions from "Out of scope", where `cand` is `NO` too.
+
+With `--jev` (real Jev ranking), `ZG_HITS = 40`, `WIDEN = 0`:
+
+| `JEV_CHARS` | acc |
+|---|---|
+| 6000 | 33/38 |
+| 12000 | 34/38 |
+
+Kept: `JEV_CHARS = 12000` — the value with the most accepted candidates.
+
 ## Acceptance tests
 
 `python3 -m unittest discover -s tests -q` runs **exactly 73 tests**:

@@ -77,7 +77,7 @@ def _parser():
             p.add_argument("--sort", choices=list(search.SORTS))
         p.add_argument("--no-rank", action="store_true")
         if name == "ask":
-            p.add_argument("--top-k", type=int, default=3)
+            p.add_argument("--top-k", type=int, default=8)
             p.add_argument("--lang")
 
     _common(sub.add_parser("doctor"))
@@ -131,7 +131,7 @@ def _args_to_body(cmd, args):
 
 
 
-def main(argv=None, *, runner=None, jev=None):
+def main(argv=None, *, runner=None, jev=None, llm=None):
     if os.environ.get("ZJM_IN_CONTAINER") != "1":
         print("zjm: runs only in its container; use the zjm launcher", file=sys.stderr)
         return 1
@@ -149,7 +149,7 @@ def main(argv=None, *, runner=None, jev=None):
         from .http import make_server
         cfg = config_module.resolve(args.config)
         try:
-            server = make_server(args.host, args.port, config=cfg, runner=runner, jev=jev)
+            server = make_server(args.host, args.port, config=cfg, runner=runner, jev=jev, llm=llm)
         except ValueError as e:
             print(f"zjm: {e}", file=sys.stderr)
             return 2
@@ -165,7 +165,7 @@ def main(argv=None, *, runner=None, jev=None):
     if args.cmd == "mcp":
         from .mcp import serve
         cfg = config_module.resolve(args.config)
-        return serve(sys.stdin, sys.stdout, config=cfg, runner=runner, jev=jev)
+        return serve(sys.stdin, sys.stdout, config=cfg, runner=runner, jev=jev, llm=llm)
 
     key_file = getattr(args, "key_file", None)
     usage_err = cli_keys.usage_error(args.cmd, key_file)
@@ -181,7 +181,7 @@ def main(argv=None, *, runner=None, jev=None):
         return 1
     cfg = config_module.resolve(args.config)
     try:
-        result = OPS[op][0](body, config=cfg, runner=runner, jev=jev)
+        result = OPS[op][0](body, config=cfg, runner=runner, jev=jev, llm=llm)
     except (ZjmError, ValueError) as e:
         if args.json:
             print(json.dumps({"error": str(e)}))

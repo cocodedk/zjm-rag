@@ -5,8 +5,8 @@
 1. Clone the repo and `cd` into it.
 2. Python 3.10 or newer. There is nothing to install for the tests: the package is stdlib-only.
 3. To run it for real you also need [zg](https://www.npmjs.com/package/@zvec/zvec-grep)
-   (`npm install -g @zvec/zvec-grep`), an `OPENROUTER_API_KEY` for Jev, and optionally the
-   `claude` CLI for answers. See the README for what the current proof of concept expects.
+   (`npm install -g @zvec/zvec-grep`) and an `OPENROUTER_API_KEY` for Jev ranking and OpenRouter
+   answers. See the README for what the current proof of concept expects.
 
 ## Install git hooks
 

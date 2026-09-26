@@ -1,4 +1,4 @@
-"""doctor: report zg, claude, OPENROUTER_API_KEY and locker presence (spec 06)."""
+"""doctor: report zg, age, OPENROUTER_API_KEY and locker presence (specs 06, 09)."""
 import os
 import shutil
 
@@ -20,8 +20,7 @@ def doctor(*, config=None, runner=None, jev=None):
     n = _locker_count(lockers_dir)
     egress = cfg["egress"]
     checks = {"zg": bool(shutil.which("zg")), "age": bool(shutil.which("age")),
-              "claude": bool(shutil.which(cfg["llm"][0])),
               "openrouter_key": bool(os.environ.get("OPENROUTER_API_KEY"))}
-    ok = (checks["zg"] and checks["age"] and (checks["openrouter_key"] or not egress["rank"])
-         and (checks["claude"] or not egress["answer"]))
+    ok = (checks["zg"] and checks["age"]
+         and (checks["openrouter_key"] or not (egress["rank"] or egress["answer"])))
     return {"ok": ok, "checks": checks, "config": cfg["path"], "home": cfg["home"], "egress": egress, "lockers": n}

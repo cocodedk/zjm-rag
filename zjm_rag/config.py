@@ -9,7 +9,7 @@ EGRESS_KEYS = {"rank", "answer"}
 DEFAULT_EMBEDDING = "local/potion-code-16m-v2"
 MULTILINGUAL_EMBEDDING = "local/potion-multilingual-128m"
 BAKED_EMBEDDINGS = {DEFAULT_EMBEDDING, MULTILINGUAL_EMBEDDING}
-DEFAULT_LLM = ["claude", "-p", "--tools", "", "--strict-mcp-config", "--model", "sonnet", "--effort", "medium"]
+DEFAULT_LLM = "deepseek/deepseek-v4-flash"
 
 
 def check_embedding_baked(model):
@@ -72,7 +72,8 @@ def _validate(raw, used_path):
         raise ZjmError(f"embedding must start with local/ in {used_path}")
     if "embedding" in raw:
         check_embedding_baked(raw["embedding"])
-    _check_type(raw, "llm", lambda v: _is_str_list(v) and len(v) > 0, "a non-empty list of strings", used_path)
+    if "llm" in raw and not (isinstance(raw["llm"], str) and raw["llm"]):
+        raise ZjmError(f'llm is an OpenRouter model id now, e.g. "deepseek/deepseek-v4-flash", in {used_path}')
     egress = raw.get("egress", {})
     if not isinstance(egress, dict):
         _type_error("egress", used_path, "an object")
@@ -131,6 +132,6 @@ def load(path=None, *, cwd=None, environ=None):
         "exclude": list(raw.get("exclude", [])),
         "egress": {"rank": bool(egress_raw.get("rank", False)), "answer": bool(egress_raw.get("answer", False))},
         "embedding": raw.get("embedding", DEFAULT_EMBEDDING),
-        "llm": list(raw.get("llm", DEFAULT_LLM)),
+        "llm": raw.get("llm", DEFAULT_LLM),
         "path": used_path,
     }

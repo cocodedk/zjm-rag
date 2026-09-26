@@ -20,15 +20,18 @@ A locker can be **encrypted with its own key**, supplied by the app on every cal
 [Locker keys](#locker-keys)): at rest it is one `age`-encrypted file, and zjm holds neither the
 key nor the plaintext outside the single request that needs them.
 
-1. **zg finds.** A hybrid search over a locker's zg index returns candidate files with short
-   snippets, in zg's rank order.
+1. **zg finds.** A hybrid search over a locker's zg index returns candidate files, in zg's rank
+   order. zjm keeps every one of zg's hits as a full chunk (its matched heading section, widened
+   and merged, not a truncated preview), so the text that answers a question is never lost between
+   zg and the answer model.
 2. **Jev ranks.** One request to Jev (the OpenRouter Decisions API) asks, per file, whether it
-   contains the information needed to answer the question. Each file gets a probability; files at
-   or above a threshold (default `0.5`) are accepted, the rest are reported as rejected, never
-   dropped silently.
-3. **An LLM answers.** The top accepted files go to an LLM command-line client (`claude` by
-   default) with the instruction to answer from those files only and cite the path. When no file
-   passes the threshold, no LLM is called.
+   contains the information needed to answer the question, judging from those full chunks. Each
+   file gets a probability; files at or above a threshold (default `0.5`) are accepted, the rest
+   are reported as rejected, never dropped silently.
+3. **An LLM answers.** The top accepted files (`top_k`, default `8`) go to a cheap OpenRouter model
+   (`deepseek/deepseek-v4-flash` by default) with the instruction to answer from those files only,
+   citing the path and lines. Small files are sent whole; larger ones as their chunks, while a
+   200 000-character budget lasts. When no file passes the threshold, no LLM is called.
 
 ## Install
 
@@ -42,9 +45,9 @@ launcher (a POSIX `sh` script) on `~/.local/bin`. From then on, `zjm ...` on the
 `--security-opt=no-new-privileges`, a `2g` memory cap, a `256`-pid limit, persistent data in the
 `zjm-data` Docker volume, and `--network none` unless the config turns `egress` on.
 
-Requirements: `docker` and `python3` on the host; `OPENROUTER_API_KEY` for Jev ranking and
-`ANTHROPIC_API_KEY` for answers are needed only once `egress.rank`/`egress.answer` are turned on
-in the config, and are passed through by name, never by value.
+Requirements: `docker` and `python3` on the host; `OPENROUTER_API_KEY` (used for both Jev ranking
+and OpenRouter answers) is needed only once `egress.rank` or `egress.answer` is turned on in the
+config, and is passed through by name, never by value.
 
 ## Use
 
@@ -71,11 +74,12 @@ print(reply["answer"], reply["files"])
   directly; `file_remove(locker, names, key=None)` removes files or whole directory prefixes;
   `file_list(locker, key=None)` lists what is there. `key` is required exactly when the locker is
   encrypted.
-- `find(query, lockers, keys=None, min_score=0.5, sort="score"|"zg"|"mtime"|"path", rank=None,
-  file_types=["py"])` searches one or more lockers at once (plain and encrypted mixed freely),
-  interleaving their results; `rank=None` follows the config's `egress.rank`, and `rank=True`
-  fails without it. `keys` maps each encrypted locker's name to its key.
-- `ask(...)` fails unless the config's `egress.answer` is on.
+- `find(query, lockers, keys=None, limit=8, min_score=0.5, sort="score"|"zg"|"mtime"|"path",
+  rank=None, file_types=["py"])` searches one or more lockers at once (plain and encrypted mixed
+  freely), interleaving their results; `rank=None` follows the config's `egress.rank`, and
+  `rank=True` fails without it. `keys` maps each encrypted locker's name to its key.
+- `ask(..., top_k=8, llm=zjm_rag.llm.post)` fails unless the config's `egress.answer` is on. `llm`
+  is injectable, like `jev`, for tests.
 - `locker_encrypt(name, key)` seals a plain locker into an encrypted one; this is one-way — there
   is no operation that decrypts a locker back to plain.
 - Every call takes `config=` (a path or a `load()`ed dict), plus injectable `runner=` and `jev=`
@@ -96,7 +100,7 @@ zjm file-remove LOCKER NAME... [--key-file KEY]
 zjm file-list LOCKER [--key-file KEY]
 zjm find "which linter checks CSS files" -l LOCKER [-l LOCKER]... [--key-file KEYS.json] [--limit N] [--type py]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank]
 zjm ask "which linter checks CSS files" -l LOCKER --lang da [--key-file KEYS.json] [--top-k 3]
-zjm doctor                                   # zg, age, claude, OPENROUTER_API_KEY, config, home, egress, lockers
+zjm doctor                                   # zg, age, OPENROUTER_API_KEY, config, home, egress, lockers
 ```
 
 For `find`/`ask`, `--key-file` holds a JSON object `{"locker": "key"}` (one entry per encrypted
@@ -145,13 +149,18 @@ zjm reads one JSON config file. The first of these that exists wins (files are n
 | `exclude` | list of strings (globs) | `[]` — adds to the built-in floor below, never removes from it |
 | `egress` | `{"rank": bool, "answer": bool}` | `{"rank": false, "answer": false}` |
 | `embedding` | string, must start with `local/` | `local/potion-code-16m-v2` |
-| `llm` | non-empty list of strings (argv) | a no-tools `claude -p` invocation |
+| `llm` | an OpenRouter model id string | `deepseek/deepseek-v4-flash` |
 
 A relative `home`/`allow`/`deny` entry resolves against the config file's own directory; `~`
 expands from `$HOME`. In the container, `home` is fixed to `/data` (the `zjm-data` volume) and
 `allow` names `/sources/<name>` paths — the mount points the launcher creates from `ZJM_SOURCES`.
 `embedding` must be one of the two models baked into the image:
 `local/potion-code-16m-v2` or `local/potion-multilingual-128m`.
+
+`llm` names the OpenRouter model `ask` answers with; every request sets
+`"provider": {"data_collection": "deny"}`, so OpenRouter itself does not retain the prompt. Avoid
+`:free` model variants as the answer model — OpenRouter's free tier usually logs prompts, and
+`data_collection: deny` cannot change that — which is why the default is a paid, non-`:free` model.
 
 Example config for the launcher (`$XDG_CONFIG_HOME/zjm/config.json`, or `$ZJM_HOST_CONFIG`):
 
@@ -194,8 +203,10 @@ app, never in zjm: **zjm never stores a key**, and a lost key means a lost locke
 - Symlinks inside a source are never copied. Gitignored files are never copied (denying a single
   file inside an allowed repository's own git metadata is not supported; deny the whole directory).
 - **Nothing leaves this machine unless `egress` says so.** Ranking (Jev/OpenRouter) needs
-  `egress.rank`; answering (the LLM) needs `egress.answer`. The answer LLM runs with no tools, no
-  MCP servers, a fresh empty `cwd`, and a filtered environment (no `OPENROUTER_API_KEY`).
+  `egress.rank`; answering (the OpenRouter model) needs `egress.answer`. The answer request has no
+  `tools` key, so the model cannot act; it only ever returns text. `OPENROUTER_API_KEY` is sent
+  only in the request's `Authorization` header — never in argv, logs, errors, results or the
+  messages sent to the model.
 - `zjm serve` binds to `127.0.0.1`, `localhost` or `::1` only, and checks `Host`/`Origin` on every
   request (in the container, `0.0.0.0` is also accepted, since the launcher publishes only to
   the host's loopback interface).
@@ -215,13 +226,33 @@ python3 -m unittest discover -s tests -q    # the test suite
 ```
 
 The package is stdlib-only, so there is nothing else to install. Tests use fakes and never call
-zg, Jev or an LLM. See [CONTRIBUTING.md](CONTRIBUTING.md).
+zg, Jev or the answer model. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Recall eval
+
+`evals/recall.py` measures whether zjm keeps the text that answers a question, from zg's hits
+through to the answer model's prompt, over `evals/corpus` plus a generated runbook. It runs the
+real `zg` (offline; no network), captures the answer prompt instead of calling the model, and is
+not part of the unit suite:
+
+```sh
+python3 evals/recall.py                                # ranking off (no network)
+python3 evals/recall.py --jev                           # also ranks with the real Jev (network, costs)
+python3 evals/recall.py --limit 20 --min-score 0.7 --multilingual --verbose
+```
+
+Per question it reports whether the expected file was a candidate (`cand`), whether the answer
+text was in that file's evidence (`evid`), whether the file was accepted (`acc`), and whether the
+answer text reached the answer model's prompt (`ctx`). The gate: for every question where `cand`
+is `yes`, `evid` and `ctx` must be `yes` too.
 
 ## Architecture
 
 ```
-zjm_rag/            library: lockers, files, search (zg + Jev), ask (claude), sealed (age), ops table
+zjm_rag/            library: lockers, files, search, evidence (full chunks), llm (OpenRouter),
+                    sealed (age), ops table
 tests/              unittest suite and the zg output fixture
+evals/              the recall eval: corpus, golden questions and recall.py
 docs/lean/          specs for the library, CLI, HTTP API, MCP server and installer
 profile-python.md   gate profile the lean loop builds against
 website/            the project site (rag.cocode.dk)
@@ -231,7 +262,7 @@ website/            the project site (rag.cocode.dk)
 |---|---|
 | Search | zg (zvec-grep), local hybrid index per locker |
 | Ranking | Jev via the OpenRouter Decisions API |
-| Answer | an LLM CLI (`claude` by default) |
+| Answer | an OpenRouter model (`deepseek/deepseek-v4-flash` by default) |
 | Code | Python 3.10+, standard library only |
 
 ## Author

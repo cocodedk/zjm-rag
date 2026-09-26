@@ -38,8 +38,7 @@ network_args=
 [ "$egress_rank" = 0 ] && [ "$egress_answer" = 0 ] && network_args="--network none"
 
 env_args=
-[ "$egress_rank" = 1 ] && env_args="$env_args -e OPENROUTER_API_KEY"
-[ "$egress_answer" = 1 ] && env_args="$env_args -e ANTHROPIC_API_KEY"
+{ [ "$egress_rank" = 1 ] || [ "$egress_answer" = 1 ]; } && env_args="$env_args -e OPENROUTER_API_KEY"
 
 source_args=
 seen=" "

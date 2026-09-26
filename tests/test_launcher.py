@@ -64,9 +64,17 @@ class LauncherTest(unittest.TestCase):
         line = r.stdout.strip()
         self.assertIn("-p 127.0.0.1:8765:8765", line)
         self.assertIn("-e OPENROUTER_API_KEY", line)
-        self.assertIn("-e ANTHROPIC_API_KEY", line)
+        self.assertNotIn("ANTHROPIC_API_KEY", line)
         self.assertNotIn("--network none", line)
         self.assertTrue(line.endswith("zjm-rag:latest serve --host 0.0.0.0 --port 8765"))
+
+        # Either egress switch alone is still enough for -e OPENROUTER_API_KEY.
+        self.write_config({"rank": True, "answer": False})
+        r2 = self.run_launcher(["find", "q", "-l", "lib"])
+        self.assertIn("-e OPENROUTER_API_KEY", r2.stdout)
+        self.write_config({"rank": False, "answer": True})
+        r3 = self.run_launcher(["find", "q", "-l", "lib"])
+        self.assertIn("-e OPENROUTER_API_KEY", r3.stdout)
 
     def test_serve_offline_refused_and_bad_sources(self):
         self.write_config({"rank": False, "answer": False})

@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from fakes import FakeRunner, fake_jev, make_config, make_locker
+from fakes import FakeRunner, fake_jev, fake_llm, make_config, make_locker
 from zjm_rag.cli import main
 
 
@@ -63,14 +63,14 @@ class CliTest(unittest.TestCase):
         code, out, _ = run(["find", "q", "-l", "lib", "--config", self.config_path],
                            runner=FakeRunner(), jev=fake_jev([0.9, 0.2, 0.5]))
         self.assertEqual(code, 0)
-        self.assertEqual(out, "0.90  lib/proj/b.md\n0.50  lib/proj/c.txt\nrejected: 1 below 0.5\n")
+        self.assertEqual(out, "0.90  lib/proj/b.md:1-1\n0.50  lib/proj/c.txt:1-1\nrejected: 1 below 0.5\n")
 
     def test_ask_lang(self):
-        runner = FakeRunner()
+        runner, llm = FakeRunner(), fake_llm("the answer")
         code, out, _ = run(["ask", "q", "-l", "lib", "--config", self.config_path, "--lang", "da"],
-                           runner=runner, jev=fake_jev([0.9, 0.2, 0.1]))
+                           runner=runner, jev=fake_jev([0.9, 0.2, 0.1]), llm=llm)
         self.assertEqual(code, 0)
-        self.assertIn("Answer in da.", runner.calls[-1][3])
+        self.assertIn("Answer in da.", llm.calls[-1][1][-1]["content"])
         self.assertEqual(out, "the answer\n\nsources: lib/proj/b.md\n")
 
     def test_error_exit_and_json(self):
@@ -92,10 +92,10 @@ class CliTest(unittest.TestCase):
             self.assertEqual(code, 0)
             r = json.loads(out)
             self.assertEqual(r["ok"], True)
-            self.assertEqual(r["checks"], {"zg": True, "age": True, "claude": True, "openrouter_key": True})
+            self.assertEqual(r["checks"], {"zg": True, "age": True, "openrouter_key": True})
             human = run(["doctor", "--config", self.config_path])
         self.assertEqual(human[0], 0)
-        self.assertTrue(human[1].startswith("ok zg\nok age\nok claude\nok openrouter_key\n"))
+        self.assertTrue(human[1].startswith("ok zg\nok age\nok openrouter_key\n"))
         self.assertNotIn("secret-value", out + err + human[1] + human[2])
         with mock.patch.dict(os.environ, {"ZJM_IN_CONTAINER": "1"}, clear=True), \
                 mock.patch("shutil.which", return_value=None):

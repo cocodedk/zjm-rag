@@ -1,6 +1,13 @@
 """Human (non-JSON) CLI output, split out of cli.py to keep it under 200 lines."""
 
 
+def _where(hit):
+    """`<locker>/<path>[:<start>-<end>]`, using the first passage when there is one."""
+    label = f"{hit['locker']}/{hit['path']}"
+    passages = hit.get("passages") or []
+    return f"{label}:{passages[0]['start']}-{passages[0]['end']}" if passages else label
+
+
 def human(cmd, r):
     if cmd == "locker-create":
         return [f"created {r['name']} ({r['embedding']})"]
@@ -26,8 +33,7 @@ def human(cmd, r):
     if cmd == "file-list":
         return [f"{f['name']}  {f['size']} bytes" for f in r["files"]]
     if cmd == "find":
-        lines = [f"{'-' if h['score'] is None else format(h['score'], '.2f')}  {h['locker']}/{h['path']}"
-                 for h in r["accepted"]]
+        lines = [f"{'-' if h['score'] is None else format(h['score'], '.2f')}  {_where(h)}" for h in r["accepted"]]
         return lines + ([f"rejected: {len(r['rejected'])} below {r['min_score']}"] if r["rejected"] else [])
     if cmd == "ask":
         return [r["answer"] or r["reason"], "", f"sources: {', '.join(r['files'])}"]

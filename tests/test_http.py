@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 from unittest import mock
 
-from fakes import FakeRunner, fake_jev, make_config, make_locker
+from fakes import FakeRunner, fake_jev, fake_llm, make_config, make_locker
 from zjm_rag.cli import main
 from zjm_rag.http import MAX_BODY, make_server
 
@@ -60,7 +60,7 @@ class HttpTest(unittest.TestCase):
             thread.join(5)
         self.assertEqual(code, 200)
         self.assertEqual(set(r), {"ok", "checks", "config", "home", "egress", "lockers"})
-        self.assertEqual(set(r["checks"]), {"zg", "age", "claude", "openrouter_key"})
+        self.assertEqual(set(r["checks"]), {"zg", "age", "openrouter_key"})
         self.assertEqual(servers[1], 0)
 
     def test_find_roundtrip(self):
@@ -80,13 +80,13 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(r["name"], "lib2")
 
     def test_ask_language(self):
-        runner = FakeRunner()
+        runner, llm = FakeRunner(), fake_llm("the answer")
         cfg = make_config(self)
         make_locker(self, cfg, "lib")
-        self.serve(cfg, runner=runner, jev=fake_jev([0.9, 0.2, 0.1]))
+        self.serve(cfg, runner=runner, jev=fake_jev([0.9, 0.2, 0.1]), llm=llm)
         code, r = self.call("/ask", {"query": "q", "lockers": ["lib"], "answer_language": "da", "top_k": 1})
         self.assertEqual(code, 200)
-        self.assertIn("Answer in da.", runner.calls[-1][3])
+        self.assertIn("Answer in da.", llm.calls[-1][1][-1]["content"])
         self.assertEqual((r["answer"], r["files"]), ("the answer", ["lib/proj/b.md"]))
 
     def test_rejects_store_and_unknown_keys(self):

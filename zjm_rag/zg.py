@@ -2,12 +2,13 @@
 import re
 import subprocess
 
-MAX_SNIPPETS, SNIPPET_CHARS = 2, 1500
+ZG_HITS = 40
+HIT_RE = re.compile(r"^#(\d+) matchedBy=\S+ (.+?):(\d+)(?:-(\d+))?$")
 
 
 def run(argv, *, cwd, env, input=None):
     """Default runner: (returncode, stdout, stderr); a missing binary is exit 127. `input` as
-    bytes selects binary mode (used for age), text or None selects text mode (zg, git, the LLM)."""
+    bytes selects binary mode (used for age), text or None selects text mode (zg, git)."""
     binary = isinstance(input, bytes)
     try:
         p = subprocess.run(argv, cwd=cwd, env=env, input=input, text=not binary, capture_output=True)
@@ -22,20 +23,21 @@ def index_argv(embedding, rebuild=False):
 
 
 def query_argv(query, file_types=None):
-    argv = ["zg", "query", query, "--preview", "short", "--limit", "40", "--mode", "direct"]
+    argv = ["zg", "query", query, "--preview", "none", "--limit", str(ZG_HITS), "--mode", "direct"]
     for t in file_types or []:
         argv += ["-t", t]
     return argv
 
 
-def parse(out, limit=8):
-    """zg query output -> {path: [snippets]} in zg order, at most `limit` paths and 2 snippets each."""
-    files = {}
-    for hit in re.split(r"\n(?=#\d+ matchedBy=)", out)[1:]:
-        path = re.match(r"#\d+ \S+ (.+):\d+-\d+$", hit.split("\n", 1)[0]).group(1)
-        if path not in files and len(files) >= limit:
+def parse(out):
+    """zg query output -> every hit, in zg order, as {"path", "start", "end", "rank"}. Only header
+    lines matter; everything else (heading/scope/source lines) is ignored."""
+    hits = []
+    for line in out.split("\n"):
+        m = HIT_RE.match(line)
+        if not m:
             continue
-        snippets = files.setdefault(path, [])
-        if len(snippets) < MAX_SNIPPETS:
-            snippets.append(hit.split("source:\n", 1)[-1][:SNIPPET_CHARS])
-    return files
+        rank, path, start, end = m.groups()
+        start = int(start)
+        hits.append({"path": path, "start": start, "end": int(end) if end else start, "rank": int(rank)})
+    return hits
