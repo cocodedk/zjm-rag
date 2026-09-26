@@ -81,10 +81,11 @@ def find(query, lockers, *, limit=8, file_types=None, min_score=0.5, sort=None, 
     if sort not in SORTS or (sort == "score" and not effective_rank):
         raise ValueError(f"bad sort {sort!r} (rank={effective_rank})")
     per_locker, ldirs, sources = {}, {}, {}
-    for name in lockers:
-        ldir, files = _query_locker(cfg, name, query, file_types, limit, runner)
-        per_locker[name], ldirs[name] = files, ldir
-        sources[name] = lockers_mod.read_manifest(ldir)["files"]
+    with lockers_mod.lock(cfg, exclusive=False):
+        for name in lockers:
+            ldir, files = _query_locker(cfg, name, query, file_types, limit, runner)
+            per_locker[name], ldirs[name] = files, ldir
+            sources[name] = lockers_mod.read_manifest(ldir)["files"]
     merged = _interleave(per_locker, limit)
     merged_paths = {f"{n}/{p}": s for n, p, s in merged}
     scores = _rank(query, merged_paths, jev) if effective_rank and merged else [None] * len(merged)

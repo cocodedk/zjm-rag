@@ -1,10 +1,12 @@
 """zjm: the library on the command line, with --json."""
 import argparse
 import json
+import os
 import sys
 
 from . import config as config_module
 from . import search
+from .cli_human import human as _human
 from .errors import ZjmError
 from .ops import OPS, check
 
@@ -110,44 +112,19 @@ def _args_to_body(cmd, args):
     return body
 
 
-def _human(cmd, r):
-    if cmd == "locker-create":
-        return [f"created {r['name']} ({r['embedding']})"]
-    if cmd == "locker-list":
-        return [f"{l['name']}  {l['files']} files  {l['bytes']} bytes  ({l['embedding']})" for l in r["lockers"]]
-    if cmd == "locker-drop":
-        return [f"dropped {r['name']} ({r['files']} files)"]
-    if cmd == "file-add":
-        lines = [f"added {n}" for n in r["added"]] + [f"replaced {n}" for n in r["replaced"]]
-        if r["excluded"]:
-            lines.append(f"excluded {r['excluded']} entries")
-        return lines
-    if cmd == "file-put":
-        return [f"added {n}" for n in r["added"]] + [f"replaced {n}" for n in r["replaced"]]
-    if cmd == "file-remove":
-        return [f"removed {n}" for n in r["removed"]]
-    if cmd == "file-list":
-        return [f"{f['name']}  {f['size']} bytes" for f in r["files"]]
-    if cmd == "find":
-        lines = [f"{'-' if h['score'] is None else format(h['score'], '.2f')}  {h['locker']}/{h['path']}"
-                 for h in r["accepted"]]
-        return lines + ([f"rejected: {len(r['rejected'])} below {r['min_score']}"] if r["rejected"] else [])
-    if cmd == "ask":
-        return [r["answer"] or r["reason"], "", f"sources: {', '.join(r['files'])}"]
-    lines = [f"{'ok' if ok else 'missing'} {name}" for name, ok in r["checks"].items()]
-    lines.append(f"config {r['config'] or '(built-in defaults)'}")
-    lines.append(f"home {r['home']}")
-    lines.append(f"egress rank={r['egress']['rank']} answer={r['egress']['answer']}")
-    lines.append(f"lockers {r['lockers']}")
-    return lines
-
 
 def main(argv=None, *, runner=None, jev=None):
+    if os.environ.get("ZJM_IN_CONTAINER") != "1":
+        print("zjm: runs only in its container; use the zjm launcher", file=sys.stderr)
+        return 1
     try:
         args = _parser().parse_args(argv)
     except SystemExit as e:
         return e.code
-    if args.cmd == "serve" and args.host not in ("127.0.0.1", "localhost", "::1"):
+    allowed_hosts = ("127.0.0.1", "localhost", "::1")
+    if os.environ.get("ZJM_IN_CONTAINER") == "1":
+        allowed_hosts += ("0.0.0.0",)
+    if args.cmd == "serve" and args.host not in allowed_hosts:
         print(f"zjm: --host must be 127.0.0.1, localhost or ::1, not {args.host!r}", file=sys.stderr)
         return 2
     if args.cmd == "serve":

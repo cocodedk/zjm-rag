@@ -1,5 +1,6 @@
 """zjm serve: the library as a local HTTP JSON API, generated from OPS (spec 06)."""
 import json
+import os
 import urllib.parse
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -22,8 +23,11 @@ def _host_of(value):
 
 
 def make_server(host="127.0.0.1", port=8765, *, config=None, runner=None, jev=None):
-    """A ThreadingHTTPServer bound to host:port (loopback only), not yet serving."""
-    if host not in ("127.0.0.1", "localhost", "::1"):
+    """A ThreadingHTTPServer bound to host:port (loopback only, or 0.0.0.0 in the container)."""
+    allowed = ("127.0.0.1", "localhost", "::1")
+    if os.environ.get("ZJM_IN_CONTAINER") == "1":
+        allowed += ("0.0.0.0",)
+    if host not in allowed:
         raise ValueError(f"host must be 127.0.0.1, localhost or ::1, not {host!r}")
     cfg = config_module.resolve(config)
     fakes = {"runner": runner, "jev": jev}

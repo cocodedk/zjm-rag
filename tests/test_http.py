@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import os
 import threading
 import time
 import unittest
@@ -43,7 +44,8 @@ class HttpTest(unittest.TestCase):
             return servers[0]
 
         argv = ["serve", "--port", "0", "--config", make_config(self)["path"]]
-        with mock.patch("zjm_rag.http.make_server", capture), contextlib.redirect_stdout(out):
+        with mock.patch("zjm_rag.http.make_server", capture), contextlib.redirect_stdout(out), \
+                mock.patch.dict(os.environ, {"ZJM_IN_CONTAINER": "1"}):
             thread = threading.Thread(target=lambda: servers.append(main(argv)))
             thread.start()
             for _ in range(500):
