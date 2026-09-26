@@ -5,14 +5,16 @@
 zjm must not lose the text that answers a question between zg and the answer model, and `ask`
 uses a cheap OpenRouter model instead of the `claude` CLI.
 
-The recall eval (`evals/recall.py`, 25 questions over `evals/corpus` plus a generated runbook)
-measured the current code with ranking off:
+The recall eval (`evals/recall.py`, 38 questions over `evals/corpus` plus a generated runbook, in
+English, German, Danish, Norwegian and Swedish) measured the current code with ranking off:
 
 | | found by zg | answer text in zjm's evidence | answer text in the answer prompt |
 |---|---|---|---|
-| before this spec | 24/25 | **14/25** | **19/25** |
+| before this spec | 34/38 | **24/38** | **29/38** |
 
-zg ranked the right file first in 19 of 25 questions. The losses are all zjm's:
+zg found the right file for every question except the 4 English questions about a foreign-language
+text that share no words with it (see "Out of scope"). In those 34 cases zjm lost the answer
+anyway:
 - **Evidence is truncated.** zg's chunks are whole heading sections (for example
   `06-lockers.md:75-124`), but zjm kept only `--preview short`, about 10 lines from the matched
   line. It also kept only 2 chunks per file.
@@ -28,8 +30,8 @@ This spec builds on specs 01–08; where they disagree, this one wins.
 - The query argv is `zg query <query> --preview none --limit <ZG_HITS> --mode direct`, plus
   `-t <type>` per file type. `ZG_HITS` is a module constant, `40`.
 - `parse(out)` returns every hit in zg order as `{"path", "start", "end", "rank"}`. The fields
-  come from each header line matching `^#(\d+) matchedBy=\S+ (.+):(\d+)-(\d+)$`, and `rank` is the
-  `#` number. It ignores all other lines, so it also parses the unchanged
+  come from each header line matching `^#(\d+) matchedBy=\S+ (.+?):(\d+)(?:-(\d+))?$`. A
+  single-line header such as `one.md:7` gives `end = start`, and `rank` is the `#` number. It ignores all other lines, so it also parses the unchanged
   `tests/fixtures/zg-query.md`.
 
 ### Evidence is the full chunks: `zjm_rag/evidence.py`
@@ -39,7 +41,8 @@ These steps run inside each locker's session, which is required for encrypted lo
 1. **Candidates** are the first `limit` distinct hit paths, in zg order, that are keys of the
    locker's manifest `files`. Hits on any other path are ignored, and such files are never read.
    Every hit on a candidate is kept, whatever its rank.
-2. **Reading:** a candidate's text is read with `errors="replace"` and split on `"\n"` only (not
+2. **Reading:** a candidate's text is read with `open(path, encoding="utf-8", errors="replace",
+   newline="")`, so a bare `\r` is not turned into a line break, and split on `"\n"` only (not
    `splitlines`), so line numbers match zg's. Line numbers are 1-based and inclusive.
 3. **Passages:** each hit's range is widened by `WIDEN` lines on both sides (a module constant,
    `0`) and clamped to the file. Ranges that overlap or touch are merged, and a range starting
@@ -86,7 +89,8 @@ These steps run inside each locker's session, which is required for encrypted lo
     with no other keys, so there are no tools
   - headers: `Authorization: Bearer <OPENROUTER_API_KEY>` and
     `Content-Type: application/json`
-- It follows no redirects. Like `jev.py`, it raises `ZjmError` when the key is missing, and on any
+- The request goes through a module-level `_open(req, timeout)`, which opens it with a
+  `build_opener` whose redirect handler raises `ZjmError`. It follows no redirects. Like `jev.py`, it raises `ZjmError` when the key is missing, and on any
   HTTP or network error. The error message never includes the response body or the key.
 - It returns `choices[0].message.content` when that is a string. Anything else raises
   `ZjmError("answer model returned no text")`.
@@ -112,9 +116,11 @@ These steps run inside each locker's session, which is required for encrypted lo
 ### Recall eval: `evals/`
 
 `evals/recall.py`, `evals/golden.json` and `evals/corpus/` are committed as they are. They are not
-part of the unit suite. After implementation, the eval must report **evid 24/25 or better** and
-**ctx 24/25 or better** with ranking off, in both runs of the "Tuning" section. The known miss is
-the English question about the Persian file.
+part of the unit suite.
+
+**Gate (ranking off, every `ZG_HITS`/`WIDEN` value kept):** zjm loses nothing zg found. For every
+question where `cand` is yes, `evid` and `ctx` must be yes too. With `--jev`, the eval reports
+`acc`, and the tuning keeps the `JEV_CHARS` value with the most accepted candidates.
 
 ## Tuning (done by the owner's agent after the suite is green, not by tests)
 
@@ -130,6 +136,9 @@ the English question about the Persian file.
 - minus the 2 in `tests/test_zg.py`, which are replaced
 - plus the 11 below
 
+Tests that depend on `ZG_HITS`, `WIDEN`, `JEV_CHARS` or `ASK_CHARS` patch those constants
+explicitly, so tuning them later cannot break a test.
+
 Existing tests are updated to the new shapes:
 - `passages` instead of `snippets`
 - a fake `llm` instead of an LLM runner call
@@ -140,12 +149,13 @@ never called for anything but zg or git, and the messages contain no key.
 
 - `tests/test_zg.py`:
   1. `test_parse_keeps_every_hit_with_lines`: the fixture gives every hit, in order, with its path,
-     start, end and rank.
+     start, end and rank. A single-line header `#9 matchedBy=fts one.md:7` gives start 7 and
+     end 7.
   2. `test_query_argv`: it has `--preview none` and `--limit 40`, plus `-t` per type.
 - `tests/test_evidence.py`:
   3. `test_passage_is_the_full_chunk`: a hit `5-9` on a 20-line file gives exactly lines 5 to 9,
      so numbering is 1-based and inclusive. A file containing `\x0c` or ` ` does not shift
-     the lines.
+     the lines, and neither does a bare `\r`.
   4. `test_overlaps_merge_and_order_by_rank`.
   5. `test_unknown_path_never_read`: a hit whose path is not in the manifest is skipped, and the
      file is not opened.
@@ -159,12 +169,13 @@ never called for anything but zg or git, and the messages contain no key.
   9. `test_ask_deep_answer_reaches_prompt`: an answer in the last lines of a 60 000-character file
      reaches the prompt.
 - `tests/test_llm.py`:
-  10. `test_request_shape_and_errors`, with `urlopen` patched:
+  10. `test_request_shape_and_errors`, with `zjm_rag.llm._open` patched:
       - the URL, `model`, `messages` and `provider` are exactly as specified
       - the body has no `tools` key
       - the key appears only in the header
       - an HTTP error raises without the response body
       - a reply with no text raises
+      - the real opener's redirect handler raises `ZjmError`
   11. `test_config_llm_is_model_id`: the default is `deepseek/deepseek-v4-flash`, and a list
       raises with the message.
 
@@ -172,7 +183,12 @@ never called for anything but zg or git, and the messages contain no key.
 
 - An exact-term rescue pass.
 - A query translation step.
-- Changing the default embedding model. The eval showed the multilingual model found fewer right
-  files (23/25 vs 24/25).
+- Changing the default embedding model. The multilingual model found fewer right files (33/38 vs
+  34/38).
+- **Cross-language questions by meaning.** An English question about a Danish, German, Norwegian
+  or Swedish text that shares no words with it: 0/4 with either model, and only the German one
+  shows up among 40 files. This is a limit of the index (static embeddings plus full-text search),
+  not of zjm. Whether another indexing type is needed is a separate investigation. Questions in
+  the text's own language pass in all four languages (8/8).
 - Line-level ranking by Jev.
 - Streaming answers.
