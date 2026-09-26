@@ -154,7 +154,7 @@ never called for anything but zg or git, and the messages contain no key.
   2. `test_query_argv`: it has `--preview none` and `--limit 40`, plus `-t` per type.
 - `tests/test_evidence.py`:
   3. `test_passage_is_the_full_chunk`: a hit `5-9` on a 20-line file gives exactly lines 5 to 9,
-     so numbering is 1-based and inclusive. A file containing `\x0c` or ` ` does not shift
+     so numbering is 1-based and inclusive. A file containing `\x0c` or `\u2028` does not shift
      the lines, and neither does a bare `\r`.
   4. `test_overlaps_merge_and_order_by_rank`.
   5. `test_unknown_path_never_read`: a hit whose path is not in the manifest is skipped, and the
