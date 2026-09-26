@@ -55,16 +55,17 @@ zjm never reads, keeps or sends anything you have not allowed in the config file
 ```python
 import os, zjm_rag
 
-zjm_rag.locker_create("linters")
+zjm_rag.locker_create("linters", plain=True)   # or locker_create("linters", key) to encrypt
 zjm_rag.file_add("linters", [os.path.expanduser("~/projects/agent-linters")])
 hits = zjm_rag.find("which linter checks CSS files", ["linters"])   # {"accepted": [...], "rejected": [...], ...}
 reply = zjm_rag.ask("which linter checks CSS files", ["linters"], answer_language="da")
 print(reply["answer"], reply["files"])
 ```
 
-- `locker_create(name, key=None, multilingual=True)` for non-English queries; the embedding is
-  fixed for the locker's lifetime — drop and recreate it to change models. Without `key` the
-  locker is a plain directory; with one it is `age`-encrypted from the start.
+- `locker_create(name, key, multilingual=True)` for non-English queries; the embedding is
+  fixed for the locker's lifetime — drop and recreate it to change models. **Lockers are
+  encrypted by default**: `locker_create` needs a key, and a plain directory locker needs an
+  explicit `plain=True` (CLI `--plain`).
 - `file_add(locker, paths, key=None)` copies files or directories in (spec 05's
   allow/deny/exclude/gitignore rules apply); `file_put(locker, name, text, key=None)` writes text
   directly; `file_remove(locker, names, key=None)` removes files or whole directory prefixes;
@@ -85,7 +86,7 @@ The same operations on the command line (`zjm` or `python3 -m zjm_rag`); add `--
 wherever a key is needed (`-` reads it from stdin):
 
 ```sh
-zjm locker-create NAME [--key-file KEY] [--multilingual | --embedding MODEL]
+zjm locker-create NAME (--key-file KEY | --plain) [--multilingual | --embedding MODEL]
 zjm locker-list
 zjm locker-drop NAME [--key-file KEY]
 zjm locker-encrypt NAME --key-file KEY        # one-way: plain -> encrypted
@@ -171,7 +172,8 @@ A locker's key is an [age](https://github.com/FiloSottile/age) X25519 identity s
 (`AGE-SECRET-KEY-1…`). Generate one with `age-keygen` (baked into the image) and keep it in the
 app, never in zjm: **zjm never stores a key**, and a lost key means a lost locker.
 
-- Without a key, a locker is a plain directory under `<home>/lockers/<name>/`, exactly as before.
+- A plain locker exists only when created with `plain=True` (`--plain`); it is a directory under
+  `<home>/lockers/<name>/`, exactly as before.
 - With a key — on `locker_create`, or later via `locker_encrypt` — a locker is exactly one file,
   `<home>/lockers/<name>.age`: the whole locker (its files, zg index and manifest), tarred and
   encrypted. No other per-locker file exists on disk.

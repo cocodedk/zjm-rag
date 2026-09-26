@@ -178,3 +178,12 @@ No real age runs in tests.
   - a plain and an encrypted locker are both searched in one `find`
   - each of the two wrong-key errors above is raised
   - `locker_list` shows the `encrypted` flag
+
+## Amendment: encrypted by default (owner, 2026-09-26)
+
+- `locker_create` takes a new boolean `plain` (default `false`; CLI `--plain`). Without a key it
+  raises `ZjmError("locker <name> needs a key; pass plain=true for an unencrypted locker")`,
+  unless `plain` is true. A key together with `plain=true` raises
+  `ZjmError("a plain locker takes no key")`. Both raise before anything is created.
+- Tests stay at **64**. `test_plain_and_encrypted_mix` asserts both refusals, and every test
+  that creates a plain locker passes `plain=True`.

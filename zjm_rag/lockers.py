@@ -91,8 +91,13 @@ def _locations(cfg, name):
     return lockers_dir / f"{name}.age", locker_dir(cfg, name)
 
 
-def locker_create(name, key=None, multilingual=False, embedding=None, *, config=None, runner=zg.run, jev=None):
+def locker_create(name, key=None, multilingual=False, embedding=None, plain=False, *, config=None, runner=zg.run,
+                  jev=None):
     check_name(name)
+    if key is None and not plain:
+        raise ZjmError(f"locker {name} needs a key; pass plain=true for an unencrypted locker")
+    if key is not None and plain:
+        raise ZjmError("a plain locker takes no key")
     cfg = config_module.resolve(config)
     model = embedding or (MULTILINGUAL_MODEL if multilingual else cfg["embedding"])
     if not model.startswith("local/"):

@@ -27,6 +27,7 @@ def _parser():
     p.add_argument("--key-file", metavar="PATH")
     p.add_argument("--multilingual", action="store_true")
     p.add_argument("--embedding", metavar="MODEL")
+    p.add_argument("--plain", action="store_true")
 
     _common(sub.add_parser("locker-list"))
 
@@ -98,6 +99,8 @@ def _args_to_body(cmd, args):
             body["multilingual"] = True
         if args.embedding:
             body["embedding"] = args.embedding
+        if args.plain:
+            body["plain"] = True
         return body
     if cmd in ("locker-list", "doctor"):
         return {}

@@ -109,7 +109,13 @@ class SealedTest(unittest.TestCase):
         with self.assertRaisesRegex(ZjmError, "enc1 needs its key"):
             find("q", ["plain1", "enc1"], config=self.cfg, runner=FakeRunner(), jev=fake_jev([]))
 
+        with self.assertRaisesRegex(ZjmError, "needs a key; pass plain=true"):
+            locker_create("nokey", config=self.cfg, runner=FakeRunner())
+        with self.assertRaisesRegex(ZjmError, "plain locker takes no key"):
+            locker_create("both", TEST_KEY, plain=True, config=self.cfg, runner=FakeRunner())
+
         listed = {l["name"]: l for l in locker_list(config=self.cfg)["lockers"]}
+        self.assertNotIn("nokey", listed)
         self.assertEqual(listed["plain1"]["encrypted"], False)
         self.assertEqual(listed["enc1"]["encrypted"], True)
 

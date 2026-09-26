@@ -14,13 +14,13 @@ class LockerTest(unittest.TestCase):
         self.cfg = make_config(self)
 
     def test_create_list_drop(self):
-        locker_create("a", config=self.cfg)
-        locker_create("b", config=self.cfg)
+        locker_create("a", plain=True, config=self.cfg)
+        locker_create("b", plain=True, config=self.cfg)
         listed = locker_list(config=self.cfg)["lockers"]
         self.assertEqual([l["name"] for l in listed], ["a", "b"])
         self.assertEqual([l["files"] for l in listed], [0, 0])
         with self.assertRaisesRegex(ZjmError, "already exists"):
-            locker_create("a", config=self.cfg)
+            locker_create("a", plain=True, config=self.cfg)
         r = locker_drop("a", config=self.cfg)
         self.assertEqual(r, {"name": "a", "files": 0})
         self.assertEqual([l["name"] for l in locker_list(config=self.cfg)["lockers"]], ["b"])
@@ -30,7 +30,7 @@ class LockerTest(unittest.TestCase):
     def test_bad_names_refused(self):
         for bad in ("", "A", "a/b", "..", "x" * 65):
             with self.assertRaises(ZjmError):
-                locker_create(bad, config=self.cfg)
+                locker_create(bad, plain=True, config=self.cfg)
         self.assertFalse(Path(self.cfg["home"]).exists())
 
     def test_file_add_manifest_and_zg(self):
@@ -42,7 +42,7 @@ class LockerTest(unittest.TestCase):
         single = Path(tmp.name) / "single.txt"
         single.write_text("bbb")
         cfg = make_config(self, allow=[tmp.name])
-        locker_create("lib", config=cfg)
+        locker_create("lib", plain=True, config=cfg)
         runner = FakeRunner()
         r = files_mod.file_add("lib", [str(src), str(single)], config=cfg, runner=runner)
         self.assertEqual(r["added"], ["docs", "single.txt"])
@@ -116,7 +116,7 @@ class LockerTest(unittest.TestCase):
 
     def test_file_put_rules(self):
         cfg = make_config(self)
-        locker_create("lib", config=cfg)
+        locker_create("lib", plain=True, config=cfg)
         r = files_mod.file_put("lib", "notes/a.md", "hello", config=cfg, runner=FakeRunner())
         self.assertEqual(r, {"added": ["notes/a.md"], "replaced": []})
         manifest = lockers_mod.read_manifest(lockers_mod.locker_dir(cfg, "lib"))
@@ -129,7 +129,7 @@ class LockerTest(unittest.TestCase):
 
     def test_file_remove_all_or_nothing(self):
         cfg = make_config(self)
-        locker_create("lib", config=cfg)
+        locker_create("lib", plain=True, config=cfg)
         files_mod.file_put("lib", "a.md", "a", config=cfg, runner=FakeRunner())
         files_mod.file_put("lib", "dir/b.md", "b", config=cfg, runner=FakeRunner())
         with self.assertRaisesRegex(ZjmError, "nope"):
@@ -143,17 +143,17 @@ class LockerTest(unittest.TestCase):
 
     def test_embedding_fixed_per_locker(self):
         cfg = make_config(self, embedding="local/potion-code-16m-v2")
-        locker_create("lib", multilingual=True, config=cfg)
+        locker_create("lib", multilingual=True, plain=True, config=cfg)
         runner = FakeRunner()
         files_mod.file_put("lib", "a.md", "a", config=cfg, runner=runner)
         argv = [c[0] for c in runner.calls if c[0][0] == "zg"][0]
         self.assertIn("local/potion-multilingual-128m", argv)
         with self.assertRaises(ZjmError):
-            locker_create("other", embedding="qwen/x", config=cfg)
+            locker_create("other", embedding="qwen/x", plain=True, config=cfg)
 
     def test_foreign_or_symlinked_locker_refused(self):
         cfg = make_config(self)
-        locker_create("lib", config=cfg)
+        locker_create("lib", plain=True, config=cfg)
         home = Path(cfg["home"])
         planted = home / "lockers" / "planted"
         (home / "lockers").mkdir(parents=True, exist_ok=True)
@@ -161,10 +161,10 @@ class LockerTest(unittest.TestCase):
         real.mkdir()
         planted.symlink_to(real)
         with self.assertRaisesRegex(ZjmError, "symlink"):
-            locker_create("planted", config=cfg)
+            locker_create("planted", plain=True, config=cfg)
         with mock.patch("os.getuid", return_value=home.stat().st_uid + 1):
             with self.assertRaisesRegex(ZjmError, "owned by another user"):
-                locker_create("lib2", config=cfg)
+                locker_create("lib2", plain=True, config=cfg)
 
 
 if __name__ == "__main__":

@@ -31,9 +31,10 @@ _ASK_PROPS = {**_FIND_PROPS, "top_k": {"type": "integer", "minimum": 1}, "answer
 OPS = {
     "locker_create": (_wrap(lockers.locker_create, needs_runner=True),
                       {"type": "object", "properties": {"name": _STR, "key": _STR,
-                                                        "multilingual": {"type": "boolean"}, "embedding": _STR},
+                                                        "multilingual": {"type": "boolean"}, "embedding": _STR,
+                                                        "plain": {"type": "boolean"}},
                        "required": ["name"], "additionalProperties": False},
-                      "Create a named locker, plain or (with a key) encrypted, with a fixed embedding model."),
+                      "Create a named locker, encrypted with a key (or plain only with plain=true), with a fixed embedding model."),
     "locker_list": (_wrap(lockers.locker_list),
                     {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
                     "List lockers, each with whether it is encrypted, and its size."),

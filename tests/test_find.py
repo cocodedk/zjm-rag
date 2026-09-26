@@ -88,7 +88,7 @@ class FindTest(unittest.TestCase):
 
         empty_cfg = make_config(self)
         from zjm_rag import lockers as lm
-        lm.locker_create("empty", config=empty_cfg)
+        lm.locker_create("empty", plain=True, config=empty_cfg)
         r2 = find("q", ["empty"], runner=FakeRunner(), jev=fake_jev([]), config=empty_cfg)
         self.assertEqual(r2["accepted"], [])
         self.assertEqual(r2["rejected"], [])
