@@ -83,6 +83,35 @@ The launcher adds:
 - `--ulimit core=0`
 - a `/tmp` tmpfs of `1g` instead of `256m`
 
+## Settled details (review, override anything above)
+
+1. **Tar extraction** accepts only regular files and directories. It rejects symlinks, hardlinks
+   and device, fifo or other special members, as well as absolute and `..` names, before
+   extracting anything.
+2. **Binary transport:** age calls go through a bytes runner (`input: bytes | None`, stdout as
+   bytes). zg calls keep the text runner. The test fake plays age in bytes.
+3. **`ask`:** each session buffers its candidates' text (up to spec 01's 20 000 characters)
+   alongside their snippets. Ranking and prompt building happen after every session has closed,
+   so no session stays open across ranking.
+4. **Single lock owner:** the session holds the only lock. The spec 06 file and search code is
+   refactored into helpers that take the session directory and do not lock or resolve paths
+   themselves.
+5. **`find` hits:** each session records `mtime` and the manifest `source` for its candidates
+   before closing.
+6. **`locker_create`** is the only operation that opens without decrypting. It builds the empty
+   locker in the session directory and seals it. Every other operation on a missing `.age` raises
+   `no locker <name>`.
+7. **Key validation:** the key must be exactly one line matching `^AGE-SECRET-KEY-1[0-9A-Z]+$`,
+   and `age-keygen -y` must print exactly one recipient. Anything else raises
+   `ZjmError("invalid key")`.
+8. **Sealing failure:** `<name>.age` is replaced only after `age -o <name>.age.tmp` succeeds.
+   `.age.tmp` is always removed during cleanup. On any failure the old `.age` stays, so a failed
+   write leaves the locker exactly as it was, and the spec 06 `indexed` flag never persists
+   `false`.
+9. **Existing tests:** `test_locker.test_same_name_replaces` changes its failure assertion to
+   "the locker is unchanged and `find` still works". Storage and runner expectations in the other
+   tests move to the fakes. The total stays 62.
+
 ## Acceptance tests
 
 `python3 -m unittest discover -s tests -q` runs **exactly 62 tests**: the 56 earlier ones, updated
