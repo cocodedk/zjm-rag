@@ -1,5 +1,9 @@
-"""zjm_rag: zg finds candidate files, Jev ranks them, an LLM answers."""
-from .core import ask, doctor, find, index
+"""zjm_rag: named lockers; zg finds, Jev ranks, an LLM answers."""
+from .core import doctor
 from .errors import ZjmError
+from .files import file_add, file_list, file_put, file_remove
+from .lockers import locker_create, locker_drop, locker_list
+from .search import ask, find
 
-__all__ = ["index", "find", "ask", "doctor", "ZjmError"]
+__all__ = ["locker_create", "locker_list", "locker_drop", "file_add", "file_put", "file_remove", "file_list",
+          "find", "ask", "doctor", "ZjmError"]

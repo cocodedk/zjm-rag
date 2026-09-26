@@ -1,4 +1,4 @@
-"""A store with three copied files and a fake runner that plays zg, git and the LLM."""
+"""A locker with three files, a resolved config, and a fake runner that plays zg, git and the LLM."""
 import json
 import os
 import tempfile
@@ -7,19 +7,6 @@ from pathlib import Path
 PATHS = ["proj/b.md", "proj/a.py", "proj/c.txt"]  # zg order
 ZG_OUT = "hits: 3\n" + "".join(f"\n#{i} matchedBy=fts+vector {p}:1-2\nsource:\n1\tbody of {p}\n"
                                for i, p in enumerate(PATHS, 1))
-
-
-def make_store(test):
-    tmp = tempfile.TemporaryDirectory()
-    test.addCleanup(tmp.cleanup)
-    store = Path(tmp.name)
-    for mtime, p in zip((300, 100, 200), PATHS):
-        f = store / "corpus" / p
-        f.parent.mkdir(parents=True, exist_ok=True)
-        f.write_text(f"content of {p}")
-        os.utime(f, (mtime, mtime))
-    (store / "zjm.json").write_text(json.dumps({"sources": ["/src/proj"], "embedding": "m"}))
-    return store
 
 
 def make_config(test, *, allow=None, egress=None, home=None, **extra):
@@ -35,6 +22,24 @@ def make_config(test, *, allow=None, egress=None, home=None, **extra):
     conf_path = conf_dir / "config.json"
     conf_path.write_text(json.dumps(raw))
     return config_module.load(str(conf_path))
+
+
+def make_locker(test, cfg, name="lib", *, embedding="m"):
+    """A locker under cfg["home"]/lockers/<name> with three indexed files, without calling zg."""
+    from zjm_rag import lockers
+
+    ldir = lockers.locker_dir(cfg, name)
+    (ldir / "corpus").mkdir(parents=True)
+    (ldir / "zghome").mkdir(parents=True)
+    files = {}
+    for mtime, p in zip((300, 100, 200), PATHS):
+        f = ldir / "corpus" / p
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(f"content of {p}")
+        os.utime(f, (mtime, mtime))
+        files[p] = {"source": f"/src/{p}", "size": f.stat().st_size, "sha256": "x", "added": mtime}
+    lockers.write_manifest(ldir, {"name": name, "embedding": embedding, "indexed": True, "files": files})
+    return ldir
 
 
 class FakeRunner:

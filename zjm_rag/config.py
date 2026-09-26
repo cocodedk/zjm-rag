@@ -83,6 +83,13 @@ def _resolve_path(value, *, base_dir, home_env):
     return os.path.abspath(value)
 
 
+def resolve(config):
+    """`config` as a dict (as-is), a path to load, or None (load defaults)."""
+    if isinstance(config, dict):
+        return config
+    return load(config)
+
+
 def load(path=None, *, cwd=None, environ=None):
     """The resolved config: every key above, plus "path" (the file used, or None)."""
     cwd = cwd if cwd is not None else os.getcwd()

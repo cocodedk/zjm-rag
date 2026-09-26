@@ -1,21 +1,11 @@
-"""zjm mcp: the library as MCP tools, JSON-RPC 2.0 over stdio, one message per line."""
+"""zjm mcp: the library as MCP tools, JSON-RPC 2.0 over stdio, generated from OPS (spec 06)."""
 import json
 import sys
 from importlib import metadata
 
-from . import core
+from . import config as config_module
 from .errors import ZjmError
-from .http import CHECKS, KEYS, _check
-
-TOOLS = {"zjm_index": ("/index", "Copy source folders into the store and build its zg index."),
-         "zjm_find": ("/find", "Find the indexed files that may hold the answer, ranked by Jev."),
-         "zjm_ask": ("/ask", "Answer a question with an LLM from the top accepted files, citing their paths."),
-         "zjm_doctor": (None, "Report whether zg, claude, OPENROUTER_API_KEY and the store are present.")}
-TYPES = {"sources": {"type": "array", "items": {"type": "string"}},
-         "file_types": {"type": "array", "items": {"type": "string"}},
-         "limit": {"type": "integer", "minimum": 1}, "top_k": {"type": "integer", "minimum": 1},
-         "min_score": {"type": "number", "minimum": 0, "maximum": 1},
-         "sort": {"type": "string", "enum": list(core.SORTS)}}
+from .ops import OPS, check
 
 
 def _version():
@@ -23,12 +13,6 @@ def _version():
         return metadata.version("zjm-rag")
     except metadata.PackageNotFoundError:
         return "0.0.0+unknown"
-
-
-def _schema(path):
-    required, allowed = KEYS[path] if path else (set(), set())
-    props = {k: TYPES.get(k, {"type": "boolean" if k in CHECKS else "string"}) for k in sorted(allowed)}
-    return {"type": "object", "properties": props, "required": sorted(required), "additionalProperties": False}
 
 
 def _tool_result(obj, error=False):
@@ -40,30 +24,23 @@ class _BadParams(Exception):
     pass
 
 
-def serve(stdin, stdout, *, store=None, config=None, runner=None, jev=None):
+def serve(stdin, stdout, *, config=None, runner=None, jev=None):
     """Answer JSON-RPC lines from `stdin` on `stdout` until EOF."""
-    cfg = core._load_config(config)
-    store = core._resolve_store(store, cfg)
-    fakes = {k: v for k, v in {"runner": runner, "jev": jev}.items() if v is not None}
-    calls = {"/index": lambda a: core.index(**a, store=store, config=cfg,
-                                            **{k: v for k, v in fakes.items() if k != "jev"}),
-             "/find": lambda a: core.find(**a, store=store, config=cfg, **fakes),
-             "/ask": lambda a: core.ask(**a, store=store, config=cfg, **fakes),
-             None: lambda a: core.doctor(store, config=cfg)}
+    cfg = config_module.resolve(config)
+    fakes = {"runner": runner, "jev": jev}
+    tools = {f"zjm_{name}": (name, desc) for name, (_, _, desc) in OPS.items()}
 
     def call_tool(params):
-        if not isinstance(params.get("name"), str) or params["name"] not in TOOLS:
-            raise _BadParams(f"unknown tool: {params.get('name')!r}")
-        path = TOOLS[params["name"]][0]
+        tool_name = params.get("name")
+        if not isinstance(tool_name, str) or tool_name not in tools:
+            raise _BadParams(f"unknown tool: {tool_name!r}")
+        op = tools[tool_name][0]
         args = params.get("arguments", {})
-        if path:
-            error = _check(path, args)
-        else:
-            error = None if args == {} else "zjm_doctor takes no arguments"
+        error = check(op, args)
         if error:
             return _tool_result({"error": error}, True)
         try:
-            return _tool_result(calls[path](args))
+            return _tool_result(OPS[op][0](args, config=cfg, **fakes))
         except (ZjmError, ValueError) as e:
             return _tool_result({"error": str(e)}, True)
 
@@ -75,8 +52,8 @@ def serve(stdin, stdout, *, store=None, config=None, runner=None, jev=None):
         if method == "ping":
             return {}
         if method == "tools/list":
-            return {"tools": [{"name": n, "description": d, "inputSchema": _schema(p)}
-                              for n, (p, d) in TOOLS.items()]}
+            return {"tools": [{"name": n, "description": d, "inputSchema": OPS[op][1]}
+                              for n, (op, d) in tools.items()]}
         if method == "tools/call":
             return call_tool(params)
         return None

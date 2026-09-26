@@ -1,55 +1,16 @@
-"""zjm serve: the library as a local HTTP JSON API, bound to loopback only."""
+"""zjm serve: the library as a local HTTP JSON API, generated from OPS (spec 06)."""
 import json
 import urllib.parse
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from . import config as config_module
 from . import core
 from .errors import ZjmError
+from .ops import OPS, check
 
 MAX_BODY = 1 << 20
 ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
-FIND_KEYS = {"query", "limit", "file_types", "min_score", "sort", "rank"}
-KEYS = {"/index": ({"sources"}, {"sources", "multilingual", "embedding", "rebuild"}),
-        "/find": ({"query"}, FIND_KEYS),
-        "/ask": ({"query"}, FIND_KEYS | {"top_k", "answer_language"})}
-
-
-def _list_str(v):
-    return isinstance(v, list) and all(isinstance(s, str) for s in v)
-
-
-def _pos_int(v):
-    return isinstance(v, int) and not isinstance(v, bool) and v > 0
-
-
-def _score(v):
-    return isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 1
-
-
-CHECKS = {"sources": (_list_str, "a list of strings"), "file_types": (_list_str, "a list of strings"),
-          "limit": (_pos_int, "a positive integer"), "top_k": (_pos_int, "a positive integer"),
-          "min_score": (_score, "a number in [0, 1]"), "rank": (lambda v: isinstance(v, bool), "a boolean"),
-          "multilingual": (lambda v: isinstance(v, bool), "a boolean"),
-          "rebuild": (lambda v: isinstance(v, bool), "a boolean")}
-
-
-def _check(path, body):
-    """The error message for a bad body, or None."""
-    if not isinstance(body, dict):
-        return "body must be a JSON object"
-    if "store" in body:
-        return "store is set by the server"
-    required, allowed = KEYS[path]
-    if body.keys() - allowed:
-        return f"unknown keys: {', '.join(sorted(body.keys() - allowed))}"
-    if required - body.keys():
-        return f"missing key: {', '.join(sorted(required - body.keys()))}"
-    for key, value in body.items():
-        ok, want = CHECKS.get(key, (lambda v: isinstance(v, str), "a string"))
-        if not ok(value):
-            return f"{key} must be {want}"
-    return None
 
 
 def _host_of(value):
@@ -60,17 +21,13 @@ def _host_of(value):
     return value.rsplit(":", 1)[0] if value.count(":") <= 1 else value.split("]")[0].lstrip("[")
 
 
-def make_server(host="127.0.0.1", port=8765, *, store=None, config=None, runner=None, jev=None):
+def make_server(host="127.0.0.1", port=8765, *, config=None, runner=None, jev=None):
     """A ThreadingHTTPServer bound to host:port (loopback only), not yet serving."""
     if host not in ("127.0.0.1", "localhost", "::1"):
         raise ValueError(f"host must be 127.0.0.1, localhost or ::1, not {host!r}")
-    cfg = core._load_config(config)
-    store = core._resolve_store(store, cfg)
-    fakes = {k: v for k, v in {"runner": runner, "jev": jev}.items() if v is not None}
-    calls = {"/index": lambda b: core.index(**b, store=store, config=cfg,
-                                            **{k: v for k, v in fakes.items() if k != "jev"}),
-             "/find": lambda b: core.find(**b, store=store, config=cfg, **fakes),
-             "/ask": lambda b: core.ask(**b, store=store, config=cfg, **fakes)}
+    cfg = config_module.resolve(config)
+    fakes = {"runner": runner, "jev": jev}
+    routes = {f"/{name}": func for name, (func, _, _) in OPS.items()}
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format, *args):
@@ -108,8 +65,8 @@ def make_server(host="127.0.0.1", port=8765, *, store=None, config=None, runner=
             if self._guarded(method):
                 return
             if self.path == "/health":
-                return self._send(200, core.doctor(store, config=cfg)) if method == "GET" else self.send_error(405)
-            if self.path not in calls:
+                return self._send(200, core.doctor(config=cfg)) if method == "GET" else self.send_error(405)
+            if self.path not in routes:
                 return self.send_error(404)
             if method != "POST":
                 return self.send_error(405)
@@ -125,11 +82,11 @@ def make_server(host="127.0.0.1", port=8765, *, store=None, config=None, runner=
                 body = json.loads(self.rfile.read(length))
             except ValueError:
                 return self.send_error(400, "invalid JSON")
-            error = _check(self.path, body)
+            error = check(self.path[1:], body)
             if error:
                 return self.send_error(400, error)
             try:
-                result = calls[self.path](body)
+                result = routes[self.path](body, config=cfg, **fakes)
             except (ZjmError, ValueError) as e:
                 return self.send_error(422, str(e))
             except Exception as e:
