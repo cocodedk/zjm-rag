@@ -19,4 +19,4 @@ packages = ["zjm_rag"]
 
 [tool.setuptools_scm]
 # The version comes from the latest vX.Y.Z git tag; the release workflow stamps it.
-fallback_version = "0.0.0"
+fallback_version = "0.6.0"

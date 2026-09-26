@@ -1,12 +1,9 @@
 import io
 import json
-import tempfile
 import unittest
-from pathlib import Path
 
-from fakes import FakeRunner, fake_jev, make_store
+from fakes import FakeRunner, fake_jev, make_config, make_locker
 from zjm_rag import find
-from zjm_rag.core import MULTILINGUAL_MODEL
 from zjm_rag.mcp import serve
 
 
@@ -30,53 +27,51 @@ class McpTest(unittest.TestCase):
         self.assertEqual(init["result"]["capabilities"], {"tools": {}})
         self.assertEqual(init["result"]["serverInfo"]["name"], "zjm-rag")
         listed = {t["name"]: t for t in tools["result"]["tools"]}
-        self.assertEqual(set(listed), {"zjm_index", "zjm_find", "zjm_ask", "zjm_doctor"})
+        self.assertEqual(set(listed), {"zjm_locker_create", "zjm_locker_list", "zjm_locker_drop", "zjm_file_add",
+                                       "zjm_file_put", "zjm_file_remove", "zjm_file_list", "zjm_find", "zjm_ask",
+                                       "zjm_doctor"})
         for t in listed.values():
             self.assertTrue(t["description"])
             self.assertEqual(t["inputSchema"]["type"], "object")
             self.assertIs(t["inputSchema"]["additionalProperties"], False)
         self.assertEqual(listed["zjm_doctor"]["inputSchema"]["properties"], {})
-        self.assertEqual(listed["zjm_find"]["inputSchema"]["required"], ["query"])
+        self.assertEqual(listed["zjm_find"]["inputSchema"]["required"], ["query", "lockers"])
 
     def test_call_find(self):
-        store = make_store(self)
-        args = {"query": "q", "min_score": 0.7, "sort": "path"}
-        (r,) = rpc(call(1, "zjm_find", args), store=store, runner=FakeRunner(), jev=fake_jev([0.9, 0.8, 0.1]))
-        want = find(**args, store=store, runner=FakeRunner(), jev=fake_jev([0.9, 0.8, 0.1]))
+        cfg = make_config(self)
+        make_locker(self, cfg, "lib")
+        args = {"query": "q", "lockers": ["lib"], "min_score": 0.7, "sort": "path"}
+        (r,) = rpc(call(1, "zjm_find", args), config=cfg, runner=FakeRunner(), jev=fake_jev([0.9, 0.8, 0.1]))
+        want = find(**args, config=cfg, runner=FakeRunner(), jev=fake_jev([0.9, 0.8, 0.1]))
         self.assertEqual(r["result"]["structuredContent"], want)
         self.assertEqual(json.loads(r["result"]["content"][0]["text"]), want)
         self.assertNotIn("isError", r["result"])
 
-        src = Path(tempfile.mkdtemp(dir=store)) / "docs"
-        src.mkdir()
-        (src / "a.md").write_text("x")
         runner = FakeRunner()
-        idx, ask, doc, doc_args = rpc(call(2, "zjm_index", {"sources": [str(src)], "multilingual": True, "rebuild": True}),
-                                      call(3, "zjm_ask", {"query": "q", "top_k": 1, "answer_language": "da"}),
-                                      call(4, "zjm_doctor", {}), call(5, "zjm_doctor", {"x": 1}),
-                                      store=store, runner=runner, jev=fake_jev([0.9, 0.2, 0.1]))
-        self.assertEqual(idx["result"]["structuredContent"], {"store": str(store), "sources": [str(src.resolve())],
-                                                              "embedding": MULTILINGUAL_MODEL, "files": 1})
-        self.assertEqual(runner.calls[0][0][0], "zg")
+        create, ask, doc, doc_args = rpc(call(2, "zjm_locker_create", {"name": "lib2", "multilingual": True}),
+                                         call(3, "zjm_ask", {"query": "q", "lockers": ["lib"], "top_k": 1,
+                                                             "answer_language": "da"}),
+                                         call(4, "zjm_doctor", {}), call(5, "zjm_doctor", {"x": 1}),
+                                         config=cfg, runner=runner, jev=fake_jev([0.9, 0.2, 0.1]))
+        self.assertEqual(create["result"]["structuredContent"]["name"], "lib2")
         self.assertEqual(ask["result"]["structuredContent"]["answer"], "the answer")
         self.assertIn("Answer in da.", runner.calls[-1][3])
-        self.assertEqual(set(doc["result"]["structuredContent"]["checks"]), {"zg", "claude", "openrouter_key", "store"})
+        self.assertEqual(set(doc["result"]["structuredContent"]["checks"]), {"zg", "claude", "openrouter_key"})
         self.assertIs(doc_args["result"]["isError"], True)
 
     def test_errors(self):
-        empty = tempfile.TemporaryDirectory()
-        self.addCleanup(empty.cleanup)
         runner = FakeRunner()
         unknown, bad, lib, typed, name = rpc({"jsonrpc": "2.0", "id": 1, "method": "nope"}, "{not json",
-                                             call(3, "zjm_find", {"query": "q"}),
-                                             call(4, "zjm_find", {"query": "q", "store": "/tmp/x"}),
+                                             call(3, "zjm_find", {"query": "q", "lockers": ["nope"]}),
+                                             call(4, "zjm_find", {"query": "q", "lockers": ["nope"],
+                                                                  "store": "/tmp/x"}),
                                              call(5, ["zjm_find"], {}),
-                                             store=empty.name, runner=runner, jev=fake_jev([]))
+                                             config=make_config(self), runner=runner, jev=fake_jev([]))
         self.assertEqual(name["error"]["code"], -32602)
         self.assertEqual(unknown["error"]["code"], -32601)
         self.assertEqual((bad["id"], bad["error"]["code"]), (None, -32700))
         self.assertIs(lib["result"]["isError"], True)
-        self.assertIn("no index", lib["result"]["structuredContent"]["error"])
+        self.assertIn("no locker", lib["result"]["structuredContent"]["error"])
         self.assertIs(typed["result"]["isError"], True)
         self.assertEqual(runner.calls, [])
 
