@@ -49,7 +49,8 @@ def _floor_excluded(name, is_dir, extra):
     return False
 
 
-def _walk(src, dest, config, files, count_excluded):
+def _walk(src, dest, config, files, count_excluded, root=None):
+    root = root or src
     with os.scandir(src) as it:
         entries = sorted(it, key=lambda e: e.name)
     for entry in entries:
@@ -62,12 +63,12 @@ def _walk(src, dest, config, files, count_excluded):
                 count_excluded[0] += 1
                 continue
             os.makedirs(os.path.join(dest, entry.name), exist_ok=True)
-            _walk(entry.path, os.path.join(dest, entry.name), config, files, count_excluded)
+            _walk(entry.path, os.path.join(dest, entry.name), config, files, count_excluded, root)
         elif entry.is_file(follow_symlinks=False):
             if _floor_excluded(entry.name, False, config["exclude"]):
                 count_excluded[0] += 1
                 continue
-            rel = os.path.relpath(entry.path, src)
+            rel = os.path.relpath(entry.path, root)
             files.append((rel, entry.path, os.path.join(dest, entry.name)))
         else:
             count_excluded[0] += 1
