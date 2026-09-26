@@ -120,8 +120,10 @@ def fake_jev(scores):
 
 
 def fake_llm(text="the answer"):
-    """Plays the answer model: records every (model, messages) call, always returns `text`."""
-    def llm(model, messages):
+    """Plays the answer model: records every (model, messages) call, always returns `text`. Also
+    accepts `reasoning=` (spec 10), so it can stand in for the translator too, without recording it
+    (calls stay a 2-tuple; tests that need to see `reasoning` use their own local fake)."""
+    def llm(model, messages, reasoning=True):
         llm.calls.append((model, messages))
         return text
     llm.calls = []

@@ -75,11 +75,15 @@ print(reply["answer"], reply["files"])
   `file_list(locker, key=None)` lists what is there. `key` is required exactly when the locker is
   encrypted.
 - `find(query, lockers, keys=None, limit=8, min_score=0.5, sort="score"|"zg"|"mtime"|"path",
-  rank=None, file_types=["py"])` searches one or more lockers at once (plain and encrypted mixed
-  freely), interleaving their results; `rank=None` follows the config's `egress.rank`, and
-  `rank=True` fails without it. `keys` maps each encrypted locker's name to its key.
-- `ask(..., top_k=8, llm=zjm_rag.llm.post)` fails unless the config's `egress.answer` is on. `llm`
-  is injectable, like `jev`, for tests.
+  rank=None, translate=None, file_types=["py"])` searches one or more lockers at once (plain and
+  encrypted mixed freely), interleaving their results; `rank=None` follows the config's
+  `egress.rank`, and `rank=True` fails without it. `translate=None` follows `egress.translate` the
+  same way, and adds the question's translations into the configured `languages` as further
+  candidates (see [Questions in other languages](#questions-in-other-languages)). `keys` maps each
+  encrypted locker's name to its key.
+- `ask(..., top_k=None, llm=zjm_rag.llm.post)` fails unless the config's `egress.answer` is on.
+  `top_k=None` (the default) sends every accepted file, still bounded by the context budget; an
+  integer still caps the count. `llm` is injectable, like `jev`, for tests.
 - `locker_encrypt(name, key)` seals a plain locker into an encrypted one; this is one-way — there
   is no operation that decrypts a locker back to plain.
 - Every call takes `config=` (a path or a `load()`ed dict), plus injectable `runner=` and `jev=`
@@ -98,8 +102,8 @@ zjm file-add LOCKER PATH... [--key-file KEY]
 zjm file-put LOCKER NAME [--key-file KEY]     # reads the text from stdin
 zjm file-remove LOCKER NAME... [--key-file KEY]
 zjm file-list LOCKER [--key-file KEY]
-zjm find "which linter checks CSS files" -l LOCKER [-l LOCKER]... [--key-file KEYS.json] [--limit N] [--type py]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank]
-zjm ask "which linter checks CSS files" -l LOCKER --lang da [--key-file KEYS.json] [--top-k 3]
+zjm find "which linter checks CSS files" -l LOCKER [-l LOCKER]... [--key-file KEYS.json] [--limit N] [--type py]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank] [--no-translate]
+zjm ask "which linter checks CSS files" -l LOCKER --lang da [--key-file KEYS.json] [--top-k 3] [--no-translate]
 zjm doctor                                   # zg, age, OPENROUTER_API_KEY, config, home, egress, lockers
 ```
 
@@ -147,9 +151,11 @@ zjm reads one JSON config file. The first of these that exists wins (files are n
 | `allow` | list of strings | `[]` — nothing is added to a locker until you add paths here |
 | `deny` | list of strings | `[]` — write real paths; symlinked parents are not resolved |
 | `exclude` | list of strings (globs) | `[]` — adds to the built-in floor below, never removes from it |
-| `egress` | `{"rank": bool, "answer": bool}` | `{"rank": false, "answer": false}` |
+| `egress` | `{"rank": bool, "answer": bool, "translate": bool}` | `{"rank": false, "answer": false, "translate": false}` |
 | `embedding` | string, must start with `local/` | `local/potion-code-16m-v2` |
 | `llm` | an OpenRouter model id string | `deepseek/deepseek-v4-flash` |
+| `languages` | list of non-empty strings | `["English", "German", "Danish", "Norwegian", "Swedish"]` |
+| `translate_model` | non-empty string | `upstage/solar-mini4` |
 
 A relative `home`/`allow`/`deny` entry resolves against the config file's own directory; `~`
 expands from `$HOME`. In the container, `home` is fixed to `/data` (the `zjm-data` volume) and
@@ -174,6 +180,38 @@ Example config for the launcher (`$XDG_CONFIG_HOME/zjm/config.json`, or `$ZJM_HO
 
 Set `ZJM_SOURCES` to a colon-separated list of host folders to mount, one becomes
 `/sources/<basename>`: `ZJM_SOURCES=/home/you/projects/agent-linters zjm file-add linters /sources/agent-linters`.
+
+## Questions in other languages
+
+An English question finds the Danish, German, Norwegian or Swedish text that answers it, even when
+they share no words, and a question in any language finds text in the configured `languages`. zjm
+translates the **question**, never the files, into each configured language and searches the
+translations in addition to the original; the translations can only **add** candidate files, never
+displace one the original question already found, and no language detection is needed.
+
+Measured (`evals/recall.py`, 38 questions, potion-code index; prototype):
+
+| approach | English question, foreign text, no shared words | everything else |
+|---|---|---|
+| no translation | 0/4 | 34/34 |
+| local multilingual embeddings | 0–1/4 | 33–34/34 |
+| translations fused into one ranking | 4/4 | 27/34 |
+| **translations add files after the original's** | **4/4** | **34/34** |
+
+- `egress.translate` (default `false`) follows the same rule as `egress.rank`/`egress.answer`:
+  `translate=True` while it is off raises before any call; CLI `--no-translate` forces it off for
+  one `find`/`ask`.
+- `languages` (default `["English", "German", "Danish", "Norwegian", "Swedish"]`); an empty list
+  turns translation off even with `egress.translate` on.
+- `translate_model` (default `upstage/solar-mini4`) — the OpenRouter model asked to translate.
+- The translation request sends only the question — never file text, paths or snippets. Ranking
+  and answering keep their own `egress` switches and are unaffected by this one.
+- **Why files are not translated:** mixed-language documents work chunk by chunk regardless, the
+  model translates a question from any language without first detecting it, and translating one
+  short question is far cheaper than translating (and re-indexing on every change) a whole corpus.
+- A hit found only through a translation carries `"via": "translation"` (`"via": "query"`
+  otherwise, for a hit the original question itself found); `find`'s human output marks such a
+  line with a trailing `  (translation)`.
 
 ## Locker keys
 
@@ -203,10 +241,11 @@ app, never in zjm: **zjm never stores a key**, and a lost key means a lost locke
 - Symlinks inside a source are never copied. Gitignored files are never copied (denying a single
   file inside an allowed repository's own git metadata is not supported; deny the whole directory).
 - **Nothing leaves this machine unless `egress` says so.** Ranking (Jev/OpenRouter) needs
-  `egress.rank`; answering (the OpenRouter model) needs `egress.answer`. The answer request has no
-  `tools` key, so the model cannot act; it only ever returns text. `OPENROUTER_API_KEY` is sent
-  only in the request's `Authorization` header — never in argv, logs, errors, results or the
-  messages sent to the model.
+  `egress.rank`; answering (the OpenRouter model) needs `egress.answer`; translating the question
+  (see [Questions in other languages](#questions-in-other-languages)) needs `egress.translate`. The
+  answer request has no `tools` key, so the model cannot act; it only ever returns text.
+  `OPENROUTER_API_KEY` is sent only in the request's `Authorization` header — never in argv, logs,
+  errors, results or the messages sent to the model.
 - `zjm serve` binds to `127.0.0.1`, `localhost` or `::1` only, and checks `Host`/`Origin` on every
   request (in the container, `0.0.0.0` is also accepted, since the launcher publishes only to
   the host's loopback interface).
@@ -249,7 +288,8 @@ is `yes`, `evid` and `ctx` must be `yes` too.
 ## Architecture
 
 ```
-zjm_rag/            library: lockers, files, search, evidence (full chunks), llm (OpenRouter),
+zjm_rag/            library: lockers, files, search, gather (per-locker zg queries), evidence
+                    (full chunks), translate (question translation), llm (OpenRouter),
                     sealed (age), ops table
 tests/              unittest suite and the zg output fixture
 evals/              the recall eval: corpus, golden questions and recall.py

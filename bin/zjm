@@ -27,18 +27,23 @@ e = raw.get("egress", {}) if isinstance(raw, dict) else {}
 e = e if isinstance(e, dict) else {}
 print("1" if e.get("rank") is True else "0")
 print("1" if e.get("answer") is True else "0")
+print("1" if e.get("translate") is True else "0")
 ' "$host_config") || die "cannot read egress from $host_config"
-# Split the two-line python output without touching "$@" (positional params stay the caller's).
+# Split the three-line python output without touching "$@" (positional params stay the caller's).
 nl='
 '
-egress_rank=${egress%%"$nl"*}
-egress_answer=${egress#*"$nl"}
+rest=$egress
+egress_rank=${rest%%"$nl"*}
+rest=${rest#*"$nl"}
+egress_answer=${rest%%"$nl"*}
+egress_translate=${rest#*"$nl"}
 
 network_args=
-[ "$egress_rank" = 0 ] && [ "$egress_answer" = 0 ] && network_args="--network none"
+[ "$egress_rank" = 0 ] && [ "$egress_answer" = 0 ] && [ "$egress_translate" = 0 ] && network_args="--network none"
 
 env_args=
-{ [ "$egress_rank" = 1 ] || [ "$egress_answer" = 1 ]; } && env_args="$env_args -e OPENROUTER_API_KEY"
+{ [ "$egress_rank" = 1 ] || [ "$egress_answer" = 1 ] || [ "$egress_translate" = 1 ]; } \
+  && env_args="$env_args -e OPENROUTER_API_KEY"
 
 source_args=
 seen=" "

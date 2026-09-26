@@ -57,6 +57,30 @@ class LlmTest(unittest.TestCase):
         with self.assertRaisesRegex(ZjmError, "redirect"):
             llm._NoRedirect().redirect_request(None, None, 302, "Found", {}, "https://evil.example")
 
+    def test_reasoning_off_adds_only_that_key(self):
+        sent = []
+
+        def patched(result):
+            def _open(req, timeout):
+                sent.append((req, timeout))
+                return io.BytesIO(result)
+            return mock.patch.object(llm, "_open", _open)
+
+        ok = b'{"choices": [{"message": {"content": "hi"}}]}'
+        messages = [{"role": "user", "content": "q"}]
+        with mock.patch.dict("os.environ", {"OPENROUTER_API_KEY": "sk-secret"}, clear=True):
+            with patched(ok):
+                llm.post("m", messages, reasoning=False)
+            body = json.loads(sent[-1][0].data)
+            self.assertEqual(body, {"model": "m", "messages": messages, "provider": {"data_collection": "deny"},
+                                    "reasoning": {"enabled": False}})
+            with patched(ok):
+                llm.post("m", messages)
+            body_default = json.loads(sent[-1][0].data)
+            self.assertEqual(body_default, {"model": "m", "messages": messages,
+                                            "provider": {"data_collection": "deny"}})
+            self.assertNotIn("reasoning", body_default)
+
     def test_config_llm_is_model_id(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)

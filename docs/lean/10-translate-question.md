@@ -191,9 +191,31 @@ where the shapes changed (fakes accept `reasoning=`; `find` results carry `trans
   8. `test_translate_only_egress`: `translate` on and the other two off gives no `--network none` and
      `-e OPENROUTER_API_KEY`.
 
-## Results
+## Results (2026-09-26, this repo's corpus + generated runbook, 38 questions)
 
-(Filled in after the eval runs.)
+| run | cand | evid | acc | ctx |
+|---|---|---|---|---|
+| `python3 evals/recall.py` (ranking off, translate off) | 34/38 | 34/38 | 34/38 | 34/38 |
+| `python3 evals/recall.py --translate` (ranking off) | **38/38** | **38/38** | **38/38** | **38/38** |
+| `python3 evals/recall.py --translate --jev` (real Jev ranking) | 37/38 | 37/38 | 37/38 | 37/38 |
+
+The gate holds: without `--translate` the 34/38 baseline is unchanged from spec 09 (the 4 `NO`
+rows are still the `cross-meaning` questions). With `--translate`, all 4 cross-meaning questions
+(an English question about Danish, German, Norwegian or Swedish text sharing no words with it) are
+now found — via their translation, at zg_rank 9, 11, 9 and 16 — without displacing any of the 8
+candidates the original question already found.
+
+`--translate --jev` is not part of the pass/fail gate (spec 09's own `--jev` tuning table shows the
+same kind of run-to-run variance from the real ranking model); it is recorded here as the spec
+asks. One cross-meaning question (`chore-de-en`, its file found only at zg_rank #16) was rejected
+by the real Jev call on this run — real-model judgement of a passage far down the merged list, not
+a regression in this implementation.
+
+**Translate latency:** measured cheaply as the wall-clock delta between the `--translate` run
+(2m17s wall, 38 real translation calls, one per question) and the baseline run with no network
+(31s wall) — about 106s / 38 ≈ **2.8 s per translation call** on average
+(`translate_model` = `upstage/solar-mini4`, `reasoning=False`), the same order of magnitude as this
+spec's own prototype measurement (1.5 s average).
 
 ## Out of scope
 

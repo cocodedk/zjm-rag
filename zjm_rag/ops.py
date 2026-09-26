@@ -28,7 +28,8 @@ def _wrap(func, *, needs_runner=False, needs_jev=False, needs_llm=False):
 _FIND_PROPS = {"query": _STR, "lockers": {**_STR_ARR, "minItems": 1}, "keys": _KEYS,
               "limit": {"type": "integer", "minimum": 1},
               "file_types": _STR_ARR, "min_score": {"type": "number", "minimum": 0, "maximum": 1},
-              "sort": {"type": "string", "enum": list(search.SORTS)}, "rank": {"type": "boolean"}}
+              "sort": {"type": "string", "enum": list(search.SORTS)}, "rank": {"type": "boolean"},
+              "translate": {"type": "boolean"}}
 _ASK_PROPS = {**_FIND_PROPS, "top_k": {"type": "integer", "minimum": 1}, "answer_language": _STR}
 
 OPS = {
@@ -65,7 +66,7 @@ OPS = {
                  {"type": "object", "properties": {"locker": _STR, "key": _STR}, "required": ["locker"],
                   "additionalProperties": False},
                  "List the files in a locker."),
-    "find": (_wrap(search.find, needs_runner=True, needs_jev=True),
+    "find": (_wrap(search.find, needs_runner=True, needs_jev=True, needs_llm=True),
             {"type": "object", "properties": _FIND_PROPS, "required": ["query", "lockers"],
              "additionalProperties": False},
             "Find the files across lockers that may hold the answer to a question."),

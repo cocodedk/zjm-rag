@@ -69,12 +69,12 @@ class ConfigTest(unittest.TestCase):
         cfg = config_module.load(cwd=str(self.tmp / "nowhere"), environ=environ)
         self.assertEqual(cfg["home"], str(self.tmp / "xdg-data" / "zjm"))
         self.assertEqual(cfg["allow"], [])
-        self.assertEqual(cfg["egress"], {"rank": False, "answer": False})
+        self.assertEqual(cfg["egress"], {"rank": False, "answer": False, "translate": False})
         self.assertIsNone(cfg["path"])
         rank_only = self.tmp / "rank_only.json"
         write(rank_only, {"egress": {"rank": True}})
         cfg2 = config_module.load(str(rank_only), environ=self.environ)
-        self.assertEqual(cfg2["egress"], {"rank": True, "answer": False})
+        self.assertEqual(cfg2["egress"], {"rank": True, "answer": False, "translate": False})
 
 
 if __name__ == "__main__":

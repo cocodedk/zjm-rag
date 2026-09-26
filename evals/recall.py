@@ -21,6 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent))
 import zjm_rag  # noqa: E402
+from zjm_rag import llm as llm_client  # noqa: E402
 from zjm_rag import zg  # noqa: E402
 
 TOOLS = {"zg", "git", "age", "age-keygen"}
@@ -58,6 +59,7 @@ def main():
     ap.add_argument("--limit", type=int, default=8)
     ap.add_argument("--min-score", type=float, default=0.5)
     ap.add_argument("--jev", action="store_true", help="rank with the real Jev (network, costs)")
+    ap.add_argument("--translate", action="store_true", help="turn on egress.translate (network, costs)")
     ap.add_argument("--multilingual", action="store_true")
     ap.add_argument("--embedding", help="any zg local model, e.g. local/multilingual-e5-small")
     ap.add_argument("--verbose", action="store_true")
@@ -74,7 +76,7 @@ def main():
                 sys.exit(f"golden error: {g['id']}: must text not in {g['file']}")
         cfg = tmp / "config.json"
         cfg.write_text(json.dumps({"allow": [str(src)], "home": str(tmp / "home"),
-                                   "egress": {"rank": args.jev, "answer": True}}))
+                                   "egress": {"rank": args.jev, "answer": True, "translate": args.translate}}))
         zjm_rag.locker_create("eval", plain=True, multilingual=args.multilingual, embedding=args.embedding,
                               config=str(cfg))
         zjm_rag.file_add("eval", [str(src)], config=str(cfg))
@@ -87,7 +89,9 @@ def main():
             prompts.append(input or "")
             return 0, "", ""
 
-        def llm(model, messages):
+        def llm(model, messages, reasoning=True):
+            if not reasoning:
+                return llm_client.post(model, messages, reasoning=False)  # a real translation call
             prompts.append("\n".join(m["content"] for m in messages))
             return ""
 
@@ -115,6 +119,8 @@ def main():
             if args.verbose and hit and not row["evid"]:
                 spans = [(p["start"], p["end"]) for p in hit.get("passages", [])]
                 print(f"{'':30}evidence spans: {spans or len(hit.get('snippets', []))}")
+            if args.verbose and (found.get("translations") or found.get("translate_error")):
+                print(f"{'':30}translations: {found.get('translations')} {found.get('translate_error') or ''}")
         print()
         for kind, t in totals.items():
             print(f"{kind:12} " + "  ".join(f"{k} {v[0]}/{v[1]}" for k, v in t.items()))

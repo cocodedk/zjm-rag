@@ -21,10 +21,12 @@ class ZgTest(unittest.TestCase):
         # ZG_HITS is patched explicitly so tuning it later cannot break this test.
         with mock.patch.object(zg, "ZG_HITS", 7):
             argv = zg.query_argv("q", ["py", "md"])
-            self.assertEqual(argv, ["zg", "query", "q", "--preview", "none", "--limit", "7", "--mode", "direct",
-                                    "-t", "py", "-t", "md"])
+            self.assertEqual(argv, ["zg", "query", "--preview", "none", "--limit", "7", "--mode", "direct",
+                                    "-t", "py", "-t", "md", "--", "q"])
             self.assertEqual(zg.query_argv("q"),
-                             ["zg", "query", "q", "--preview", "none", "--limit", "7", "--mode", "direct"])
+                             ["zg", "query", "--preview", "none", "--limit", "7", "--mode", "direct", "--", "q"])
+            self.assertEqual(zg.query_argv("--help"),
+                             ["zg", "query", "--preview", "none", "--limit", "7", "--mode", "direct", "--", "--help"])
 
 
 if __name__ == "__main__":

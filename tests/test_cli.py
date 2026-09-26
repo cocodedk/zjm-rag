@@ -54,7 +54,7 @@ class CliTest(unittest.TestCase):
                             "--min-score", "0.7", "--sort", "path", "--type", "py"],
                            runner=runner, jev=fake_jev([0.9, 0.8, 0.1]))
         self.assertEqual(code, 0)
-        self.assertEqual(runner.calls[0][0][-2:], ["-t", "py"])
+        self.assertEqual(runner.calls[0][0][-4:], ["-t", "py", "--", "q"])
         r = json.loads(out)
         self.assertEqual((r["min_score"], r["sort"]), (0.7, "path"))
         self.assertEqual([h["path"] for h in r["accepted"]], ["proj/a.py", "proj/b.md"])

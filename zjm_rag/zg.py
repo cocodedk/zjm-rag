@@ -23,7 +23,21 @@ def index_argv(embedding, rebuild=False):
 
 
 def query_argv(query, file_types=None):
-    argv = ["zg", "query", query, "--preview", "none", "--limit", str(ZG_HITS), "--mode", "direct"]
+    """Options first, `-t` per type, then `--` and the query last, so a question such as
+    `--help` is searched, not obeyed (spec 10)."""
+    argv = ["zg", "query", "--preview", "none", "--limit", str(ZG_HITS), "--mode", "direct"]
+    for t in file_types or []:
+        argv += ["-t", t]
+    return argv + ["--", query]
+
+
+def query_argv_translations(translations, file_types=None):
+    """One `--hybrid=<t>` argv element per translation, so it can never be read as an option;
+    `--fuse` only when there is more than one (spec 10)."""
+    argv = ["zg", "query"] + [f"--hybrid={t}" for t in translations]
+    if len(translations) > 1:
+        argv.append("--fuse")
+    argv += ["--preview", "none", "--limit", str(ZG_HITS), "--mode", "direct"]
     for t in file_types or []:
         argv += ["-t", t]
     return argv
