@@ -67,10 +67,10 @@ def _visible_allow(cfg):
 def _lockers_view(cfg):
     """[{"name", "encrypted"}] read the same way `doctor` counts lockers: no lock is taken and
     nothing is created. `[]` when `<home>/lockers` does not exist; `None` if reading it fails."""
-    _, lockers_dir = lockers_mod.home_dirs(cfg)
-    if not lockers_dir.is_dir():
-        return []
     try:
+        _, lockers_dir = lockers_mod.home_dirs(cfg)
+        if not lockers_dir.is_dir():
+            return []
         out = []
         for p in lockers_dir.iterdir():
             if p.is_file() and p.suffix == ".age":
