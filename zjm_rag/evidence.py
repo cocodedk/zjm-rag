@@ -7,8 +7,6 @@ and that file is never read. Each candidate's passages are its hit ranges, widen
 (and for an encrypted locker, its decrypted /tmp copy) is still open; nothing here re-opens a file
 once the caller's session has closed.
 """
-import array
-
 WIDEN = 0
 JEV_CHARS = 12000
 ASK_CHARS = 200000
@@ -37,30 +35,10 @@ def _widen_clamp(hit, n_lines):
     return None if start > n_lines else (start, end)
 
 
-def _line_offsets(text):
-    """Start offset of each 1-based line in `text`, split on "\\n" only (len == its line count).
-    Kept as offsets into `text`, in a packed `array` of native ints rather than a Python list of
-    line strings (or even a list of int objects): a text file with many short lines would
-    otherwise force one Python object per line just to extract a couple of small passages."""
-    offsets = array.array("q", (0,))
-    pos = text.find("\n")
-    while pos != -1:
-        offsets.append(pos + 1)
-        pos = text.find("\n", pos + 1)
-    return offsets
-
-
-def _slice_lines(text, offsets, start, end):
-    """`text`'s lines `start`..`end` (1-based, inclusive) - what "\\n".join(lines[start-1:end])
-    would give if `text` had been split on "\\n" into `lines`."""
-    begin = offsets[start - 1]
-    stop = offsets[end] - 1 if end < len(offsets) else len(text)
-    return text[begin:stop]
-
-
-def build_passages(hits, text, offsets):
-    """Merged passages for one file's hits, ordered by the best (lowest) rank merged into each."""
-    n_lines = len(offsets)
+def build_passages(hits, lines):
+    """Merged passages for one file's hits (its text split on "\\n" only), ordered by the best
+    (lowest) rank merged into each."""
+    n_lines = len(lines)
     ranges = []
     for hit in hits:
         widened = _widen_clamp(hit, n_lines)
@@ -75,7 +53,7 @@ def build_passages(hits, text, offsets):
         else:
             merged.append((start, end, rank))
     merged.sort(key=lambda r: r[2])
-    return [{"start": s, "end": e, "text": _slice_lines(text, offsets, s, e)} for s, e, _rank in merged]
+    return [{"start": s, "end": e, "text": "\n".join(lines[s - 1:e])} for s, e, _rank in merged]
 
 
 def _whole_text(path, text):
@@ -97,8 +75,7 @@ def read_candidates(hits, manifest_files, corpus_dir, limit, *, want_text):
         full = corpus_dir / path
         with open(full, encoding="utf-8", errors="replace", newline="") as f:
             text = f.read()
-        offsets = _line_offsets(text)
-        records[path] = {"passages": build_passages(by_path[path], text, offsets),
+        records[path] = {"passages": build_passages(by_path[path], text.split("\n")),
                           "whole": _whole_text(full, text) if want_text else None}
     return records
 
