@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from fakes import make_config
 from zjm_rag import ZjmError, index
 
 
@@ -35,9 +36,10 @@ class IndexTest(unittest.TestCase):
         write(self.src / "node_modules/x/index.js")
         write(self.src / ".env")
         write(self.src / ".env.local")
+        self.cfg = make_config(self, allow=[str(self.tmp)], home=str(self.tmp / "unused-home"))
 
     def test_copies_and_skips(self):
-        result = index([self.src], store=self.store, runner=FakeRunner())
+        result = index([self.src], store=self.store, runner=FakeRunner(), config=self.cfg)
         copy = self.store / "corpus/proj"
         self.assertTrue((copy / ".githooks/pre-push").is_file())
         self.assertTrue((copy / "pkg/mod.py").is_file())
@@ -49,7 +51,7 @@ class IndexTest(unittest.TestCase):
         write(other / "only.md")
         for sources in ([other], [self.src, other]):
             with self.assertRaisesRegex(ZjmError, "basename clash"):
-                index(sources, store=self.store, runner=FakeRunner())
+                index(sources, store=self.store, runner=FakeRunner(), config=self.cfg)
         self.assertFalse((copy / "only.md").exists())
         victim = self.tmp / "victim"
         write(victim / "proj/keep.txt")
@@ -57,13 +59,13 @@ class IndexTest(unittest.TestCase):
         planted.mkdir()
         (planted / "corpus").symlink_to(victim)
         with self.assertRaisesRegex(ZjmError, "symlink"):
-            index([self.src], store=planted, runner=FakeRunner())
+            index([self.src], store=planted, runner=FakeRunner(), config=self.cfg)
         self.assertEqual([p.name for p in (victim / "proj").iterdir()], ["keep.txt"])
 
     def test_zg_argv_and_env(self):
         runner = FakeRunner()
-        index([self.src], store=self.store, runner=runner)
-        [(argv, cwd, env, stdin)] = runner.calls
+        index([self.src], store=self.store, runner=runner, config=self.cfg)
+        argv, cwd, env, stdin = runner.calls[-1]
         self.assertEqual(argv, ["zg", "index", ".", "--embedding", "local/potion-code-16m-v2",
                                 "--mode", "direct", "--hidden"])
         self.assertEqual(cwd, str(self.store / "corpus"))
@@ -72,33 +74,33 @@ class IndexTest(unittest.TestCase):
         self.assertEqual(json.loads((self.store / "zjm.json").read_text()),
                          {"sources": [str(self.src.resolve())], "embedding": "local/potion-code-16m-v2"})
         with self.assertRaises(ZjmError):
-            index([self.src], store=self.store, runner=FakeRunner(code=1))
+            index([self.src], store=self.store, runner=FakeRunner(code=1), config=self.cfg)
 
     def test_multilingual_picks_model(self):
         runner = FakeRunner()
-        result = index([self.src], store=self.store, multilingual=True, runner=runner)
-        self.assertIn("local/potion-multilingual-128m", runner.calls[0][0])
+        result = index([self.src], store=self.store, multilingual=True, runner=runner, config=self.cfg)
+        self.assertIn("local/potion-multilingual-128m", runner.calls[-1][0])
         self.assertEqual(result["embedding"], "local/potion-multilingual-128m")
 
     def test_model_change_needs_rebuild(self):
-        index([self.src], store=self.store, runner=FakeRunner())
+        index([self.src], store=self.store, runner=FakeRunner(), config=self.cfg)
         runner = FakeRunner()
         with self.assertRaisesRegex(ZjmError, "rebuild=True"):
-            index([self.src], store=self.store, multilingual=True, runner=runner)
+            index([self.src], store=self.store, multilingual=True, runner=runner, config=self.cfg)
         self.assertEqual(runner.calls, [])
-        index([self.src], store=self.store, multilingual=True, rebuild=True, runner=runner)
-        self.assertEqual(runner.calls[0][0][-1], "--rebuild")
+        index([self.src], store=self.store, multilingual=True, rebuild=True, runner=runner, config=self.cfg)
+        self.assertEqual(runner.calls[-1][0][-1], "--rebuild")
 
     def test_foreign_store_refused(self):
         self.store.mkdir()
         runner = FakeRunner()
         with mock.patch("os.getuid", return_value=self.store.stat().st_uid + 1):
             with self.assertRaisesRegex(ZjmError, "owned by another user"):
-                index([self.src], store=self.store, runner=runner)
+                index([self.src], store=self.store, runner=runner, config=self.cfg)
         self.assertEqual(list(self.store.iterdir()), [])
         self.assertEqual(runner.calls, [])
         fresh = self.tmp / "fresh"
-        index([self.src], store=fresh, runner=FakeRunner())
+        index([self.src], store=fresh, runner=FakeRunner(), config=self.cfg)
         self.assertEqual(fresh.stat().st_mode & 0o777, 0o700)
 
 

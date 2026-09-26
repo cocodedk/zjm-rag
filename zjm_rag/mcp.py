@@ -40,13 +40,16 @@ class _BadParams(Exception):
     pass
 
 
-def serve(stdin, stdout, *, store=core.DEFAULT_STORE, runner=None, jev=None):
+def serve(stdin, stdout, *, store=None, config=None, runner=None, jev=None):
     """Answer JSON-RPC lines from `stdin` on `stdout` until EOF."""
+    cfg = core._load_config(config)
+    store = core._resolve_store(store, cfg)
     fakes = {k: v for k, v in {"runner": runner, "jev": jev}.items() if v is not None}
-    calls = {"/index": lambda a: core.index(**a, store=store, **{k: v for k, v in fakes.items() if k != "jev"}),
-             "/find": lambda a: core.find(**a, store=store, **fakes),
-             "/ask": lambda a: core.ask(**a, store=store, **fakes),
-             None: lambda a: core.doctor(store)}
+    calls = {"/index": lambda a: core.index(**a, store=store, config=cfg,
+                                            **{k: v for k, v in fakes.items() if k != "jev"}),
+             "/find": lambda a: core.find(**a, store=store, config=cfg, **fakes),
+             "/ask": lambda a: core.ask(**a, store=store, config=cfg, **fakes),
+             None: lambda a: core.doctor(store, config=cfg)}
 
     def call_tool(params):
         if not isinstance(params.get("name"), str) or params["name"] not in TOOLS:

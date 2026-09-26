@@ -1,4 +1,4 @@
-"""A store with three copied files and a fake runner that plays zg (and the LLM)."""
+"""A store with three copied files and a fake runner that plays zg, git and the LLM."""
 import json
 import os
 import tempfile
@@ -22,13 +22,35 @@ def make_store(test):
     return store
 
 
+def make_config(test, *, allow=None, egress=None, home=None, **extra):
+    """A resolved config dict (as config.load() would return), for a temp `home`."""
+    from zjm_rag import config as config_module
+
+    tmp = tempfile.TemporaryDirectory()
+    test.addCleanup(tmp.cleanup)
+    home = home or str(Path(tmp.name) / "home")
+    raw = {"home": home, "allow": allow or [], "egress": egress or {"rank": True, "answer": True}, **extra}
+    conf_dir = Path(tmp.name) / "conf"
+    conf_dir.mkdir()
+    conf_path = conf_dir / "config.json"
+    conf_path.write_text(json.dumps(raw))
+    return config_module.load(str(conf_path))
+
+
 class FakeRunner:
-    def __init__(self, llm_out="the answer\n"):
-        self.calls, self.llm_out = [], llm_out
+    def __init__(self, llm_out="the answer\n", ignored=()):
+        self.calls, self.llm_out, self.ignored = [], llm_out, set(ignored)
 
     def __call__(self, argv, *, cwd, env, input):
         self.calls.append((argv, cwd, env, input))
-        return 0, ZG_OUT if argv[0] == "zg" else self.llm_out, ""
+        if argv[0] == "zg":
+            return 0, ZG_OUT, ""
+        if argv[0] == "git":
+            if not self.ignored:
+                return 128, "", "not a git repository"
+            hits = [p for p in (input or "").split("\0") if p and p in self.ignored]
+            return 0, "".join(h + "\0" for h in hits), ""
+        return 0, self.llm_out, ""
 
 
 CRITERIA = {"true": "The file holds the answer.", "false": "The file does not hold the answer."}

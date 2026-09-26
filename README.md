@@ -29,23 +29,30 @@ their paths.
 It checks for Python 3.10+, installs `zg` with npm when missing, installs the package with `uv`,
 `pipx` or `pip --user`, and runs `zjm doctor`.
 
-Requirements: the `zg` binary on `PATH`, `OPENROUTER_API_KEY` for Jev ranking, and optionally
-`claude` for answers.
+Requirements: the `zg` binary on `PATH`; `OPENROUTER_API_KEY` for Jev ranking and `claude` for
+answers are needed only once `egress.rank`/`egress.answer` are turned on in the config.
 
 ## Use
+
+zjm never reads, keeps or sends anything you have not allowed in the config file (see
+[Config](#config) and [Safety](#safety) below). With `allow: ["~/projects/agent-linters"]` and
+`egress: {"rank": true, "answer": true}` in your config:
 
 ```python
 import os, zjm_rag
 
-zjm_rag.index([os.path.expanduser("~/projects/agent-linters")])        # copies into zjm_rag.DEFAULT_STORE and indexes
+zjm_rag.index([os.path.expanduser("~/projects/agent-linters")])        # copies into <home>/store and indexes
 hits = zjm_rag.find("which linter checks CSS files")   # {"accepted": [...], "rejected": [...], ...}
 reply = zjm_rag.ask("which linter checks CSS files", answer_language="da")
 print(reply["answer"], reply["files"])
 ```
 
 - `index(sources, multilingual=True)` for non-English queries; changing the model needs `rebuild=True`.
-- `find(query, min_score=0.5, sort="score"|"zg"|"mtime"|"path", rank=False, file_types=["py"])`.
-- Every call takes `store=`, plus injectable `runner=` and `jev=` for tests.
+- `find(query, min_score=0.5, sort="score"|"zg"|"mtime"|"path", rank=None, file_types=["py"])`;
+  `rank=None` follows the config's `egress.rank`, and `rank=True` fails without it.
+- `ask(...)` fails unless the config's `egress.answer` is on.
+- Every call takes `store=` and `config=` (a path or a `load()`ed dict), plus injectable `runner=`
+  and `jev=` for tests.
 - Errors raise `zjm_rag.ZjmError`.
 
 The same operations on the command line (`zjm` or `python3 -m zjm_rag`):
@@ -54,16 +61,17 @@ The same operations on the command line (`zjm` or `python3 -m zjm_rag`):
 zjm index ~/projects/agent-linters [--multilingual] [--embedding MODEL] [--rebuild]
 zjm find "which linter checks CSS files" [--limit N] [--type py]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank]
 zjm ask "which linter checks CSS files" --lang da [--top-k 3]
-zjm doctor                                   # zg, claude, OPENROUTER_API_KEY, store
+zjm doctor                                   # zg, claude, OPENROUTER_API_KEY, store, config, home, egress
 ```
 
-Every subcommand takes `--store PATH` and `--json`, which prints the library's return value as one
-JSON object (errors as `{"error": "..."}`). Exit codes: `0` ok, `1` error or failed `doctor`, `2` usage.
+Every subcommand takes `--store PATH`, `--config PATH` and `--json`, which prints the library's
+return value as one JSON object (errors as `{"error": "..."}`). Exit codes: `0` ok, `1` error or
+failed `doctor`, `2` usage.
 
-From any language on the same machine, over HTTP:
+From any language on the same machine, over HTTP (loopback only):
 
 ```sh
-zjm serve [--host 127.0.0.1] [--port 8765] [--store PATH]
+zjm serve [--host 127.0.0.1] [--port 8765] [--store PATH] [--config PATH]
 curl -s localhost:8765/find -d '{"query": "which linter checks CSS files", "file_types": ["py"]}'
 ```
 
@@ -76,6 +84,50 @@ For agents, as MCP tools over stdio (`zjm_index`, `zjm_find`, `zjm_ask`, `zjm_do
 ```sh
 claude mcp add zjm -- zjm mcp          # add --store PATH after `zjm mcp` for another store
 ```
+
+## Config
+
+zjm reads one JSON config file. The first of these that exists wins (files are never merged):
+
+1. `--config PATH` / the library's `config=` argument
+2. `$ZJM_CONFIG`
+3. `<cwd>/.zjm/config.json` (only `cwd` itself; parent directories are never searched)
+4. `$XDG_CONFIG_HOME/zjm/config.json`, else `$HOME/.config/zjm/config.json`
+5. built-in defaults (nothing is allowed, nothing leaves the machine)
+
+| key | type | default |
+|---|---|---|
+| `home` | string | `$XDG_DATA_HOME/zjm`, else `$HOME/.local/share/zjm` |
+| `allow` | list of strings | `[]` — nothing is indexed until you add paths here |
+| `deny` | list of strings | `[]` — write real paths; symlinked parents are not resolved |
+| `exclude` | list of strings (globs) | `[]` — adds to the built-in floor below, never removes from it |
+| `egress` | `{"rank": bool, "answer": bool}` | `{"rank": false, "answer": false}` |
+| `embedding` | string, must start with `local/` | `local/potion-code-16m-v2` |
+| `llm` | non-empty list of strings (argv) | a no-tools `claude -p` invocation |
+
+A relative `home`/`allow`/`deny` entry resolves against the config file's own directory; `~`
+expands from `$HOME`. Example config for local testing:
+
+```json
+{
+  "allow": ["/home/you/projects/agent-linters"],
+  "egress": {"rank": true, "answer": true}
+}
+```
+
+## Safety
+
+- **Exclude floor**, always skipped, however `exclude` is set: directories `.git`, `node_modules`,
+  `.venv`, `__pycache__`, `.zvec-grep`, `.zjm`, `.ssh`, `.gnupg`, `.aws`, `.kube`, `.docker`; files
+  `.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.kdbx`, `id_rsa*`, `id_dsa*`, `id_ecdsa*`,
+  `id_ed25519*`, `.npmrc`, `.pypirc`, `.netrc`, `.git-credentials`, `credentials*`.
+- Symlinks inside a source are never copied. Gitignored files are never copied (denying a single
+  file inside an allowed repository's own git metadata is not supported; deny the whole directory).
+- **Nothing leaves this machine unless `egress` says so.** Ranking (Jev/OpenRouter) needs
+  `egress.rank`; answering (the LLM) needs `egress.answer`. The answer LLM runs with no tools, no
+  MCP servers, a fresh empty `cwd`, and a filtered environment (no `OPENROUTER_API_KEY`).
+- `zjm serve` binds to `127.0.0.1`, `localhost` or `::1` only, and checks `Host`/`Origin` on every
+  request.
 
 ## Build from source
 

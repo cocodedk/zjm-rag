@@ -1,5 +1,6 @@
-"""zjm serve: the library as a local HTTP JSON API."""
+"""zjm serve: the library as a local HTTP JSON API, bound to loopback only."""
 import json
+import urllib.parse
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -7,6 +8,7 @@ from . import core
 from .errors import ZjmError
 
 MAX_BODY = 1 << 20
+ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
 FIND_KEYS = {"query", "limit", "file_types", "min_score", "sort", "rank"}
 KEYS = {"/index": ({"sources"}, {"sources", "multilingual", "embedding", "rebuild"}),
         "/find": ({"query"}, FIND_KEYS),
@@ -50,12 +52,25 @@ def _check(path, body):
     return None
 
 
-def make_server(host="127.0.0.1", port=8765, *, store=core.DEFAULT_STORE, runner=None, jev=None):
-    """A ThreadingHTTPServer bound to host:port, not yet serving."""
+def _host_of(value):
+    if not value:
+        return None
+    if "://" in value:
+        value = urllib.parse.urlsplit(value).netloc
+    return value.rsplit(":", 1)[0] if value.count(":") <= 1 else value.split("]")[0].lstrip("[")
+
+
+def make_server(host="127.0.0.1", port=8765, *, store=None, config=None, runner=None, jev=None):
+    """A ThreadingHTTPServer bound to host:port (loopback only), not yet serving."""
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        raise ValueError(f"host must be 127.0.0.1, localhost or ::1, not {host!r}")
+    cfg = core._load_config(config)
+    store = core._resolve_store(store, cfg)
     fakes = {k: v for k, v in {"runner": runner, "jev": jev}.items() if v is not None}
-    calls = {"/index": lambda b: core.index(**b, store=store, **{k: v for k, v in fakes.items() if k != "jev"}),
-             "/find": lambda b: core.find(**b, store=store, **fakes),
-             "/ask": lambda b: core.ask(**b, store=store, **fakes)}
+    calls = {"/index": lambda b: core.index(**b, store=store, config=cfg,
+                                            **{k: v for k, v in fakes.items() if k != "jev"}),
+             "/find": lambda b: core.find(**b, store=store, config=cfg, **fakes),
+             "/ask": lambda b: core.ask(**b, store=store, config=cfg, **fakes)}
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format, *args):
@@ -73,9 +88,27 @@ def make_server(host="127.0.0.1", port=8765, *, store=core.DEFAULT_STORE, runner
             self.close_connection = True
             self._send(code, {"error": message or HTTPStatus(code).phrase})
 
+        def _guarded(self, method):
+            host_hdr = _host_of(self.headers.get("Host"))
+            if host_hdr is not None and host_hdr not in ALLOWED_HOSTS:
+                self._send(403, {"error": "host not allowed"})
+                return True
+            origin = self.headers.get("Origin")
+            if origin is not None and _host_of(origin) not in ALLOWED_HOSTS:
+                self._send(403, {"error": "origin not allowed"})
+                return True
+            if method == "POST":
+                ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip()
+                if ctype != "application/json":
+                    self.send_error(415)
+                    return True
+            return False
+
         def _route(self, method):
+            if self._guarded(method):
+                return
             if self.path == "/health":
-                return self._send(200, core.doctor(store)) if method == "GET" else self.send_error(405)
+                return self._send(200, core.doctor(store, config=cfg)) if method == "GET" else self.send_error(405)
             if self.path not in calls:
                 return self.send_error(404)
             if method != "POST":

@@ -6,13 +6,14 @@ import unittest
 import urllib.error
 from unittest import mock
 
-from fakes import PATHS, FakeRunner, fake_jev, make_store
+from fakes import PATHS, FakeRunner, fake_jev, make_config, make_store
 from zjm_rag import ZjmError, find, jev
 
 
 class FindTest(unittest.TestCase):
     def setUp(self):
         self.store = make_store(self)
+        self.cfg = make_config(self)
 
     def test_threshold_splits_accepted_rejected(self):
         runner, payloads = FakeRunner(), []
@@ -21,7 +22,7 @@ class FindTest(unittest.TestCase):
             payloads.append(payload)
             return fake_jev([0.9, 0.2, 0.5])(payload)
 
-        r = find("q", store=self.store, file_types=["py", "md"], runner=runner, jev=jev)
+        r = find("q", store=self.store, file_types=["py", "md"], runner=runner, jev=jev, config=self.cfg)
         self.assertEqual(runner.calls[0][0], ["zg", "query", "q", "--preview", "short", "--limit", "40",
                                               "--mode", "direct", "-t", "py", "-t", "md"])
         self.assertEqual(runner.calls[0][2]["ZVEC_GREP_HOME"], str(self.store / "zghome"))
@@ -40,18 +41,18 @@ class FindTest(unittest.TestCase):
         orders = {"score": ["proj/a.py", "proj/c.txt", "proj/b.md"], "zg": PATHS,
                   "mtime": ["proj/b.md", "proj/c.txt", "proj/a.py"], "path": sorted(PATHS)}
         for key, expected in orders.items():
-            r = find("q", store=self.store, sort=key, runner=FakeRunner(), jev=jev)
+            r = find("q", store=self.store, sort=key, runner=FakeRunner(), jev=jev, config=self.cfg)
             self.assertEqual([h["path"] for h in r["accepted"]], expected, key)
         with self.assertRaises(ValueError):
-            find("q", store=self.store, sort="size", runner=FakeRunner(), jev=jev)
+            find("q", store=self.store, sort="size", runner=FakeRunner(), jev=jev, config=self.cfg)
         with self.assertRaises(ValueError):
-            find("q", store=self.store, sort="score", rank=False, runner=FakeRunner(), jev=jev)
+            find("q", store=self.store, sort="score", rank=False, runner=FakeRunner(), jev=jev, config=self.cfg)
 
     def test_no_rank_skips_jev(self):
         def jev(payload):
             self.fail("jev called")
 
-        r = find("q", store=self.store, rank=False, runner=FakeRunner(), jev=jev)
+        r = find("q", store=self.store, rank=False, runner=FakeRunner(), jev=jev, config=self.cfg)
         self.assertEqual(r["sort"], "zg")
         self.assertEqual([h["path"] for h in r["accepted"]], PATHS)
         self.assertEqual([h["score"] for h in r["accepted"]], [None] * 3)
@@ -60,9 +61,9 @@ class FindTest(unittest.TestCase):
 
     def test_bad_jev_answer_raises(self):
         with self.assertRaises(ZjmError):
-            find("q", store=self.store, runner=FakeRunner(), jev=fake_jev([0.9, 0.2]))
+            find("q", store=self.store, runner=FakeRunner(), jev=fake_jev([0.9, 0.2]), config=self.cfg)
         with self.assertRaises(ZjmError):
-            find("q", store=self.store, runner=FakeRunner(), jev=fake_jev([0.9, 1.5, 0.3]))
+            find("q", store=self.store, runner=FakeRunner(), jev=fake_jev([0.9, 1.5, 0.3]), config=self.cfg)
         self.check_jev_post()
 
     def check_jev_post(self):
