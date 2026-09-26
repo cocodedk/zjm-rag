@@ -92,10 +92,10 @@ class CliTest(unittest.TestCase):
             self.assertEqual(code, 0)
             r = json.loads(out)
             self.assertEqual(r["ok"], True)
-            self.assertEqual(r["checks"], {"zg": True, "claude": True, "openrouter_key": True})
+            self.assertEqual(r["checks"], {"zg": True, "age": True, "claude": True, "openrouter_key": True})
             human = run(["doctor", "--config", self.config_path])
         self.assertEqual(human[0], 0)
-        self.assertTrue(human[1].startswith("ok zg\nok claude\nok openrouter_key\n"))
+        self.assertTrue(human[1].startswith("ok zg\nok age\nok claude\nok openrouter_key\n"))
         self.assertNotIn("secret-value", out + err + human[1] + human[2])
         with mock.patch.dict(os.environ, {"ZJM_IN_CONTAINER": "1"}, clear=True), \
                 mock.patch("shutil.which", return_value=None):

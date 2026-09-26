@@ -6,11 +6,13 @@ MAX_SNIPPETS, SNIPPET_CHARS = 2, 1500
 
 
 def run(argv, *, cwd, env, input=None):
-    """Default runner: (returncode, stdout, stderr); a missing binary is exit 127."""
+    """Default runner: (returncode, stdout, stderr); a missing binary is exit 127. `input` as
+    bytes selects binary mode (used for age), text or None selects text mode (zg, git, the LLM)."""
+    binary = isinstance(input, bytes)
     try:
-        p = subprocess.run(argv, cwd=cwd, env=env, input=input, text=True, capture_output=True)
+        p = subprocess.run(argv, cwd=cwd, env=env, input=input, text=not binary, capture_output=True)
     except OSError as e:
-        return 127, "", str(e)
+        return 127, (b"" if binary else ""), (str(e).encode() if binary else str(e))
     return p.returncode, p.stdout, p.stderr
 
 

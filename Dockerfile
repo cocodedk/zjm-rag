@@ -2,7 +2,7 @@
 FROM python:3.12-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git ca-certificates curl gnupg \
+    && apt-get install -y --no-install-recommends git ca-certificates curl gnupg age \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g @zvec/zvec-grep@0.2.2 @anthropic-ai/claude-code@2.1.283 \

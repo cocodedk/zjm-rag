@@ -72,10 +72,12 @@ fi
 set -- docker run --rm -i \
   --user 10001:10001 \
   --read-only \
-  --tmpfs /tmp:rw,size=256m,mode=1777 \
+  --tmpfs /tmp:rw,size=1g,mode=1777 \
   --cap-drop=ALL \
   --security-opt=no-new-privileges \
   --memory=2g \
+  --memory-swap=2g \
+  --ulimit core=0 \
   --pids-limit=256 \
   -v zjm-data:/data \
   -v "$host_config":/etc/zjm/config.json:ro \

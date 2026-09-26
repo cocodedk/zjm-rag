@@ -16,6 +16,10 @@ zjm works like OpenAI's vector stores: a **locker** is a named index. Files and 
 and they come out again. `find` and `ask` search the lockers the caller names. zjm has no idea of
 users, chats, organizations or tenants — the app decides who may use which locker.
 
+A locker can be **encrypted with its own key**, supplied by the app on every call (see
+[Locker keys](#locker-keys)): at rest it is one `age`-encrypted file, and zjm holds neither the
+key nor the plaintext outside the single request that needs them.
+
 1. **zg finds.** A hybrid search over a locker's zg index returns candidate files with short
    snippets, in zg's rank order.
 2. **Jev ranks.** One request to Jev (the OpenRouter Decisions API) asks, per file, whether it
@@ -58,33 +62,44 @@ reply = zjm_rag.ask("which linter checks CSS files", ["linters"], answer_languag
 print(reply["answer"], reply["files"])
 ```
 
-- `locker_create(name, multilingual=True)` for non-English queries; the embedding is fixed for the
-  locker's lifetime — drop and recreate it to change models.
-- `file_add(locker, paths)` copies files or directories in (spec 05's allow/deny/exclude/gitignore
-  rules apply); `file_put(locker, name, text)` writes text directly; `file_remove(locker, names)`
-  removes files or whole directory prefixes; `file_list(locker)` lists what is there.
-- `find(query, lockers, min_score=0.5, sort="score"|"zg"|"mtime"|"path", rank=None,
-  file_types=["py"])` searches one or more lockers at once, interleaving their results;
-  `rank=None` follows the config's `egress.rank`, and `rank=True` fails without it.
+- `locker_create(name, key=None, multilingual=True)` for non-English queries; the embedding is
+  fixed for the locker's lifetime — drop and recreate it to change models. Without `key` the
+  locker is a plain directory; with one it is `age`-encrypted from the start.
+- `file_add(locker, paths, key=None)` copies files or directories in (spec 05's
+  allow/deny/exclude/gitignore rules apply); `file_put(locker, name, text, key=None)` writes text
+  directly; `file_remove(locker, names, key=None)` removes files or whole directory prefixes;
+  `file_list(locker, key=None)` lists what is there. `key` is required exactly when the locker is
+  encrypted.
+- `find(query, lockers, keys=None, min_score=0.5, sort="score"|"zg"|"mtime"|"path", rank=None,
+  file_types=["py"])` searches one or more lockers at once (plain and encrypted mixed freely),
+  interleaving their results; `rank=None` follows the config's `egress.rank`, and `rank=True`
+  fails without it. `keys` maps each encrypted locker's name to its key.
 - `ask(...)` fails unless the config's `egress.answer` is on.
+- `locker_encrypt(name, key)` seals a plain locker into an encrypted one; this is one-way — there
+  is no operation that decrypts a locker back to plain.
 - Every call takes `config=` (a path or a `load()`ed dict), plus injectable `runner=` and `jev=`
   for tests.
 - Errors raise `zjm_rag.ZjmError`.
 
-The same operations on the command line (`zjm` or `python3 -m zjm_rag`):
+The same operations on the command line (`zjm` or `python3 -m zjm_rag`); add `--key-file PATH`
+wherever a key is needed (`-` reads it from stdin):
 
 ```sh
-zjm locker-create NAME [--multilingual | --embedding MODEL]
+zjm locker-create NAME [--key-file KEY] [--multilingual | --embedding MODEL]
 zjm locker-list
-zjm locker-drop NAME
-zjm file-add LOCKER PATH...
-zjm file-put LOCKER NAME                     # reads the text from stdin
-zjm file-remove LOCKER NAME...
-zjm file-list LOCKER
-zjm find "which linter checks CSS files" -l LOCKER [-l LOCKER]... [--limit N] [--type py]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank]
-zjm ask "which linter checks CSS files" -l LOCKER --lang da [--top-k 3]
-zjm doctor                                   # zg, claude, OPENROUTER_API_KEY, config, home, egress, lockers
+zjm locker-drop NAME [--key-file KEY]
+zjm locker-encrypt NAME --key-file KEY        # one-way: plain -> encrypted
+zjm file-add LOCKER PATH... [--key-file KEY]
+zjm file-put LOCKER NAME [--key-file KEY]     # reads the text from stdin
+zjm file-remove LOCKER NAME... [--key-file KEY]
+zjm file-list LOCKER [--key-file KEY]
+zjm find "which linter checks CSS files" -l LOCKER [-l LOCKER]... [--key-file KEYS.json] [--limit N] [--type py]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank]
+zjm ask "which linter checks CSS files" -l LOCKER --lang da [--key-file KEYS.json] [--top-k 3]
+zjm doctor                                   # zg, age, claude, OPENROUTER_API_KEY, config, home, egress, lockers
 ```
+
+For `find`/`ask`, `--key-file` holds a JSON object `{"locker": "key"}` (one entry per encrypted
+locker searched); for every other command it holds one key.
 
 Every subcommand takes `--config PATH` and `--json`, which prints the library's return value as
 one JSON object (errors as `{"error": "..."}`). Exit codes: `0` ok, `1` error or failed `doctor`,
@@ -99,10 +114,11 @@ curl -s localhost:8765/find -d '{"query": "which linter checks CSS files", "lock
 ```
 
 `GET /health` returns the `doctor` dict; `POST /<op>` (one per row in `zjm_rag/ops.py`'s `OPS`
-table — `locker_create`, `locker_list`, `locker_drop`, `file_add`, `file_put`, `file_remove`,
-`file_list`, `find`, `ask`, `doctor`) takes the library's keyword arguments as a JSON body (`home`,
-`store` and `config` are the server's and cannot be set) and returns its result. Errors are
-`{"error": "..."}`: `400` bad body, `404`, `405`, `413` over 1 MiB, `422` from the library.
+table — `locker_create`, `locker_list`, `locker_drop`, `locker_encrypt`, `file_add`, `file_put`,
+`file_remove`, `file_list`, `find`, `ask`, `doctor`) takes the library's keyword arguments as a
+JSON body (`home`, `store` and `config` are the server's and cannot be set), including `key` /
+`keys` where a key is needed, and returns its result. Errors are `{"error": "..."}`: `400` bad
+body, `404`, `405`, `413` over 1 MiB, `422` from the library.
 
 For agents, as MCP tools over stdio (`zjm_<op>` for each op above):
 
@@ -149,6 +165,24 @@ Example config for the launcher (`$XDG_CONFIG_HOME/zjm/config.json`, or `$ZJM_HO
 Set `ZJM_SOURCES` to a colon-separated list of host folders to mount, one becomes
 `/sources/<basename>`: `ZJM_SOURCES=/home/you/projects/agent-linters zjm file-add linters /sources/agent-linters`.
 
+## Locker keys
+
+A locker's key is an [age](https://github.com/FiloSottile/age) X25519 identity string
+(`AGE-SECRET-KEY-1…`). Generate one with `age-keygen` (baked into the image) and keep it in the
+app, never in zjm: **zjm never stores a key**, and a lost key means a lost locker.
+
+- Without a key, a locker is a plain directory under `<home>/lockers/<name>/`, exactly as before.
+- With a key — on `locker_create`, or later via `locker_encrypt` — a locker is exactly one file,
+  `<home>/lockers/<name>.age`: the whole locker (its files, zg index and manifest), tarred and
+  encrypted. No other per-locker file exists on disk.
+- Every request that touches an encrypted locker decrypts it into a private `/tmp` directory for
+  that request only, re-encrypts after a write, and deletes both the plaintext and the key file
+  before returning — even on error.
+- The key travels only in files under `/tmp` and in request bodies. It never appears in argv, the
+  environment, logs, error messages or results.
+- `find` and `ask` can search plain and encrypted lockers together in one call; pass `keys` (a
+  `{locker: key}` map, or `--key-file KEYS.json` on the CLI) for the encrypted ones only.
+
 ## Safety
 
 - **Exclude floor**, always skipped, however `exclude` is set: directories `.git`, `node_modules`,
@@ -165,8 +199,9 @@ Set `ZJM_SOURCES` to a colon-separated list of host folders to mount, one become
   the host's loopback interface).
 - The app, not zjm, decides who may use which locker and which lockers a question may search.
 - **The container is the only supported way to run zjm.** It runs read-only, as a non-root user,
-  with no Linux capabilities, `--network none` unless `egress` is on, and persistent data confined
-  to the `zjm-data` volume.
+  with no Linux capabilities, no swap, no core dumps, `--network none` unless `egress` is on, and
+  persistent data confined to the `zjm-data` volume.
+- **Encryption at rest is per locker, opt in.** See [Locker keys](#locker-keys).
 
 ## Build from source
 
@@ -183,7 +218,7 @@ zg, Jev or an LLM. See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Architecture
 
 ```
-zjm_rag/            library: lockers, files, search (zg + Jev), ask (claude), ops table
+zjm_rag/            library: lockers, files, search (zg + Jev), ask (claude), sealed (age), ops table
 tests/              unittest suite and the zg output fixture
 docs/lean/          specs for the library, CLI, HTTP API, MCP server and installer
 profile-python.md   gate profile the lean loop builds against
