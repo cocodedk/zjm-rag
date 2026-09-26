@@ -2,7 +2,7 @@ import io
 import json
 import unittest
 
-from fakes import FakeRunner, fake_jev, make_config, make_locker
+from fakes import FakeRunner, fake_jev, fake_llm, make_config, make_locker
 from zjm_rag import find
 from zjm_rag.mcp import serve
 
@@ -47,16 +47,16 @@ class McpTest(unittest.TestCase):
         self.assertEqual(json.loads(r["result"]["content"][0]["text"]), want)
         self.assertNotIn("isError", r["result"])
 
-        runner = FakeRunner()
+        runner, llm = FakeRunner(), fake_llm("the answer")
         create, ask, doc, doc_args = rpc(call(2, "zjm_locker_create", {"name": "lib2", "multilingual": True, "plain": True}),
                                          call(3, "zjm_ask", {"query": "q", "lockers": ["lib"], "top_k": 1,
                                                              "answer_language": "da"}),
                                          call(4, "zjm_doctor", {}), call(5, "zjm_doctor", {"x": 1}),
-                                         config=cfg, runner=runner, jev=fake_jev([0.9, 0.2, 0.1]))
+                                         config=cfg, runner=runner, jev=fake_jev([0.9, 0.2, 0.1]), llm=llm)
         self.assertEqual(create["result"]["structuredContent"]["name"], "lib2")
         self.assertEqual(ask["result"]["structuredContent"]["answer"], "the answer")
-        self.assertIn("Answer in da.", runner.calls[-1][3])
-        self.assertEqual(set(doc["result"]["structuredContent"]["checks"]), {"zg", "age", "claude", "openrouter_key"})
+        self.assertIn("Answer in da.", llm.calls[-1][1][-1]["content"])
+        self.assertEqual(set(doc["result"]["structuredContent"]["checks"]), {"zg", "age", "openrouter_key"})
         self.assertIs(doc_args["result"]["isError"], True)
 
     def test_errors(self):

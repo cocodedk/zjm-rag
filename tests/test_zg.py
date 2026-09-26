@@ -1,25 +1,30 @@
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from zjm_rag import zg
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures/zg-query.md"
 
 
-class ParseTest(unittest.TestCase):
-    def test_groups_hits_by_file_in_zg_order(self):
-        files = zg.parse(FIXTURE.read_text())
-        self.assertEqual(list(files)[:3], ["agent-linters/llms.txt", "agent-linters/README.md", "agent-linters/bin/lintp"])
-        self.assertEqual(len(files), 8)
-        self.assertIn("| `.css .scss .json .jsonc` | biome |", "".join(files["agent-linters/README.md"]))
+class ZgTest(unittest.TestCase):
+    def test_parse_keeps_every_hit_with_lines(self):
+        hits = zg.parse(FIXTURE.read_text())
+        self.assertEqual(len(hits), 20)
+        self.assertEqual(hits[0], {"path": "agent-linters/llms.txt", "start": 1, "end": 43, "rank": 1})
+        self.assertEqual(hits[1], {"path": "agent-linters/README.md", "start": 10, "end": 32, "rank": 2})
+        self.assertEqual([h["rank"] for h in hits], list(range(1, 21)))
+        single = zg.parse("hits: 1\n\n#9 matchedBy=fts one.md:7\nsource:\n7\tx\n")
+        self.assertEqual(single, [{"path": "one.md", "start": 7, "end": 7, "rank": 9}])
 
-    def test_caps_files_and_snippets(self):
-        files = zg.parse(FIXTURE.read_text(), limit=3)
-        self.assertEqual(len(files), 3)
-        self.assertTrue(all(len(s) <= 2 for s in files.values()))
-        self.assertTrue(all(len(x) <= 1500 for s in files.values() for x in s))
-        spaced = zg.parse("hits: 1\n\n#1 matchedBy=fts my proj/a b.md:3-4\nsource:\n3\tx\n")
-        self.assertEqual(spaced, {"my proj/a b.md": ["3\tx\n"]})
+    def test_query_argv(self):
+        # ZG_HITS is patched explicitly so tuning it later cannot break this test.
+        with mock.patch.object(zg, "ZG_HITS", 7):
+            argv = zg.query_argv("q", ["py", "md"])
+            self.assertEqual(argv, ["zg", "query", "q", "--preview", "none", "--limit", "7", "--mode", "direct",
+                                    "-t", "py", "-t", "md"])
+            self.assertEqual(zg.query_argv("q"),
+                             ["zg", "query", "q", "--preview", "none", "--limit", "7", "--mode", "direct"])
 
 
 if __name__ == "__main__":

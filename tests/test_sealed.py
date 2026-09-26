@@ -1,12 +1,13 @@
 """Sealed locker sessions (spec 08): one file at rest, no key leaks, safe extraction, mixed lockers."""
 import io
+import json
 import tarfile
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from fakes import (AGE_MARKER, OTHER_KEY, TEST_KEY, FakeRunner, _fake_recipient, fake_jev, make_config,
+from fakes import (AGE_MARKER, OTHER_KEY, TEST_KEY, FakeRunner, _fake_recipient, fake_jev, fake_llm, make_config,
                    make_encrypted_locker, make_locker)
 from zjm_rag import ZjmError, ask, file_list, file_put, find, locker_create, locker_encrypt, locker_list
 from zjm_rag import lockers as lockers_mod
@@ -42,16 +43,18 @@ class SealedTest(unittest.TestCase):
         self.assertNotIn(OTHER_KEY, str(ctx.exception))
 
     def test_key_never_in_argv_or_env(self):
-        runner = FakeRunner()
+        runner, llm = FakeRunner(), fake_llm()
         make_encrypted_locker(self, self.cfg, "lib", key=TEST_KEY)
         file_put("lib", "a.md", "hello", key=TEST_KEY, config=self.cfg, runner=runner)
         find("q", ["lib"], keys={"lib": TEST_KEY}, config=self.cfg, runner=runner,
             jev=fake_jev([0.9, 0.8, 0.7]))
         ask("q", ["lib"], keys={"lib": TEST_KEY}, config=self.cfg, runner=runner,
-           jev=fake_jev([0.9, 0.8, 0.7]))
+           jev=fake_jev([0.9, 0.8, 0.7]), llm=llm)
         for argv, _cwd, env, _input in runner.calls:
             self.assertNotIn(TEST_KEY, argv)
             self.assertTrue(all(TEST_KEY not in str(v) for v in (env or {}).values()))
+        for _model, messages in llm.calls:
+            self.assertNotIn(TEST_KEY, json.dumps(messages))
 
     def test_plaintext_removed_on_error(self):
         locker_create("lib", TEST_KEY, config=self.cfg, runner=FakeRunner())

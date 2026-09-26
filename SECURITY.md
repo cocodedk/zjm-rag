@@ -4,14 +4,15 @@
 
 `zjm-rag` is a local tool: it indexes folders you choose into a local store, searches them with
 [zg](https://www.npmjs.com/package/@zvec/zvec-grep), asks Jev (the OpenRouter Decisions API) which files hold
-the answer, and can pass those files to an LLM command-line client for an answer. It is
+the answer, and can pass those files to an OpenRouter model for an answer. It is
 stdlib-only Python with no third-party runtime dependency.
 
 ## Actual threat surface
 
-- **File content leaves the machine.** Ranking sends the question and short snippets of each
-  candidate file to OpenRouter; answering sends up to 20,000 characters of each chosen file to
-  the LLM client (`claude` by default). Index only folders whose content you are willing to send.
+- **File content leaves the machine.** Ranking sends the question and each candidate file's full
+  matched chunks to OpenRouter; answering sends up to 200,000 characters of the top accepted files
+  to an OpenRouter model (`deepseek/deepseek-v4-flash` by default). Index only folders whose
+  content you are willing to send.
   The planned `index()` copy (docs/lean/01) skips `.env*` files, `.git`, `node_modules` and
   `.venv`; other secrets in the indexed folders are not detected.
 - **`OPENROUTER_API_KEY`** is read from the environment and sent only to `openrouter.ai`. Error

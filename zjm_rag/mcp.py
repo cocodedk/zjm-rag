@@ -24,10 +24,10 @@ class _BadParams(Exception):
     pass
 
 
-def serve(stdin, stdout, *, config=None, runner=None, jev=None):
+def serve(stdin, stdout, *, config=None, runner=None, jev=None, llm=None):
     """Answer JSON-RPC lines from `stdin` on `stdout` until EOF."""
     cfg = config_module.resolve(config)
-    fakes = {"runner": runner, "jev": jev}
+    fakes = {"runner": runner, "jev": jev, "llm": llm}
     tools = {f"zjm_{name}": (name, desc) for name, (_, _, desc) in OPS.items()}
 
     def call_tool(params):

@@ -2,6 +2,7 @@
 from . import core
 from . import files
 from . import jev as jev_client
+from . import llm as llm_client
 from . import lockers
 from . import search
 from . import zg
@@ -11,13 +12,15 @@ _STR_ARR = {"type": "array", "items": {"type": "string"}}
 _KEYS = {"type": "object", "additionalProperties": {"type": "string"}}
 
 
-def _wrap(func, *, needs_runner=False, needs_jev=False):
-    def call(args, *, config, runner=None, jev=None):
+def _wrap(func, *, needs_runner=False, needs_jev=False, needs_llm=False):
+    def call(args, *, config, runner=None, jev=None, llm=None):
         kwargs = dict(args, config=config)
         if needs_runner:
             kwargs["runner"] = runner or zg.run
         if needs_jev:
             kwargs["jev"] = jev or jev_client.post
+        if needs_llm:
+            kwargs["llm"] = llm or llm_client.post
         return func(**kwargs)
     return call
 
@@ -66,13 +69,13 @@ OPS = {
             {"type": "object", "properties": _FIND_PROPS, "required": ["query", "lockers"],
              "additionalProperties": False},
             "Find the files across lockers that may hold the answer to a question."),
-    "ask": (_wrap(search.ask, needs_runner=True, needs_jev=True),
+    "ask": (_wrap(search.ask, needs_runner=True, needs_jev=True, needs_llm=True),
            {"type": "object", "properties": _ASK_PROPS, "required": ["query", "lockers"],
             "additionalProperties": False},
            "Answer a question with an LLM from the top accepted files across lockers."),
     "doctor": (_wrap(core.doctor),
               {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
-              "Report whether zg, age, claude, OPENROUTER_API_KEY and lockers are present."),
+              "Report whether zg, age, OPENROUTER_API_KEY and lockers are present."),
 }
 
 

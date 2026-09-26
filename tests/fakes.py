@@ -60,8 +60,8 @@ def make_encrypted_locker(test, cfg, name="lib", *, embedding="m", key=TEST_KEY)
 
 
 class FakeRunner:
-    def __init__(self, llm_out="the answer\n", ignored=()):
-        self.calls, self.llm_out, self.ignored = [], llm_out, set(ignored)
+    def __init__(self, ignored=()):
+        self.calls, self.ignored = [], set(ignored)
 
     def __call__(self, argv, *, cwd, env, input):
         self.calls.append((argv, cwd, env, input))
@@ -76,7 +76,7 @@ class FakeRunner:
                 return 128, "", "not a git repository"
             hits = [p for p in (input or "").split("\0") if p and p in self.ignored]
             return 0, "".join(h + "\0" for h in hits), ""
-        return 0, self.llm_out, ""
+        raise AssertionError(f"unexpected runner call: {argv}")
 
     def _age_keygen(self, argv):
         key_file = argv[-1]
@@ -117,3 +117,12 @@ def fake_jev(scores):
                          "criteria": CRITERIA}, q
         return {"answers": {k: {"type": "noul", "noul": s} for k, s in zip(payload["questions"], scores)}}
     return jev
+
+
+def fake_llm(text="the answer"):
+    """Plays the answer model: records every (model, messages) call, always returns `text`."""
+    def llm(model, messages):
+        llm.calls.append((model, messages))
+        return text
+    llm.calls = []
+    return llm
