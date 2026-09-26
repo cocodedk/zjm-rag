@@ -151,7 +151,8 @@ No real age runs in tests.
 - `key` on `locker_create` is **optional**:
   - With a key, the locker is encrypted as described above.
   - Without one, it is a plain spec 06 locker directory `<home>/lockers/<name>/`, and it stays
-    plain. There is no conversion between the two kinds.
+    plain until it is encrypted with `locker_encrypt` (below). Encrypting is one-way: there is no
+    operation that decrypts a locker back to plain.
 - For every other operation, `key` (or the locker's entry in `keys`) is required exactly when the
   locker is encrypted:
   - A missing key for an encrypted locker raises `ZjmError("locker <name> needs its key")`.
@@ -161,7 +162,19 @@ No real age runs in tests.
 - `locker_list` adds `"encrypted": bool` to each entry. It keeps spec 06's `files` count for plain
   lockers and omits it for encrypted ones.
 - `find` and `ask` can mix both kinds of locker in one call.
-- **Tests:** exactly **63**. The one extra test is `tests/test_sealed.py::test_plain_and_encrypted_mix`:
+- **`locker_encrypt(name, key)`** is a new operation (CLI `locker-encrypt NAME --key-file F`,
+  HTTP `/locker_encrypt`, MCP `zjm_locker_encrypt`). It runs under the exclusive lock and:
+  1. validates the key (settled detail 7)
+  2. seals the plain locker directory into `<name>.age.tmp` exactly as a write session does
+  3. checks the result by decrypting it with the key
+  4. `os.replace`s it to `<name>.age`
+  5. deletes the plain directory
+
+  If any step fails, the plain locker is left untouched and `.age.tmp` is removed. An encrypted
+  or missing locker raises. `OPS` grows by one, so `test_surfaces_match_ops` covers it.
+- **Tests:** exactly **64**. `tests/test_sealed.py::test_encrypt_plain_locker` checks three
+  things: after `locker_encrypt` only `<name>.age` remains and `find` with the key works; a
+  second `locker_encrypt` raises; a sealing failure leaves the plain locker intact. Plus The one extra test is `tests/test_sealed.py::test_plain_and_encrypted_mix`:
   - a plain and an encrypted locker are both searched in one `find`
   - each of the two wrong-key errors above is raised
   - `locker_list` shows the `encrypted` flag
