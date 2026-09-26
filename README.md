@@ -124,12 +124,14 @@ curl -s localhost:8765/find -d '{"query": "which linter checks CSS files", "lock
 
 `GET /health` returns the `doctor` dict; `POST /<op>` (one per row in `zjm_rag/ops.py`'s `OPS`
 table — `locker_create`, `locker_list`, `locker_drop`, `locker_encrypt`, `file_add`, `file_put`,
-`file_remove`, `file_list`, `find`, `ask`, `doctor`) takes the library's keyword arguments as a
+`file_remove`, `file_list`, `find`, `ask`, `doctor`, `help`) takes the library's keyword arguments as a
 JSON body (`home`, `store` and `config` are the server's and cannot be set), including `key` /
 `keys` where a key is needed, and returns its result. Errors are `{"error": "..."}`: `400` bad
 body, `404`, `405`, `413` over 1 MiB, `422` from the library.
 
-For agents, as MCP tools over stdio (`zjm_<op>` for each op above):
+For agents, as MCP tools over stdio (`zjm_<op>` for each op above). **Agents: call `zjm_help`
+first** — it returns a guide to the workflow, keys and egress, plus this instance's allowed
+paths, egress, languages and lockers, and it changes nothing.
 
 ```sh
 claude mcp add zjm -- zjm mcp          # add --config PATH after `zjm mcp` for another config

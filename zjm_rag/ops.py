@@ -1,6 +1,7 @@
 """OPS: the single table the CLI, HTTP and MCP surfaces are generated from (spec 06)."""
 from . import core
 from . import files
+from . import guide
 from . import jev as jev_client
 from . import llm as llm_client
 from . import lockers
@@ -77,6 +78,10 @@ OPS = {
     "doctor": (_wrap(core.doctor),
               {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
               "Report whether zg, age, OPENROUTER_API_KEY and lockers are present."),
+    "help": (_wrap(guide.help),
+            {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+            "Explain how to use zjm and what this instance allows: workflow, keys, egress, allowed "
+            "source paths and lockers. Call this first."),
 }
 
 

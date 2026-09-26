@@ -29,7 +29,7 @@ class McpTest(unittest.TestCase):
         listed = {t["name"]: t for t in tools["result"]["tools"]}
         self.assertEqual(set(listed), {"zjm_locker_create", "zjm_locker_list", "zjm_locker_drop", "zjm_file_add",
                                        "zjm_file_put", "zjm_file_remove", "zjm_file_list", "zjm_find", "zjm_ask",
-                                       "zjm_doctor", "zjm_locker_encrypt"})
+                                       "zjm_doctor", "zjm_locker_encrypt", "zjm_help"})
         for t in listed.values():
             self.assertTrue(t["description"])
             self.assertEqual(t["inputSchema"]["type"], "object")
