@@ -10,7 +10,24 @@ def _where(hit):
     return f"{where}  (translation)" if hit.get("via") == "translation" else where
 
 
+def _lockers_line(lockers):
+    """`lockers: <name> (encrypted|plain), …`; `null` stands in for a failed read (spec 11)."""
+    if lockers is None:
+        return "lockers: null"
+    tags = ", ".join(f"{l['name']} ({'encrypted' if l['encrypted'] else 'plain'})" for l in lockers)
+    return f"lockers: {tags}"
+
+
 def human(cmd, r):
+    if cmd == "help":
+        inst = r["instance"]
+        lines = r["guide"].split("\n")
+        lines += [f"allow: {p}" for p in inst["allow"]]
+        e = inst["egress"]
+        lines.append(f"egress: rank={e['rank']} answer={e['answer']} translate={e['translate']}")
+        lines.append(f"languages: {', '.join(inst['languages'])}")
+        lines.append(_lockers_line(inst["lockers"]))
+        return lines
     if cmd == "locker-create":
         return [f"created {r['name']} ({r['embedding']})"]
     if cmd == "locker-list":

@@ -82,6 +82,7 @@ def _parser():
             p.add_argument("--lang")
 
     _common(sub.add_parser("doctor"))
+    _common(sub.add_parser("help"))
 
     p = sub.add_parser("serve")
     p.add_argument("--host", default="127.0.0.1")
@@ -103,7 +104,7 @@ def _args_to_body(cmd, args):
         if args.plain:
             body["plain"] = True
         return body
-    if cmd in ("locker-list", "doctor"):
+    if cmd in ("locker-list", "doctor", "help"):
         return {}
     if cmd == "locker-drop":
         return {"name": args.name}
