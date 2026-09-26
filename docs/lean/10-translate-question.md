@@ -50,7 +50,8 @@ The spec 05 rules apply: unknown keys raise, wrong types raise, and an omitted `
   - `False` turns it off.
 - CLI: `--no-translate` on `find`/`ask` (absent means `None`, present means `False`).
 - HTTP and MCP: an optional boolean `translate` in the `OPS` schema.
-- Only the question leaves the machine, never file text, paths or snippets.
+- The translation request sends only the question, never file text, paths or snippets. Ranking
+  and answering keep their own spec 05 switches.
 
 ### `zjm_rag/translate.py`
 
@@ -66,13 +67,14 @@ The spec 05 rules apply: unknown keys raise, wrong types raise, and an omitted `
 - **Parsing:** take the reply from its first `{` to its last `}` and `json.loads` it. The
   translations are the values that are strings, in order.
   - Each is whitespace-stripped.
-  - A value is dropped when it is empty, longer than 500 characters, or starts with `-` (it becomes
-    a zg argument).
+  - A value is dropped when it is empty or longer than 500 characters.
   - A value is dropped when it equals the query or an earlier value, compared after
     `" ".join(s.split()).casefold()`.
   - At most `len(languages)` are kept.
-- It returns `(translations, None)` on success. It never raises: any failure (a `ZjmError` from
-  `llm`, bad JSON, no object) returns `([], <short reason, without the reply text>)`.
+- It returns `(translations, None)` on success. It never raises. On failure the error is one of
+  two fixed strings, so no exception text, question, reply or key can leak into results:
+  - `([], "translation request failed")` when `llm` raises
+  - `([], "translation reply not usable")` when there is bad JSON, no object, or no usable value
 - `find` and `ask` call it once per call, before any locker session opens, and only when the
   effective translate is on and `languages` is non-empty.
 
@@ -86,10 +88,13 @@ translating.
 ### Search: the translations add files after the original's
 
 Inside each locker's session:
-1. The spec 09 zg query for the original question runs unchanged.
+1. The spec 09 zg query for the original question runs with its options first and the question
+   last, after `--`: `zg query --preview none --limit <ZG_HITS> --mode direct [-t <type>…] --
+   <query>`. A question such as `--help` is then searched, not obeyed.
 2. When there are translations, one more zg query runs:
-   `zg query --hybrid <t1> [--hybrid <t2> …] [--fuse] --preview none --limit <ZG_HITS> --mode direct`
-   plus the same `-t` types. `--fuse` is added only when there is more than one translation.
+   `zg query --hybrid=<t1> [--hybrid=<t2> …] [--fuse] --preview none --limit <ZG_HITS> --mode direct`
+   plus the same `-t` types. Each translation is one `--hybrid=<t>` argv element, so it can never
+   be read as an option. `--fuse` is added only when there is more than one translation.
 3. **Candidates:**
    - The original's candidates come first, exactly as spec 09 picks them: the first `limit`
      distinct manifest paths from its hits.
@@ -141,7 +146,8 @@ translation reaches the prompt when ranking is off, too.
 
 - A "Questions in other languages" section: the table above, `egress.translate`, `languages` and
   `translate_model`.
-- Only the question leaves the machine.
+- The translation request sends only the question. Ranking and answering keep their own
+  switches.
 - Why files are not translated.
 - Bump `fallback_version` to `0.10.0`.
 
@@ -152,13 +158,15 @@ where the shapes changed (fakes accept `reasoning=`; `find` results carry `trans
 `translate_error` and `via`), plus these 8.
 
 - `tests/test_translate.py`:
-  1. `test_translate_parses_and_filters`: a fenced reply with 5 languages gives 4 translations.
-     - The dropped ones are equal to the query, a duplicate, one starting with `-`, and one over
-       500 characters.
+  1. `test_translate_parses_and_filters`: a fenced reply with 8 values gives 4 translations.
+     - The dropped ones are equal to the query (different case and spacing), a duplicate, an empty
+       string, and one over 500 characters.
+     - A value starting with `-` is kept, and it reaches zg as a single `--hybrid=<t>` element.
      - The call used `translate_model` and `reasoning=False`, and its system message names every
        language.
-  2. `test_translate_failure_never_raises`: an `llm` that raises `ZjmError`, and one that returns
-       `not json`, each give `([], error)`. `find` still returns the original's results with
+  2. `test_translate_failure_never_raises`: an `llm` that raises `ZjmError` whose message holds
+       the question and a fake key gives exactly `([], "translation request failed")`. One that
+       returns `not json` gives `([], "translation reply not usable")`. `find` still returns the original's results with
        `translations: []` and `translate_error` set.
   3. `test_translate_egress_ceiling`:
      - With `egress.translate` off, `llm` is never called and `translations` is `[]`.
@@ -168,7 +176,8 @@ where the shapes changed (fakes accept `reasoning=`; `find` results carry `trans
      B, and the translated hits give C, A and D.
      - The candidates are A, B, C, D, with `via` query, query, translation, translation.
      - A's passages include its translated hit.
-     - The second zg argv has one `--hybrid` per translation and `--fuse`.
+     - The first zg argv ends with `--` and the query. The second has one `--hybrid=<t>` per
+       translation and `--fuse`.
   5. `test_merge_query_candidates_first`: across two lockers, all `via: "query"` hits come before
      any `via: "translation"` hit, and each group is interleaved and cut to `limit`.
   6. `test_config_translate_keys`:
