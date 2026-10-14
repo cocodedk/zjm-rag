@@ -5,6 +5,7 @@
 In a git checkout only the files git shows are copied (tracked, or new and not ignored), as zjm itself would.
 Text files have /home/<user>/, /Users/<user>/ and /root/ replaced by ~/ and any /tmp/ path by <temp>; other files are copied as they are.
 """
+import fnmatch
 import re
 import shutil
 import subprocess
@@ -13,6 +14,10 @@ from pathlib import Path
 
 HOME = re.compile(r"/(?:home|Users)/[A-Za-z0-9_.-]+/|/root/")
 TEMP = re.compile(r"/tmp/[^\s\"'`)\]>]*")
+# zjm's exclude floor (zjm_rag/copying.py): never read or copied, matched without case
+FLOOR_DIRS = {".git", "node_modules", ".venv", "__pycache__", ".zvec-grep", ".zjm", ".ssh", ".gnupg", ".aws", ".kube", ".docker"}
+FLOOR_FILES = {".env*", "*.pem", "*.key", "*.p12", "*.pfx", "*.kdbx", "id_rsa*", "id_dsa*", "id_ecdsa*",
+               "id_ed25519*", ".npmrc", ".pypirc", ".netrc", ".git-credentials", "credentials*"}
 
 
 def redact(text: str) -> str:
@@ -43,12 +48,26 @@ def copy(src: Path, dst: Path) -> None:
         shutil.copy2(src, dst)
 
 
-def main() -> None:
-    root, mirror, rels = Path(sys.argv[1]).resolve(), Path(sys.argv[2]), sys.argv[3:] or ["."]
+def allowed(root: Path, p: Path) -> bool:
+    """No symlink anywhere between root and the file, and nothing on zjm's floor."""
+    rel = p.relative_to(root)
+    if any((root / part).is_symlink() for part in (*reversed(rel.parents[:-1]), rel)):
+        return False
+    if any(fnmatch.fnmatch(d.lower(), f) for d in rel.parts[:-1] for f in FLOOR_DIRS):
+        return False
+    return not any(fnmatch.fnmatch(rel.name.lower(), f) for f in FLOOR_FILES)
+
+
+def make(root: Path, mirror: Path, rels: list[str] | None = None) -> None:
+    root = root.resolve()
     mirror.mkdir(parents=True, exist_ok=True)  # an empty folder still mounts
-    for p in candidates(root, rels):
-        if not p.is_symlink():
+    for p in candidates(root, rels or ["."]):
+        if allowed(root, p):
             copy(p, mirror / p.relative_to(root))
+
+
+def main() -> None:
+    make(Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3:])
 
 
 if __name__ == "__main__":

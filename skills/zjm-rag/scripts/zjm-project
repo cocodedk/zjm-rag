@@ -1,50 +1,131 @@
-#!/usr/bin/env bash
-# Index folders into a zjm-rag locker from redacted copies, and search it.
-#   zjm-project reindex LOCKER DIR...            (re)build LOCKER from DIRs; run after every change to them
-#   zjm-project find LOCKER "QUERY" [ZJM-ARGS]   e.g. --limit 30 --min-score 0.3
-#   zjm-project ask LOCKER "QUESTION" [ZJM-ARGS] an answer from the accepted files, with citations
-# ZJM_MULTILINGUAL=1 on reindex builds the locker for non-English text; ZJM_EXCLUDE="*.pdf,drafts/" leaves out
-# files and folders (trailing /) by name. Nothing leaves the machine unless ZJM_SEND=1 (ranking and ask via OpenRouter).
-# Each DIR mounts read-only as /sources/<its folder name>, so names must differ. ZJM_FORCE=1 replaces a locker built from other folders.
-set -euo pipefail
-CMD=${1:-} LOCKER=${2:-}; shift 2 || { sed -n 2,6p "$0" >&2; exit 2; }
-HERE=$(cd "$(dirname "$0")" && pwd)
-STATE="${XDG_CACHE_HOME:-$HOME/.cache}/zjm-project/$LOCKER"
-TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
-config() {  # $1: the allow list; ZJM_EXCLUDE: comma-separated name globs; ZJM_SEND=1: ranking and ask may use OpenRouter
-  local out=false ex=""; [ "${ZJM_SEND:-}" = 1 ] && out=true
-  local pats=(); [ -n "${ZJM_EXCLUDE:-}" ] && IFS=, read -ra pats <<< "$ZJM_EXCLUDE" && ex=$(printf '"%s",' "${pats[@]}") && ex=${ex%,}
-  printf '{"home": "/data", "allow": [%s], "exclude": [%s], "egress": {"rank": %s, "answer": %s}}\n' "$1" "$ex" $out $out > "$TMP/config.json"
-  export ZJM_HOST_CONFIG="$TMP/config.json"; }
-case $CMD in
-  reindex)
-    srcs=() allow=() names=()
-    for d in "$@"; do
-      d=$(realpath "$d"); n=$(basename "$d")
-      [ -d "$d" ] || { echo "$d is not a folder: index folders only" >&2; exit 2; }
-      case "/${d,,}/" in */.git/*|*/node_modules/*|*/.venv/*|*/__pycache__/*|*/.zvec-grep/*|*/.zjm/*|*/.ssh/*|*/.gnupg/*|*/.aws/*|*/.kube/*|*/.docker/*)
-        echo "$d is inside a folder zjm never indexes" >&2; exit 2 ;; esac
-      [[ " ${names[*]} " == *" $n "* ]] && { echo "two folders named $n: rename one or index it separately" >&2; exit 2; }
-      python3 "$HERE/mirror.py" "$d" "$TMP/$n"
-      names+=("$n"); srcs+=("$TMP/$n"); allow+=("\"/sources/$n\"")
-    done
-    config "$(IFS=,; echo "${allow[*]}")"; export ZJM_SOURCES; ZJM_SOURCES=$(IFS=:; echo "${srcs[*]}")
-    want=$(for d in "$@"; do realpath "$d"; done)
-    if zjm locker-list | awk -v l="$LOCKER" '$1 == l {f=1} END {exit !f}'; then
-      [ "$(cat "$STATE/dirs" 2>/dev/null)" = "$want" ] || [ -n "${ZJM_FORCE:-}" ] || {
-        echo "locker $LOCKER exists and was not built from these folders; pick another name, or ZJM_FORCE=1 to replace it" >&2; exit 2; }
-      zjm locker-drop "$LOCKER" >/dev/null; rm -f "$STATE/dirs"
-    fi
-    zjm locker-create "$LOCKER" --plain ${ZJM_MULTILINGUAL:+--multilingual} >/dev/null
-    zjm file-add "$LOCKER" "${names[@]/#//sources/}" | tail -1
-    mkdir -p "$STATE"; echo "$want" > "$STATE/dirs"; touch "$STATE/stamp"
-    zjm locker-list | awk -v l="$LOCKER" '$1 == l' ;;
-  find|ask)
-    [ -f "$STATE/dirs" ] || { echo "no locker $LOCKER from this script: reindex first" >&2; exit 2; }
-    while read -r d; do  # warn, never block: a stale locker misses new text and still shows removed text
-      [ -n "$(find "$d" -newer "$STATE/stamp" -not -path '*/.git/*' -print -quit 2>/dev/null)" ] \
-        && echo "STALE: $d changed since the last reindex; run reindex before trusting this search" >&2
-    done < "$STATE/dirs"
-    config ""; zjm "$CMD" "$1" -l "$LOCKER" "${@:2}" ;;
-  *) sed -n 2,6p "$0" >&2; exit 2 ;;
-esac
+#!/usr/bin/env python3
+"""Index a project's folders into a zjm-rag locker from redacted copies, and search it.
+
+    zjm-project reindex                      (re)build the locker; run after every change to its folders
+    zjm-project find "QUESTION" [ZJM-ARGS]   e.g. --limit 30 --min-score 0.3
+    zjm-project ask "QUESTION" [ZJM-ARGS]    an answer from the accepted files, with citations (needs "send")
+
+Settings live in zjm-project.json at the project root (the git top level, else the current folder):
+    {"locker": "myproj", "folders": ["docs", "memory"], "exclude": ["*.pdf", "drafts/"],
+     "send": false, "llm": "deepseek/deepseek-v4-flash", "multilingual": false}
+Only "locker" and "folders" are required. Nothing leaves the machine unless "send" is true; then ranking and ask
+send file text to OpenRouter, and "llm" picks the answer model among the providers OpenRouter offers.
+ZJM_FORCE=1 replaces a locker of the same name built from other folders.
+"""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import mirror
+
+
+def die(msg: str) -> None:
+    print(msg, file=sys.stderr)
+    sys.exit(2)
+
+
+def project_root() -> Path:
+    r = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=False)
+    return Path(r.stdout.strip() if r.returncode == 0 else os.getcwd()).resolve()
+
+
+def settings(root: Path) -> dict:
+    path = root / "zjm-project.json"
+    if not path.is_file():
+        die(f"no {path}: create it as the skill's SKILL.md shows")
+    s = json.loads(path.read_text())
+    if not isinstance(s.get("locker"), str) or not isinstance(s.get("folders"), list) or not s["folders"]:
+        die(f'{path} needs "locker" and a non-empty "folders" list')
+    return s
+
+
+def write_config(tmp: Path, s: dict, allow: list[str]) -> Path:
+    send = s.get("send") is True
+    cfg = {"home": "/data", "allow": allow, "exclude": s.get("exclude", []), "egress": {"rank": send, "answer": send}}
+    if "llm" in s:
+        cfg["llm"] = s["llm"]
+    path = tmp / "config.json"
+    path.write_text(json.dumps(cfg))
+    return path
+
+
+def zjm(cfg: Path, *args: str, sources: list[Path] = (), capture: bool = False) -> str:
+    env = {**os.environ, "ZJM_HOST_CONFIG": str(cfg)}
+    env.pop("ZJM_SOURCES", None)
+    if sources:
+        env["ZJM_SOURCES"] = ":".join(map(str, sources))
+    return subprocess.run(["zjm", *args], env=env, check=True, text=True, capture_output=capture).stdout
+
+
+def has_locker(cfg: Path, name: str) -> bool:
+    return any(line.split()[:1] == [name] for line in zjm(cfg, "locker-list", capture=True).splitlines())
+
+
+def reindex(s: dict, root: Path, state: Path) -> None:
+    dirs = [(root / f).resolve() for f in s["folders"]]
+    names = [d.name for d in dirs]
+    for d in dirs:
+        if not d.is_dir():
+            die(f"{d} is not a folder: index folders only")
+        if any(part.lower() in mirror.FLOOR_DIRS for part in d.parts):
+            die(f"{d} is inside a folder zjm never indexes")
+    if len(set(names)) < len(names):
+        die("two folders share a name: they would replace each other; index one of them separately")
+    want = "\n".join(map(str, dirs))
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        copies = [tmp / n for n in names]
+        for d, c in zip(dirs, copies):
+            mirror.make(d, c)
+        cfg = write_config(tmp, s, [f"/sources/{n}" for n in names])
+        lk = s["locker"]
+        if has_locker(cfg, lk):
+            built = (state / "dirs").read_text() if (state / "dirs").is_file() else None
+            if built != want and os.environ.get("ZJM_FORCE") != "1":
+                die(f"locker {lk} exists and was not built from these folders; rename it, or ZJM_FORCE=1 to replace it")
+            zjm(cfg, "locker-drop", lk, capture=True)
+            (state / "dirs").unlink(missing_ok=True)
+        zjm(cfg, "locker-create", lk, "--plain", *(["--multilingual"] if s.get("multilingual") else []), capture=True)
+        print(zjm(cfg, "file-add", lk, *[f"/sources/{n}" for n in names], sources=copies, capture=True).strip())
+        state.mkdir(parents=True, exist_ok=True)
+        (state / "dirs").write_text(want)
+        (state / "stamp").touch()
+
+
+def stale(state: Path) -> list[str]:
+    since = (state / "stamp").stat().st_mtime
+    out = []
+    for d in (state / "dirs").read_text().splitlines():
+        for here, subdirs, files in os.walk(d):
+            subdirs[:] = [x for x in subdirs if x != ".git"]
+            if any(os.stat(os.path.join(here, x)).st_mtime > since for x in [".", *files]):
+                out.append(d)
+                break
+    return out
+
+
+def main() -> None:
+    cmd, rest = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
+    root = project_root()
+    s = settings(root)
+    state = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "zjm-project" / s["locker"]
+    if cmd == "reindex":
+        return reindex(s, root, state)
+    if cmd not in ("find", "ask") or not rest:
+        die(__doc__.split("\n\n")[1])
+    if not (state / "dirs").is_file():
+        die(f"no locker {s['locker']} built by zjm-project: reindex first")
+    if cmd == "ask" and s.get("send") is not True:
+        die('ask sends file text to OpenRouter: set "send": true in zjm-project.json first')
+    for d in stale(state):  # warn, never block: a stale locker misses new text and still shows removed text
+        print(f"STALE: {d} changed since the last reindex; run reindex before trusting this search", file=sys.stderr)
+    with tempfile.TemporaryDirectory() as tmp:
+        zjm(write_config(Path(tmp), s, []), cmd, rest[0], "-l", s["locker"], *rest[1:])
+
+
+if __name__ == "__main__":
+    main()
