@@ -45,6 +45,7 @@ def copy(src: Path, dst: Path) -> None:
 
 def main() -> None:
     root, mirror, rels = Path(sys.argv[1]).resolve(), Path(sys.argv[2]), sys.argv[3:] or ["."]
+    mirror.mkdir(parents=True, exist_ok=True)  # an empty folder still mounts
     for p in candidates(root, rels):
         if not p.is_symlink():
             copy(p, mirror / p.relative_to(root))

@@ -21,6 +21,9 @@ case $CMD in
     srcs=() allow=() names=()
     for d in "$@"; do
       d=$(realpath "$d"); n=$(basename "$d")
+      [ -d "$d" ] || { echo "$d is not a folder: index folders only" >&2; exit 2; }
+      case "/$d/" in */.git/*|*/node_modules/*|*/.venv/*|*/__pycache__/*|*/.zvec-grep/*|*/.zjm/*|*/.ssh/*|*/.gnupg/*|*/.aws/*|*/.kube/*|*/.docker/*)
+        echo "$d is inside a folder zjm never indexes" >&2; exit 2 ;; esac
       [[ " ${names[*]} " == *" $n "* ]] && { echo "two folders named $n: rename one or index it separately" >&2; exit 2; }
       python3 "$HERE/mirror.py" "$d" "$TMP/$n"
       names+=("$n"); srcs+=("$TMP/$n"); allow+=("\"/sources/$n\"")

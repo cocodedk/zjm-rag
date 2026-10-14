@@ -27,7 +27,7 @@ it indexes. Run them; don't read them.
 6. `scripts/zjm-project reindex <locker> <folder>...`, then record the locker name and the exact command in the
    project's own instructions so the next session uses the same ones.
 
-Choosing files: name the folders (or single files) to index; inside them, leave files and folders out by name with
+Choosing files: name the folders to index; inside them, leave files and folders out by name with
 `ZJM_EXCLUDE="*.pdf,drafts/"` (a trailing `/` means a folder). Put it on every reindex, or the next one indexes them.
 For folders that must never leave the machine, search with `ZJM_LOCAL=1` (zg only, no ranking, no `ask`).
 
