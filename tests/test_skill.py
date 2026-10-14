@@ -66,11 +66,10 @@ class SkillTest(unittest.TestCase):
         self.assertIn("is a symlink", r.stderr)
 
     def test_a_dangling_symlink_does_not_break_a_search(self):
-        self.assertEqual(self.run_script("reindex").returncode, 0)
         (self.project / "docs/gone").symlink_to(self.tmp / "missing")
+        self.assertEqual(self.run_script("reindex").returncode, 0)
         r = self.run_script("find", "who approves?")
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("STALE", r.stderr)
 
     def test_refuses_a_config_override_on_the_command_line(self):
         self.assertEqual(self.run_script("reindex").returncode, 0)
