@@ -6,9 +6,9 @@
     zjm-project ask "QUESTION" [ZJM-ARGS]    an answer from the accepted files, with citations (needs "send")
 
 Settings live in zjm-project.json at the project root (the git top level, else the current folder):
-    {"locker": "myproj", "folders": ["docs", "memory"], "exclude": ["*.pdf", "drafts/"],
+    {"locker": "myproj", "folders": ["docs", "memory"], "files": ["CLAUDE.md"], "exclude": ["*.pdf", "drafts/"],
      "send": false, "llm": "deepseek/deepseek-v4-flash", "multilingual": false}
-Only "locker" and "folders" are required. Nothing leaves the machine unless "send" is true; then ranking and ask
+"locker" and at least one of "folders" and "files" (relative paths, nothing outside the project) are required. Nothing leaves the machine unless "send" is true; then ranking and ask
 send file text to OpenRouter, and "llm" picks the answer model among the providers OpenRouter offers.
 ZJM_FORCE=1 replaces a locker of the same name built from other folders.
 """
@@ -38,9 +38,30 @@ def settings(root: Path) -> dict:
     if not path.is_file():
         die(f"no {path}: create it as the skill's SKILL.md shows")
     s = json.loads(path.read_text())
-    if not isinstance(s.get("locker"), str) or not isinstance(s.get("folders"), list) or not s["folders"]:
-        die(f'{path} needs "locker" and a non-empty "folders" list')
+    lists = [s.get("folders", []), s.get("files", [])]
+    if not isinstance(s.get("locker"), str) or not any(lists) or not all(
+            isinstance(x, list) and all(isinstance(i, str) and i for i in x) for x in lists):
+        die(f'{path} needs "locker" and a non-empty "folders" or "files" list of paths')
     return s
+
+
+# options find and ask pass on to zjm: anything else could change what zjm opens, where or how
+VALUE_OPTS = {"find": {"--limit", "--min-score", "--type", "--sort"},  # as zjm's own parser takes them per command
+              "ask": {"--limit", "--min-score", "--type", "--top-k", "--lang"}}
+
+
+def check_options(cmd: str, question: str, opts: list[str]) -> None:
+    if question.startswith("-"):
+        die("the question must not start with -")
+    it = iter(opts)
+    for a in it:
+        name, eq, _ = a.partition("=")
+        if name in VALUE_OPTS[cmd]:
+            if eq or not next(it, "-").startswith("-"):
+                continue
+        elif a == "--no-rank":
+            continue
+        die(f"{a} is not allowed; {cmd} takes only {', '.join(sorted(VALUE_OPTS[cmd]))} and --no-rank")
 
 
 def write_config(tmp: Path, s: dict, allow: list[str]) -> Path:
@@ -65,33 +86,50 @@ def has_locker(cfg: Path, name: str) -> bool:
     return any(line.split()[:1] == [name] for line in zjm(cfg, "locker-list", capture=True).splitlines())
 
 
+def ident(text: str) -> list:
+    return sorted((l.startswith("F\t"), l.rpartition("\t")[2]) for l in text.splitlines())
+
+
 def reindex(s: dict, root: Path, state: Path) -> None:
-    for f in s["folders"]:  # a symlink anywhere on the way would index its target instead
-        here = root
-        for part in Path(f).parts:
-            here = here / part
-            if here.is_symlink():
-                die(f"{here} is a symlink: index the real folder")
-    dirs = [(root / f).resolve() for f in s["folders"]]
-    names = [d.name for d in dirs]
-    for d in dirs:
-        if not d.is_dir():
+    dirs, missing, files = [], set(), []
+    for f in s.get("folders", []):
+        d = mirror.inside(root, f)
+        if not d.exists():
+            print(f"{f} does not exist; indexed as empty", file=sys.stderr)
+            missing.add(d)
+        elif not d.is_dir():
             die(f"{d} is not a folder: index folders only")
-        if any(part.lower() in mirror.FLOOR_DIRS for part in d.parts):
-            die(f"{d} is inside a folder zjm never indexes")
+        mirror.floor_check(d)
+        dirs.append(d)
+    for f in s.get("files", []):
+        p = mirror.inside(root, f)
+        if not p.is_file():
+            die(f"{f} is not a regular file")
+        mirror.floor_check(p.parent)
+        files.append(p)
+    names = [d.name for d in dirs] + (["_files"] if files else [])
+    if "_files" in names[:len(dirs)]:
+        die("a folder named _files is refused: that mount holds the files list")
     if len(set(names)) < len(names):
         die("two folders share a name: they would replace each other; index one of them separately")
-    want = "\n".join(map(str, dirs))
+    lines = [f"M\t{d}" if d in missing else str(d) for d in dirs] + [f"F\t{p}" for p in files]
+    want = "\n".join(lines)
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         copies = [tmp / n for n in names]
         for d, c in zip(dirs, copies):
-            mirror.make(d, c)
+            if d in missing:
+                c.mkdir(mode=0o755)
+                c.chmod(0o755)  # readable by the container's user whatever the umask
+            else:
+                mirror.make(d, c, exclude=s.get("exclude", []))
+        if files:
+            mirror.make(root, copies[-1], [str(p.relative_to(root)) for p in files], s.get("exclude", []))
         cfg = write_config(tmp, s, [f"/sources/{n}" for n in names])
         lk = s["locker"]
         if has_locker(cfg, lk):
             built = (state / "dirs").read_text() if (state / "dirs").is_file() else None
-            if built != want and os.environ.get("ZJM_FORCE") != "1":
+            if (built is None or ident(built) != ident(want)) and os.environ.get("ZJM_FORCE") != "1":
                 die(f"locker {lk} exists and was not built from these folders; rename it, or ZJM_FORCE=1 to replace it")
             zjm(cfg, "locker-drop", lk, capture=True)
             (state / "dirs").unlink(missing_ok=True)
@@ -112,7 +150,16 @@ def changed(path: str, since: float) -> bool:
 def stale(state: Path) -> list[str]:
     since = (state / "stamp").stat().st_mtime
     out = []
-    for d in (state / "dirs").read_text().splitlines():
+    for line in (state / "dirs").read_text().splitlines():
+        kind, _, d = line.rpartition("\t")
+        if kind == "M":  # missing at index time: stale only once it exists
+            if os.path.isdir(d):
+                out.append(d)
+            continue
+        if kind == "F":  # changed() counts a removed file as a change
+            if changed(d, since):
+                out.append(d)
+            continue
         if not os.path.isdir(d):  # a removed folder walks as empty, yet the locker still holds it
             out.append(d)
             continue
@@ -135,8 +182,7 @@ def main() -> None:
         die(__doc__.split("\n\n")[1])
     if not (state / "dirs").is_file():
         die(f"no locker {s['locker']} built by zjm-project: reindex first")
-    if any(len(o) > 2 and "--config".startswith(o) for o in (a.split("=", 1)[0] for a in rest)):  # argparse takes --conf
-        die("--config is set by zjm-project.json, never on the command line")
+    check_options(cmd, rest[0], rest[1:])
     if cmd == "ask" and s.get("send") is not True:
         die('ask sends file text to OpenRouter: set "send": true in zjm-project.json first')
     for d in stale(state):  # warn, never block: a stale locker misses new text and still shows removed text

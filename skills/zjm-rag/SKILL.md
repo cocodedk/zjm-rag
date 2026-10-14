@@ -15,7 +15,7 @@ indexes. Run them; don't read them.
 Write `zjm-project.json` at the project root and commit it, so every session uses the same settings:
 
 ```json
-{"locker": "myproj", "folders": ["docs", "memory"], "exclude": ["*.pdf", "drafts/"],
+{"locker": "myproj", "folders": ["docs", "memory"], "files": ["CLAUDE.md"], "exclude": ["*.pdf", "drafts/"],
  "send": false, "llm": "deepseek/deepseek-v4-flash", "multilingual": false}
 ```
 
@@ -23,7 +23,11 @@ Write `zjm-project.json` at the project root and commit it, so every session use
   store (the Docker volume `zjm-data`); reindex refuses a name built from other folders (`ZJM_FORCE=1` replaces
   it), so check `zjm locker-list` first.
 - `folders`: documents and memory only, relative to the root. A whole code tree makes the index fail and every
-  search come back empty; search code with grep. Two folders with the same name are refused.
+  search come back empty; search code with grep. Two folders with the same name are refused. A folder that does
+  not exist yet is indexed as empty, with a warning; it shows `STALE:` once it appears.
+- `files`: single files to index too, such as `CLAUDE.md`, relative to the root. They appear in hits under
+  `_files/<path>`, so no folder may be named `_files`. You need at least one of `folders` and `files`.
+  Absolute paths, `..` and symlinks are refused in both lists.
 - `exclude`: files and folders (trailing `/`) left out by name.
 - `send`: off unless the project's owner decides otherwise. Off, nothing leaves the machine: searches list zg's
   candidates unranked and `ask` is refused. On, ranking and `ask` send the text of matching files to OpenRouter
@@ -32,9 +36,11 @@ Write `zjm-project.json` at the project root and commit it, so every session use
 - `multilingual`: true for documents not in English.
 
 Either way, paths in text files are redacted (`/home/<user>/`, `/Users/<user>/`, `/root/` → `~/`, `/tmp/...` →
-`<temp>`; PDFs and other binary files go as they are), and untracked git-ignored files, files named like secrets (zjm's floor:
-`.env*`, `*.key`, `credentials*`, ...) and anything reached through a symlink are never copied. File contents are
-not scanned: a secret pasted into an ordinary document is indexed, and sent if `send` is on. Keep scratch folders git-ignored and untracked: a tracked file stays eligible even when `.gitignore` matches it. Index from
+`<temp>`). Only text files up to 1 MiB each are indexed; larger, binary and non-UTF-8 files are skipped with a
+warning. Untracked git-ignored files, files named like secrets (zjm's floor: `.env*`, `*.key`, `credentials*`,
+...) and anything reached through a symlink are never copied. File contents are not scanned: a secret pasted into
+an ordinary document is indexed, and sent if `send` is on. Keep scratch folders git-ignored and untracked: a
+tracked file stays eligible even when `.gitignore` matches it. Index from
 a checkout that stays (the main folder after a pull), not a temporary worktree. Add `.zvec-grep/` to `.gitignore`:
 zg leaves that folder where it runs directly; zjm itself writes nothing in the project. Then run
 `scripts/zjm-project reindex`.
@@ -47,7 +53,9 @@ change to an indexed folder (each commit, merge or pull) and before the next sea
 
 ## Search
 
-- `scripts/zjm-project find "<question>" [--limit 30] [--min-score 0.3]`. Write a full question as a person would
+- `scripts/zjm-project find "<question>" [--limit 30] [--min-score 0.3]`. After the question, `find` accepts only `--limit`,
+  `--min-score`, `--type`, `--sort` (each with a value) and `--no-rank`; `ask` accepts `--limit`, `--min-score`,
+  `--type`, `--top-k`, `--lang` and `--no-rank`. Write a full question as a person would
   ask it ("who approves a change before it runs?"); a bare phrase is often rejected by ranking.
 - Jev scores relevance, not truth: read every hit in the file on disk before acting on it.
 - No hit is not proof of absence. For "every document that says X": ask two or three phrasings, raise `--limit`,

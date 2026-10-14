@@ -3,37 +3,12 @@ import json
 import os
 import shutil
 import subprocess
-import tempfile
 import unittest
-from pathlib import Path
 
-SKILL = Path(__file__).resolve().parent.parent / "skills/zjm-rag/scripts"
-CLEAN = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}  # a git hook's GIT_DIR must not leak in
+from skillbase import CLEAN, SkillBase
 
 
-class SkillTest(unittest.TestCase):
-    def setUp(self):
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        self.tmp = Path(tmp.name)
-        stub = self.tmp / "bin/zjm"  # one locker, "other", exists; every config zjm receives is appended to configs
-        stub.parent.mkdir()
-        stub.write_text('#!/bin/sh\ncat "$ZJM_HOST_CONFIG" >> "$HOME/configs"; echo >> "$HOME/configs"\n'
-                        '[ "$1" = locker-list ] && echo "other  1 files  1 bytes"\nexit 0\n')
-        stub.chmod(0o755)
-        self.project = self.tmp / "project"
-        (self.project / "docs").mkdir(parents=True)
-
-    def run_script(self, *args, settings=None, **env):
-        (self.project / "zjm-project.json").write_text(json.dumps(settings or {"locker": "mine", "folders": ["docs"]}))
-        env = {**CLEAN, "PATH": f"{self.tmp / 'bin'}{os.pathsep}{os.defpath}", "HOME": str(self.tmp),
-               "XDG_CACHE_HOME": str(self.tmp / "cache"), **env}
-        return subprocess.run([shutil.which("python3"), str(SKILL / "zjm-project"), *args], cwd=self.project, env=env,
-                              capture_output=True, text=True, check=False, timeout=30)
-
-    def configs(self):
-        return [json.loads(c) for c in (self.tmp / "configs").read_text().split("\n") if c]
-
+class SkillTest(SkillBase):
     def test_nothing_is_sent_unless_the_project_says_so(self):
         self.assertEqual(self.run_script("reindex").returncode, 0)
         self.assertEqual({json.dumps(c["egress"]) for c in self.configs()}, {'{"rank": false, "answer": false}'})
@@ -71,12 +46,22 @@ class SkillTest(unittest.TestCase):
         r = self.run_script("find", "who approves?")
         self.assertEqual(r.returncode, 0, r.stderr)
 
-    def test_refuses_a_config_override_on_the_command_line(self):
+    def test_search_takes_only_the_allowed_options(self):
         self.assertEqual(self.run_script("reindex").returncode, 0)
-        for args in (["--config", "/x.json"], ["--config=/x.json"], ["--conf", "/x.json"], ["--con=/x.json"], ["--c", "/x.json"], ["--c=/x.json"]):
+        for args in (["--limit", "5"], ["--limit=5", "--no-rank"], ["--min-score=0.3", "--type", "md", "--sort=path"]):
+            self.assertEqual(self.run_script("find", "who approves?", *args).returncode, 0, args)
+        for args in (["--lang", "da"], ["--top-k=3"]):  # ask-only options, as zjm's own parser has them
+            self.assertEqual(self.run_script("find", "who approves?", *args).returncode, 2, args)
+        send = {"locker": "mine", "folders": ["docs"], "send": True}
+        self.assertEqual(self.run_script("ask", "who approves?", "--top-k=3", "--lang", "da", settings=send).returncode, 0)
+        self.assertEqual(self.run_script("ask", "who approves?", "--sort=path", settings=send).returncode, 2)
+        for args in (["--config", "/x.json"], ["--config=/x.json"], ["--c", "x"], ["--conf=x"], ["-l", "other"],
+                     ["--locker", "other"], ["--key-file", "k"], ["--lim", "5"], ["--limit"], ["--limit", "-l"],
+                     ["--no-rank=1"], ["stray"], ["--limit", "5", "--config", "x"]):
             r = self.run_script("find", "who approves?", *args)
             self.assertEqual(r.returncode, 2, args)
-            self.assertIn("--config", r.stderr)
+            self.assertIn("not allowed", r.stderr)
+        self.assertEqual(self.run_script("find", "-l").returncode, 2)
 
     def test_a_removed_folder_is_stale(self):
         self.assertEqual(self.run_script("reindex").returncode, 0)
@@ -86,7 +71,7 @@ class SkillTest(unittest.TestCase):
     def test_mirror_is_readable_by_others_whatever_the_umask(self):
         docs = self.project / "docs"
         (docs / "sub").mkdir()
-        (docs / "sub/b.bin").write_bytes(b"\xff\xfe")
+        (docs / "sub/b.bin").write_text("text")
         (docs / "sub/b.bin").chmod(0o600)
         old = os.umask(0o077)
         try:
@@ -96,12 +81,6 @@ class SkillTest(unittest.TestCase):
         out = self.tmp / "mirror"
         self.assertEqual({oct(p.stat().st_mode & 0o777) for p in [out, out / "sub"]}, {"0o755"})
         self.assertEqual(oct((out / "sub/b.bin").stat().st_mode & 0o777), "0o644")
-
-    def mirror(self, src):
-        out = self.tmp / "mirror"
-        subprocess.run([shutil.which("python3"), str(SKILL / "mirror.py"), str(src), str(out)], env=CLEAN, check=True,
-                       timeout=30)
-        return sorted(p.name for p in out.rglob("*") if p.is_file())
 
     def test_mirror_skips_floor_files(self):
         docs = self.project / "docs"

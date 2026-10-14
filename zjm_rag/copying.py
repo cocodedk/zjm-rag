@@ -8,7 +8,7 @@ from .errors import ZjmError
 FLOOR_DIRS = {".git", "node_modules", ".venv", "__pycache__", ".zvec-grep", ".zjm", ".ssh", ".gnupg", ".aws",
               ".kube", ".docker"}
 FLOOR_FILES = {".env*", "*.pem", "*.key", "*.p12", "*.pfx", "*.kdbx", "id_rsa*", "id_dsa*", "id_ecdsa*",
-               "id_ed25519*", ".npmrc", ".pypirc", ".netrc", ".git-credentials", "credentials*"}
+               "id_ed25519*", ".npmrc", ".pypirc", ".netrc", ".git-credentials", "credentials*", ".git"}
 
 
 def is_inside(path, parent):

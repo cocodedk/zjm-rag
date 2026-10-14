@@ -107,8 +107,11 @@ The commands below use `~/.claude/skills/zjm-rag/scripts/zjm-project`. If you se
    - `locker`: the name of this project's index. Start with a lowercase letter or a digit, then use lowercase
      letters, digits, `.`, `_` and `-`, up to 64 characters in all. All projects share one store, so the name must be unique. Run `zjm locker-list` to
      see the names in use.
-   - `folders`: the folders to index, relative to the top folder. Each must be a real folder, not a
-     symlink, and two folders cannot share a name.
+   - `folders`: the folders to index, relative to the top folder. Each must be a real folder inside the
+     project, not a symlink, and two folders cannot share a name. A folder that does not exist yet is
+     indexed as empty, with a warning.
+   - `files`: single files to index, such as `README.md` or `CLAUDE.md`, relative to the top folder. Use
+     it for files that sit in the top folder, so you do not index the code around them.
    - `exclude`: files or folders to leave out, by name. End a folder name with `/`.
    - `send`: `false` keeps everything on your machine. `true` lets searches and answers send file text
      to OpenRouter. Leave it `false` unless the project's owner decides otherwise. This switch belongs to
@@ -122,7 +125,8 @@ The commands below use `~/.claude/skills/zjm-rag/scripts/zjm-project`. If you se
        ~/.claude/skills/zjm-rag/scripts/zjm-project reindex
 
    Expected: zjm reports what it added, and the prompt returns. Reindex copies each folder into zjm's
-   store first. Paths inside text files are redacted (for example `/home/<user>/` becomes `~/`).
+   store first. Only text files up to 1 MiB each are copied; larger and binary files are skipped with a
+   warning. Paths inside text files are redacted (for example `/home/<user>/` becomes `~/`).
    A file that git ignores and does not track is not copied; a tracked file is copied even if `.gitignore` matches it. Files whose names match zjm's built-in secret-file patterns (`.env*`,
    `*.pem`, `*.key`, `id_rsa*` and the rest of the list under [Safety](#safety)) are left out. The contents
    of documents are not scanned for secrets, so a key pasted into an ordinary document is indexed, and
