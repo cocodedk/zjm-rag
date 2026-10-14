@@ -76,6 +76,7 @@ else
     run curl -fsSL -o "$skill_dir/$f" "https://raw.githubusercontent.com/cocodedk/zjm-rag/main/skills/zjm-rag/$f" \
       || die "cannot download the skill"
   done
+  run chmod +x "$skill_dir/scripts/zjm-project" || die "cannot make the skill's script executable"
 fi
 if [ "${ZJM_INSTALL_DRY_RUN:-}" != 1 ]; then
   have zjm || echo "warning: $bin_dir is not on PATH; add it to use zjm"
