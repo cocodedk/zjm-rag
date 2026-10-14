@@ -19,6 +19,7 @@ class InstallTest(unittest.TestCase):
             stub = Path(tmp.name) / name
             stub.write_text("#!/bin/sh\nexit 0\n")
             stub.chmod(0o755)
+        self.home = tmp.name
         env = {"PATH": tmp.name, "HOME": tmp.name}
         if dry_run:
             env["ZJM_INSTALL_DRY_RUN"] = "1"
@@ -35,6 +36,10 @@ class InstallTest(unittest.TestCase):
         self.assertIn(f"+ docker build -t zjm-rag:latest {ROOT}", out)
         self.assertTrue(any(line.startswith("+ cp ") and line.endswith("/bin/zjm") for line in out))
         self.assertTrue(any(line.startswith("+ chmod +x ") for line in out))
+
+    def test_installs_the_claude_code_skill_from_local_checkout(self):
+        out = self.install("docker", "python3")
+        self.assertIn(f"+ cp -R {ROOT}/skills/zjm-rag {self.home}/.claude/skills/zjm-rag", out)
 
     def test_fails_without_docker(self):
         r = self.run_script("python3")

@@ -46,6 +46,10 @@ if none exists, preserving existing configuration. From then on, `zjm ...` on th
 `--security-opt=no-new-privileges`, a `2g` memory cap, a `256`-pid limit, persistent data in the
 `zjm-data` Docker volume, and `--network none` unless the config turns `egress` on.
 
+It also installs the Claude Code skill `zjm-rag` into `${CLAUDE_CONFIG_DIR:-~/.claude}/skills/zjm-rag`,
+replacing any older copy: [skills/zjm-rag/SKILL.md](skills/zjm-rag/SKILL.md) says how to index a project's
+documents, keep the index fresh and search it.
+
 Requirements: `docker` and `python3` on the host; `OPENROUTER_API_KEY` (used for both Jev ranking
 and OpenRouter answers) is needed only once `egress.rank` or `egress.answer` is turned on in the
 config, and is passed through by name, never by value.

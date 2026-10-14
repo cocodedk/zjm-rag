@@ -21,17 +21,17 @@ have() {
   command -v "$1" >/dev/null 2>&1
 }
 
-echo "1/3 checking docker and python3"
+echo "1/4 checking docker and python3"
 have docker || die "docker is needed to build and run zjm's container"
 have python3 || die "python3 is needed by the zjm launcher"
 
-echo "2/3 building the zjm-rag image"
+echo "2/4 building the zjm-rag image"
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 context="$REPO"
 [ -f "$script_dir/Dockerfile" ] && context="$script_dir"
 run docker build -t zjm-rag:latest "$context" || die "docker build failed"
 
-echo "3/3 installing the launcher"
+echo "3/4 installing the launcher"
 bin_dir="$HOME/.local/bin"
 run mkdir -p "$bin_dir" || die "cannot create $bin_dir"
 if [ -f "$script_dir/bin/zjm" ]; then
@@ -62,6 +62,21 @@ else:
         json.dump({"home": "/data", "allow": [], "egress": {"rank": False, "answer": False}}, f)
         f.write("\n")
 PYCONFIG
+fi
+echo "4/4 installing the Claude Code skill"
+skill_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/zjm-rag"
+run rm -rf "$skill_dir" || die "cannot replace $skill_dir"
+if [ -d "$script_dir/skills/zjm-rag" ]; then
+  run mkdir -p "$(dirname "$skill_dir")" || die "cannot create the skills folder"
+  run cp -R "$script_dir/skills/zjm-rag" "$skill_dir" || die "cannot copy the skill"
+else
+  have curl || die "curl is needed to fetch the skill"
+  run mkdir -p "$skill_dir/scripts" || die "cannot create $skill_dir"
+  for f in SKILL.md scripts/zjm-project scripts/mirror.py; do
+    run curl -fsSL -o "$skill_dir/$f" "https://raw.githubusercontent.com/cocodedk/zjm-rag/main/skills/zjm-rag/$f" \
+      || die "cannot download the skill"
+  done
+  run chmod +x "$skill_dir/scripts/zjm-project" || die "cannot make the skill's script executable"
 fi
 if [ "${ZJM_INSTALL_DRY_RUN:-}" != 1 ]; then
   have zjm || echo "warning: $bin_dir is not on PATH; add it to use zjm"
