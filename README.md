@@ -28,7 +28,7 @@ key nor the plaintext outside the single request that needs them.
    contains the information needed to answer the question, judging from those full chunks. Each
    file gets a probability; files at or above a threshold (default `0.5`) are accepted, the rest
    are reported as rejected, never dropped silently.
-3. **An LLM answers.** The top accepted files (`top_k`, default `8`) go to a cheap OpenRouter model
+3. **An LLM answers.** All accepted files (by default; `top_k` caps them) go to a cheap OpenRouter model
    (`deepseek/deepseek-v4-flash` by default) with the instruction to answer from those files only,
    citing the path and lines. Small files are sent whole; larger ones as their chunks, while a
    200 000-character budget lasts. When no file passes the threshold, no LLM is called.
