@@ -73,10 +73,29 @@ class SkillTest(unittest.TestCase):
 
     def test_refuses_a_config_override_on_the_command_line(self):
         self.assertEqual(self.run_script("reindex").returncode, 0)
-        for args in (["--config", "/x.json"], ["--config=/x.json"]):
+        for args in (["--config", "/x.json"], ["--config=/x.json"], ["--conf", "/x.json"], ["--con=/x.json"]):
             r = self.run_script("find", "who approves?", *args)
             self.assertEqual(r.returncode, 2, args)
             self.assertIn("--config", r.stderr)
+
+    def test_a_removed_folder_is_stale(self):
+        self.assertEqual(self.run_script("reindex").returncode, 0)
+        shutil.rmtree(self.project / "docs")
+        self.assertIn("STALE", self.run_script("find", "who approves?").stderr)
+
+    def test_mirror_is_readable_by_others_whatever_the_umask(self):
+        docs = self.project / "docs"
+        (docs / "sub").mkdir()
+        (docs / "sub/b.bin").write_bytes(b"\xff\xfe")
+        (docs / "sub/b.bin").chmod(0o600)
+        old = os.umask(0o077)
+        try:
+            self.mirror(docs)
+        finally:
+            os.umask(old)
+        out = self.tmp / "mirror"
+        self.assertEqual({oct(p.stat().st_mode & 0o777) for p in [out, out / "sub"]}, {"0o755"})
+        self.assertEqual(oct((out / "sub/b.bin").stat().st_mode & 0o777), "0o644")
 
     def mirror(self, src):
         out = self.tmp / "mirror"

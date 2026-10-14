@@ -6,6 +6,7 @@ In a git checkout only the files git shows are copied (tracked, or new and not i
 Text files have /home/<user>/, /Users/<user>/ and /root/ replaced by ~/ and any /tmp/ path by <temp>; other files are copied as they are.
 """
 import fnmatch
+import os
 import re
 import shutil
 import subprocess
@@ -64,6 +65,10 @@ def make(root: Path, mirror: Path, rels: list[str] | None = None) -> None:
     for p in candidates(root, rels or ["."]):
         if allowed(root, p):
             copy(p, mirror / p.relative_to(root))
+    for here, dirs, files in os.walk(mirror):  # readable by the container's own user, whatever the umask or source mode
+        os.chmod(here, 0o755)
+        for f in files:
+            os.chmod(os.path.join(here, f), 0o644)
 
 
 def main() -> None:

@@ -113,6 +113,9 @@ def stale(state: Path) -> list[str]:
     since = (state / "stamp").stat().st_mtime
     out = []
     for d in (state / "dirs").read_text().splitlines():
+        if not os.path.isdir(d):  # a removed folder walks as empty, yet the locker still holds it
+            out.append(d)
+            continue
         for here, subdirs, files in os.walk(d):
             subdirs[:] = [x for x in subdirs if x != ".git"]
             if any(changed(os.path.join(here, x), since) for x in [".", *files]):
@@ -132,7 +135,7 @@ def main() -> None:
         die(__doc__.split("\n\n")[1])
     if not (state / "dirs").is_file():
         die(f"no locker {s['locker']} built by zjm-project: reindex first")
-    if any(a.startswith("--config") for a in rest):
+    if any(len(o) > 3 and "--config".startswith(o) for o in (a.split("=", 1)[0] for a in rest)):  # argparse takes --conf
         die("--config is set by zjm-project.json, never on the command line")
     if cmd == "ask" and s.get("send") is not True:
         die('ask sends file text to OpenRouter: set "send": true in zjm-project.json first')
