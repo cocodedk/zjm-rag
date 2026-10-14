@@ -1,99 +1,121 @@
-#!/bin/sh
-# zjm launcher: runs zjm-rag only inside its hardened container. See docs/lean/07-container.md.
-# ZJM_LAUNCH_DRY_RUN=1 prints the docker argv on one line, prefixed with "+ ", instead of running it.
-set -u
+#!/usr/bin/env python3
+"""Run zjm in its hardened container, preserving host paths as single arguments."""
+import json
+import os
+import shlex
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
 
-die() {
-  echo "zjm: $*" >&2
-  exit 1
-}
 
-launcher_first="${1:-}"
+def option(args, name, default=None):
+    """Read the last exact option, stopping at the positional-only separator."""
+    value = default
+    for i, arg in enumerate(args):
+        if arg == "--":
+            break
+        if arg == name:
+            if i + 1 == len(args):
+                raise ValueError(f"{name} needs a value")
+            value = args[i + 1]
+        elif arg.startswith(name + "="):
+            value = arg.split("=", 1)[1]
+    return value
 
-host_config="${ZJM_HOST_CONFIG:-}"
-if [ -z "$host_config" ]; then
-  host_config="${XDG_CONFIG_HOME:-$HOME/.config}/zjm/config.json"
-fi
-[ -f "$host_config" ] || die "host config not found: $host_config"
 
-egress=$(python3 -c '
-import json, sys
-try:
-    with open(sys.argv[1], encoding="utf-8") as f:
-        raw = json.load(f)
-except (OSError, ValueError):
-    raw = {}
-e = raw.get("egress", {}) if isinstance(raw, dict) else {}
-e = e if isinstance(e, dict) else {}
-print("1" if e.get("rank") is True else "0")
-print("1" if e.get("answer") is True else "0")
-print("1" if e.get("translate") is True else "0")
-' "$host_config") || die "cannot read egress from $host_config"
-# Split the three-line python output without touching "$@" (positional params stay the caller's).
-nl='
-'
-rest=$egress
-egress_rank=${rest%%"$nl"*}
-rest=${rest#*"$nl"}
-egress_answer=${rest%%"$nl"*}
-egress_translate=${rest#*"$nl"}
+def replace_option(args, name, value):
+    out, i = [], 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--":
+            out.extend(args[i:])
+            break
+        if arg == name:
+            out.extend([name, value])
+            i += 2
+        elif arg.startswith(name + "="):
+            out.append(name + "=" + value)
+            i += 1
+        else:
+            out.append(arg)
+            i += 1
+    return out
 
-network_args=
-[ "$egress_rank" = 0 ] && [ "$egress_answer" = 0 ] && [ "$egress_translate" = 0 ] && network_args="--network none"
 
-env_args=
-{ [ "$egress_rank" = 1 ] || [ "$egress_answer" = 1 ] || [ "$egress_translate" = 1 ]; } \
-  && env_args="$env_args -e OPENROUTER_API_KEY"
+def mount(path, target):
+    path = Path(path).expanduser().resolve()
+    if ":" in str(path):
+        raise ValueError("mount paths cannot contain a colon")
+    return ["-v", f"{path}:{target}:ro"]
 
-source_args=
-seen=" "
-old_ifs=$IFS
-IFS=:
-for dir in ${ZJM_SOURCES:-}; do
-  IFS=$old_ifs
-  [ -n "$dir" ] || continue
-  [ -d "$dir" ] || die "source directory not found: $dir"
-  base=${dir##*/}
-  case "$seen" in
-    *" $base "*) die "duplicate source basename: $base" ;;
-  esac
-  seen="$seen$base "
-  source_args="$source_args -v $dir:/sources/$base:ro"
-  IFS=:
-done
-IFS=$old_ifs
 
-image="${ZJM_IMAGE:-zjm-rag:latest}"
+def stage(source, directory, name):
+    # The directory is private on the host; only the file is mounted into the container.
+    # A readable file mode lets container UID 10001 read without changing the host original.
+    target = Path(directory) / name
+    target.write_bytes(Path(source).expanduser().read_bytes())
+    target.chmod(0o444)
+    return target
 
-port_args=
-if [ "$launcher_first" = serve ]; then
-  [ -n "$network_args" ] && die "HTTP needs egress on, or use MCP"
-  port_args="-p 127.0.0.1:${ZJM_PORT:-8765}:8765"
-  set -- serve --host 0.0.0.0 --port 8765
-fi
 
-# Prepend the fixed docker flags to "$@" (the container command), keeping each argument distinct.
-set -- docker run --rm -i \
-  --user 10001:10001 \
-  --read-only \
-  --tmpfs /tmp:rw,size=1g,mode=1777 \
-  --cap-drop=ALL \
-  --security-opt=no-new-privileges \
-  --memory=2g \
-  --memory-swap=2g \
-  --ulimit core=0 \
-  --pids-limit=256 \
-  -v zjm-data:/data \
-  -v "$host_config":/etc/zjm/config.json:ro \
-  $source_args \
-  $network_args \
-  $env_args \
-  $port_args \
-  "$image" \
-  "$@"
+def main(args, directory):
+    config = option(args, "--config", os.environ.get("ZJM_HOST_CONFIG"))
+    if not config:
+        config = str(Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "zjm/config.json")
+    config = Path(config).expanduser().resolve()
+    if not config.is_file():
+        raise ValueError(f"host config not found: {config}; run install.sh to create the default config")
+    raw = json.loads(config.read_text())
+    egress = raw.get("egress", {})
+    online = any(egress.get(key) is True for key in ("rank", "answer", "translate"))
+    args = replace_option(args, "--config", "/etc/zjm/config.json")
+    command = ["docker", "run", "--rm", "-i", "--user", "10001:10001", "--read-only",
+               "--tmpfs", "/tmp:rw,size=1g,mode=1777", "--cap-drop=ALL",
+               "--security-opt=no-new-privileges", "--memory=2g", "--memory-swap=2g",
+               "--ulimit", "core=0", "--pids-limit=256", "-v", "zjm-data:/data"]
+    command += mount(stage(config, directory, "config.json"), "/etc/zjm/config.json")
+    seen = set()
+    for source in filter(None, os.environ.get("ZJM_SOURCES", "").split(":")):
+        path = Path(source).expanduser().resolve()
+        if not path.is_dir():
+            raise ValueError(f"source directory not found: {source}")
+        if not path.name or path.name in seen:
+            raise ValueError(f"duplicate or empty source basename: {path.name}")
+        seen.add(path.name)
+        command += mount(path, f"/sources/{path.name}")
+    key = option(args, "--key-file")
+    if key and key != "-":
+        if not Path(key).expanduser().is_file():
+            raise ValueError(f"key file not found: {key}")
+        command += mount(stage(key, directory, "key"), "/run/zjm-key")
+        args = replace_option(args, "--key-file", "/run/zjm-key")
+    command += ["-e", "OPENROUTER_API_KEY"] if online else ["--network", "none"]
+    if online and os.environ.get("JEV_MODEL"):
+        command += ["-e", "JEV_MODEL"]
+    if args and args[0] == "serve":
+        if not online:
+            raise ValueError("HTTP needs egress on, or use MCP")
+        if option(args, "--host", "0.0.0.0") != "0.0.0.0":
+            raise ValueError("serve --host must be 0.0.0.0 inside Docker; the published port is loopback-only")
+        port = int(option(args, "--port", "8765"))
+        host_port = int(os.environ.get("ZJM_PORT", str(port)))
+        if not 1 <= port <= 65535 or not 1 <= host_port <= 65535:
+            raise ValueError("port must be between 1 and 65535")
+        command += ["-p", f"127.0.0.1:{host_port}:{port}"]
+        args = ["serve", "--host", "0.0.0.0", "--port", str(port), *args[1:]]
+    command += [os.environ.get("ZJM_IMAGE", "zjm-rag:latest"), *args]
+    if os.environ.get("ZJM_LAUNCH_DRY_RUN") == "1":
+        print("+ " + shlex.join(command))
+    else:
+        return subprocess.run(command, check=False).returncode
+    return 0
 
-if [ "${ZJM_LAUNCH_DRY_RUN:-}" = 1 ]; then
-  echo "+ $*"
-else
-  exec "$@"
-fi
+
+if __name__ == "__main__":
+    try:
+        with tempfile.TemporaryDirectory(prefix="zjm-launch-") as directory:
+            sys.exit(main(sys.argv[1:], directory))
+    except (OSError, ValueError, AttributeError) as exc:
+        print(f"zjm: {exc}", file=sys.stderr)
+        sys.exit(1)

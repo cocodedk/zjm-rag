@@ -2,13 +2,12 @@
 import hashlib
 import os
 import shutil
+import tempfile
 import time
 from pathlib import Path
 
 from . import config as config_module
-from . import lockers
-from . import sealed
-from . import zg
+from . import lockers, sealed, zg
 from .copying import _floor_excluded, _gitignored, check_source_allowed, copy_tree
 from .errors import ZjmError
 
@@ -36,39 +35,61 @@ def _prune(manifest, name):
         del manifest["files"][k]
 
 
+def _prepare_source(real, staged, cfg, runner):
+    """Copy and describe one source before touching the live corpus."""
+    name = os.path.basename(real.rstrip(os.sep))
+    is_dir = os.path.isdir(real)
+    if _floor_excluded(name, is_dir, cfg["exclude"]):
+        return None, 1
+    if name in _gitignored(os.path.dirname(real), [name], runner):
+        return None, 0
+    if is_dir:
+        staged.mkdir()
+        _, excluded = copy_tree(real, str(staged), cfg, runner)
+        entries = {}
+        for root, _dirs, fnames in os.walk(staged):
+            for fname in fnames:
+                full = Path(root) / fname
+                rel = full.relative_to(staged).as_posix()
+                entries[f"{name}/{rel}"] = _entry(str(Path(real) / rel), full)
+        return entries, excluded
+    shutil.copy2(real, staged)
+    return {name: _entry(real, staged)}, 0
+
+
 def _add_files(ldir, manifest, reals, cfg, runner):
     corpus = ldir / "corpus"
     added, replaced, excluded = [], [], 0
-    for real in reals:
-        name = os.path.basename(real.rstrip(os.sep))
-        dest = corpus / name
-        existed = dest.exists()
-        _prune(manifest, name)
-        if os.path.isdir(real):
-            if existed:
-                shutil.rmtree(dest)
-            dest.mkdir(parents=True)
-            _, n_excl = copy_tree(real, str(dest), cfg, runner)
-            excluded += n_excl
-            for root, _dirs, fnames in os.walk(dest):
-                for fname in fnames:
-                    full = Path(root) / fname
-                    rel = full.relative_to(corpus).as_posix()
-                    src_rel = full.relative_to(dest).as_posix()
-                    manifest["files"][rel] = _entry(str(Path(real) / src_rel), full)
-        else:
-            parent, base = os.path.dirname(real), os.path.basename(real)
-            if _floor_excluded(base, False, cfg["exclude"]):
-                excluded += 1
-                continue
-            if base in _gitignored(parent, [base], runner):
-                continue
-            if existed:
-                dest.unlink()
-            shutil.copy2(real, dest)
-            manifest["files"][name] = _entry(real, dest)
-        (replaced if existed else added).append(name)
-    lockers.run_index(ldir, manifest, runner)
+    with tempfile.TemporaryDirectory(prefix=".add-", dir=ldir) as tmp:
+        pending, installed = [], []
+        for i, real in enumerate(reals):
+            staged = Path(tmp) / f"new-{i}"
+            entries, skipped = _prepare_source(real, staged, cfg, runner)
+            excluded += skipped
+            if entries is not None:
+                pending.append((os.path.basename(real.rstrip(os.sep)), staged, entries))
+        try:
+            for i, (name, staged, entries) in enumerate(pending):
+                dest = corpus / name
+                backup = Path(tmp) / f"old-{i}" if dest.exists() else None
+                if backup is not None:
+                    os.replace(dest, backup)
+                installed.append((dest, backup))
+                os.replace(staged, dest)
+                _prune(manifest, name)
+                manifest["files"].update(entries)
+                (replaced if backup is not None else added).append(name)
+        except OSError:
+            for dest, backup in reversed(installed):
+                if dest.is_dir():
+                    shutil.rmtree(dest)
+                else:
+                    dest.unlink(missing_ok=True)
+                if backup is not None:
+                    os.replace(backup, dest)
+            raise
+        # As before, plain lockers keep copied files if indexing fails (indexed=False).
+        lockers.run_index(ldir, manifest, runner)
     return {"added": added, "replaced": replaced, "excluded": excluded}
 
 
@@ -112,14 +133,12 @@ def file_remove(locker, names, key=None, *, config=None, runner=zg.run, jev=None
         if missing:
             raise ZjmError(f"no such file(s) in locker {locker}: {', '.join(missing)}")
         corpus = ldir / "corpus"
-        removed = []
-        for name, ks in matches.items():
-            for k in ks:
-                path = corpus / k
-                if path.exists():
-                    path.unlink()
-                del manifest["files"][k]
-            removed.append(name)
+        removed = list(matches)
+        for k in sorted({k for ks in matches.values() for k in ks}):
+            path = corpus / k
+            if path.exists():
+                path.unlink()
+            del manifest["files"][k]
         lockers.run_index(ldir, manifest, runner)
     return {"removed": removed}
 

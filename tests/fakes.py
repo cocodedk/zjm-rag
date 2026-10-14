@@ -73,7 +73,7 @@ class FakeRunner:
             return 0, ZG_OUT, ""
         if argv[0] == "git":
             if not self.ignored:
-                return 128, "", "not a git repository"
+                return 1, "", ""
             hits = [p for p in (input or "").split("\0") if p and p in self.ignored]
             return 0, "".join(h + "\0" for h in hits), ""
         raise AssertionError(f"unexpected runner call: {argv}")

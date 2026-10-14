@@ -1,5 +1,6 @@
 """bin/zjm in dry run, with a stub PATH and a temp host config; never runs docker (spec 07)."""
 import json
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -38,8 +39,8 @@ class LauncherTest(unittest.TestCase):
             env["ZJM_SOURCES"] = ":".join(str(s) for s in sources)
         if env_extra:
             env.update(env_extra)
-        return subprocess.run([shutil.which("sh"), str(SCRIPT)] + args, env=env,
-                              capture_output=True, text=True, timeout=30)
+        return subprocess.run([shutil.which("python3"), str(SCRIPT)] + args, env=env,
+                              capture_output=True, text=True, check=False, timeout=30)
 
     def test_offline_argv(self):
         self.write_config({"rank": False, "answer": False})
@@ -52,7 +53,7 @@ class LauncherTest(unittest.TestCase):
         self.assertIn("--read-only", line)
         self.assertIn("--cap-drop=ALL", line)
         self.assertIn("-v zjm-data:/data", line)
-        self.assertIn(f"-v {self.config_path}:/etc/zjm/config.json:ro", line)
+        self.assertIn("/config.json:/etc/zjm/config.json:ro", line)
         self.assertIn(f"-v {src}:/sources/docs:ro", line)
         self.assertNotIn(" -e ", line)
         self.assertTrue(line.endswith("zjm-rag:latest find q -l lib"))
@@ -75,6 +76,8 @@ class LauncherTest(unittest.TestCase):
         self.write_config({"rank": False, "answer": True})
         r3 = self.run_launcher(["find", "q", "-l", "lib"])
         self.assertIn("-e OPENROUTER_API_KEY", r3.stdout)
+        r4 = self.run_launcher(["find", "q", "-l", "lib"], env_extra={"JEV_MODEL": "custom"})
+        self.assertIn("-e JEV_MODEL", r4.stdout)
 
     def test_translate_only_egress(self):
         self.write_config({"rank": False, "answer": False, "translate": True})
@@ -94,6 +97,56 @@ class LauncherTest(unittest.TestCase):
         r = self.run_launcher(["find", "q", "-l", "lib"], sources=[missing])
         self.assertEqual(r.returncode, 1)
         self.assertIn("source directory not found", r.stderr)
+
+    def test_paths_keys_and_serve_options(self):
+        self.write_config({"rank": True})
+        source = self.make_source("my docs")
+        key = self.root / "my key.txt"
+        key.write_text("not-a-real-key")
+        r = self.run_launcher(["file-put", "lib", "note", "--key-file", str(key)], sources=[source])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        argv = shlex.split(r.stdout[2:])
+        self.assertIn(f"{source}:/sources/my docs:ro", argv)
+        self.assertTrue(any(arg.endswith("/key:/run/zjm-key:ro") for arg in argv))
+        self.assertEqual(argv[-2:], ["--key-file", "/run/zjm-key"])
+        self.assertNotIn("not-a-real-key", r.stdout)
+        r = self.run_launcher(["serve", "--config", str(self.config_path), "--port", "9000"])
+        argv = shlex.split(r.stdout[2:])
+        self.assertIn("127.0.0.1:9000:9000", argv)
+        self.assertEqual(argv[-4:], ["--config", "/etc/zjm/config.json", "--port", "9000"])
+        r = self.run_launcher(["find", "q", "-l", "lib", "--key-file=-"])
+        self.assertIn("--key-file=-", r.stdout)
+        self.assertNotIn("/run/zjm-key", r.stdout)
+
+    def test_private_mounts_readable_and_cleaned(self):
+        self.write_config({})
+        self.config_path.chmod(0o600)
+        key = self.root / "private.key"
+        key.write_text("secret-test-key")
+        key.chmod(0o600)
+        docker = self.stub_path / "docker"
+        docker.write_text("#!/usr/bin/env python3\n"
+                          "import json, pathlib, sys\n"
+                          "mounts = [a for a in sys.argv if a.endswith(':ro') and "
+                          "('/etc/zjm/config.json' in a or '/run/zjm-key' in a)]\n"
+                          "for mount in mounts:\n"
+                          "    p = pathlib.Path(mount.split(':')[0])\n"
+                          "    assert p.stat().st_mode & 0o777 == 0o444\n"
+                          "    assert p.parent.stat().st_mode & 0o777 == 0o700\n"
+                          "    assert p.read_bytes()\n"
+                          "print(json.dumps(mounts))\n")
+        docker.chmod(0o755)
+        r = self.run_launcher(["file-list", "lib", "--key-file", str(key)],
+                              env_extra={"ZJM_LAUNCH_DRY_RUN": "0"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        for mount in json.loads(r.stdout):
+            self.assertFalse(Path(mount.split(":")[0]).exists())
+        self.assertEqual(key.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.config_path.stat().st_mode & 0o777, 0o600)
+        self.write_config({"rank": True})
+        r = self.run_launcher(["serve", "--host", "127.0.0.1"])
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("published port is loopback-only", r.stderr)
 
 
 if __name__ == "__main__":
