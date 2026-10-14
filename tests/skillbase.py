@@ -20,7 +20,8 @@ class SkillBase(unittest.TestCase):
         stub.parent.mkdir()
         stub.write_text('#!/bin/sh\ncat "$ZJM_HOST_CONFIG" >> "$HOME/configs"; echo >> "$HOME/configs"\n'
                         '[ "$1" = locker-list ] && echo "other  1 files  1 bytes"\n'
-                        '[ "$1" = file-add ] && mkdir -p "$HOME/seen" && cp -R $(echo "$ZJM_SOURCES" | tr : " ") "$HOME/seen"\n'
+                        '[ "$1" = file-add ] && mkdir -p "$HOME/seen" && cp -R $(echo "$ZJM_SOURCES" | tr : " ") "$HOME/seen"'
+                        ' && stat -c %a $(echo "$ZJM_SOURCES" | tr : " ") >> "$HOME/modes"\n'
                         'exit 0\n')
         stub.chmod(0o755)
         self.project = self.tmp / "project"

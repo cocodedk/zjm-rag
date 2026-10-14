@@ -48,8 +48,13 @@ class SkillTest(SkillBase):
 
     def test_search_takes_only_the_allowed_options(self):
         self.assertEqual(self.run_script("reindex").returncode, 0)
-        for args in (["--limit", "5"], ["--limit=5", "--no-rank"], ["--min-score=0.3", "--type", "md", "--lang=da"]):
+        for args in (["--limit", "5"], ["--limit=5", "--no-rank"], ["--min-score=0.3", "--type", "md", "--sort=path"]):
             self.assertEqual(self.run_script("find", "who approves?", *args).returncode, 0, args)
+        for args in (["--lang", "da"], ["--top-k=3"]):  # ask-only options, as zjm's own parser has them
+            self.assertEqual(self.run_script("find", "who approves?", *args).returncode, 2, args)
+        send = {"locker": "mine", "folders": ["docs"], "send": True}
+        self.assertEqual(self.run_script("ask", "who approves?", "--top-k=3", "--lang", "da", settings=send).returncode, 0)
+        self.assertEqual(self.run_script("ask", "who approves?", "--sort=path", settings=send).returncode, 2)
         for args in (["--config", "/x.json"], ["--config=/x.json"], ["--c", "x"], ["--conf=x"], ["-l", "other"],
                      ["--locker", "other"], ["--key-file", "k"], ["--lim", "5"], ["--limit"], ["--limit", "-l"],
                      ["--no-rank=1"], ["stray"], ["--limit", "5", "--config", "x"]):

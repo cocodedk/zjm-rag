@@ -46,21 +46,22 @@ def settings(root: Path) -> dict:
 
 
 # options find and ask pass on to zjm: anything else could change what zjm opens, where or how
-VALUE_OPTS = {"--limit", "--min-score", "--type", "--sort", "--top-k", "--lang"}
+VALUE_OPTS = {"find": {"--limit", "--min-score", "--type", "--sort"},  # as zjm's own parser takes them per command
+              "ask": {"--limit", "--min-score", "--type", "--top-k", "--lang"}}
 
 
-def check_options(question: str, opts: list[str]) -> None:
+def check_options(cmd: str, question: str, opts: list[str]) -> None:
     if question.startswith("-"):
         die("the question must not start with -")
     it = iter(opts)
     for a in it:
         name, eq, _ = a.partition("=")
-        if name in VALUE_OPTS:
+        if name in VALUE_OPTS[cmd]:
             if eq or not next(it, "-").startswith("-"):
                 continue
         elif a == "--no-rank":
             continue
-        die(f"{a} is not allowed; find and ask take only {', '.join(sorted(VALUE_OPTS))} and --no-rank")
+        die(f"{a} is not allowed; {cmd} takes only {', '.join(sorted(VALUE_OPTS[cmd]))} and --no-rank")
 
 
 def write_config(tmp: Path, s: dict, allow: list[str]) -> Path:
@@ -117,7 +118,11 @@ def reindex(s: dict, root: Path, state: Path) -> None:
         tmp = Path(tmp)
         copies = [tmp / n for n in names]
         for d, c in zip(dirs, copies):
-            c.mkdir() if d in missing else mirror.make(d, c, exclude=s.get("exclude", []))
+            if d in missing:
+                c.mkdir(mode=0o755)
+                c.chmod(0o755)  # readable by the container's user whatever the umask
+            else:
+                mirror.make(d, c, exclude=s.get("exclude", []))
         if files:
             mirror.make(root, copies[-1], [str(p.relative_to(root)) for p in files], s.get("exclude", []))
         cfg = write_config(tmp, s, [f"/sources/{n}" for n in names])
@@ -177,7 +182,7 @@ def main() -> None:
         die(__doc__.split("\n\n")[1])
     if not (state / "dirs").is_file():
         die(f"no locker {s['locker']} built by zjm-project: reindex first")
-    check_options(rest[0], rest[1:])
+    check_options(cmd, rest[0], rest[1:])
     if cmd == "ask" and s.get("send") is not True:
         die('ask sends file text to OpenRouter: set "send": true in zjm-project.json first')
     for d in stale(state):  # warn, never block: a stale locker misses new text and still shows removed text

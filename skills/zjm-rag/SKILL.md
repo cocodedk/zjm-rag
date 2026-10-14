@@ -53,8 +53,9 @@ change to an indexed folder (each commit, merge or pull) and before the next sea
 
 ## Search
 
-- `scripts/zjm-project find "<question>" [--limit 30] [--min-score 0.3]`. Only `--limit`, `--min-score`, `--type`,
-  `--sort`, `--top-k`, `--lang` (each with a value) and `--no-rank` are accepted after the question. Write a full question as a person would
+- `scripts/zjm-project find "<question>" [--limit 30] [--min-score 0.3]`. After the question, `find` accepts only `--limit`,
+  `--min-score`, `--type`, `--sort` (each with a value) and `--no-rank`; `ask` accepts `--limit`, `--min-score`,
+  `--type`, `--top-k`, `--lang` and `--no-rank`. Write a full question as a person would
   ask it ("who approves a change before it runs?"); a bare phrase is often rejected by ranking.
 - Jev scores relevance, not truth: read every hit in the file on disk before acting on it.
 - No hit is not proof of absence. For "every document that says X": ask two or three phrasings, raise `--limit`,

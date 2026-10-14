@@ -79,6 +79,15 @@ class FilesTest(SkillBase):
         self.run_script("reindex", settings=s)
         self.assertEqual(self.run_script("find", "q", settings=s).stderr, "")
 
+    def test_a_missing_folders_empty_mount_is_readable_whatever_the_umask(self):
+        old = os.umask(0o077)
+        try:
+            r = self.run_script("reindex", settings=self.cfg(folders=["docs", "later"]))
+        finally:
+            os.umask(old)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(set((self.tmp / "modes").read_text().split()), {"755"})
+
     def test_the_mirror_prunes_floor_folders_and_skips_a_git_file(self):
         (self.project / "node_modules/deep").mkdir(parents=True)
         (self.project / "node_modules/deep/a.md").write_text("x")
