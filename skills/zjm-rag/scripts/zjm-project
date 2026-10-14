@@ -135,7 +135,7 @@ def main() -> None:
         die(__doc__.split("\n\n")[1])
     if not (state / "dirs").is_file():
         die(f"no locker {s['locker']} built by zjm-project: reindex first")
-    if any(len(o) > 3 and "--config".startswith(o) for o in (a.split("=", 1)[0] for a in rest)):  # argparse takes --conf
+    if any(len(o) > 2 and "--config".startswith(o) for o in (a.split("=", 1)[0] for a in rest)):  # argparse takes --conf
         die("--config is set by zjm-project.json, never on the command line")
     if cmd == "ask" and s.get("send") is not True:
         die('ask sends file text to OpenRouter: set "send": true in zjm-project.json first')

@@ -73,7 +73,7 @@ class SkillTest(unittest.TestCase):
 
     def test_refuses_a_config_override_on_the_command_line(self):
         self.assertEqual(self.run_script("reindex").returncode, 0)
-        for args in (["--config", "/x.json"], ["--config=/x.json"], ["--conf", "/x.json"], ["--con=/x.json"]):
+        for args in (["--config", "/x.json"], ["--config=/x.json"], ["--conf", "/x.json"], ["--con=/x.json"], ["--c", "/x.json"], ["--c=/x.json"]):
             r = self.run_script("find", "who approves?", *args)
             self.assertEqual(r.returncode, 2, args)
             self.assertIn("--config", r.stderr)
