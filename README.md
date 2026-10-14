@@ -21,7 +21,7 @@ A locker can be **encrypted with its own key**, supplied by the app on every cal
 key nor the plaintext outside the single request that needs them.
 
 1. **zg finds.** A hybrid search over a locker's zg index returns candidate files, in zg's rank
-   order. For the first `limit` candidate files, zjm keeps every zg hit as a full chunk (the line ranges of its matches, with
+   order. For the first `limit` candidate files of each locker (plus up to `limit` more from a translated question), zjm keeps every zg hit as a full chunk (the line ranges of its matches, with
    overlapping or adjacent ranges merged, not a truncated preview), so the text that answers a
    question is never lost between zg and the answer model.
 2. **Jev ranks.** One request to Jev (the OpenRouter Decisions API) asks, per file, whether it
@@ -123,7 +123,7 @@ The commands below use `~/.claude/skills/zjm-rag/scripts/zjm-project`. If you se
 
    Expected: zjm reports what it added, and the prompt returns. Reindex copies each folder into zjm's
    store first. Paths inside text files are redacted (for example `/home/<user>/` becomes `~/`).
-   Git-ignored files are not copied. Files whose names match zjm's built-in secret-file patterns (`.env*`,
+   A file that git ignores and does not track is not copied; a tracked file is copied even if `.gitignore` matches it. Files whose names match zjm's built-in secret-file patterns (`.env*`,
    `*.pem`, `*.key`, `id_rsa*` and the rest of the list under [Safety](#safety)) are left out. The contents
    of documents are not scanned for secrets, so a key pasted into an ordinary document is indexed, and
    sent to OpenRouter if `send` is on.
@@ -338,7 +338,7 @@ while the published host port stays loopback-only.
 An English question finds the Danish, German, Norwegian or Swedish text that answers it, even when
 they share no words, and a question in any language finds text in the configured `languages`. zjm
 translates the **question**, never the files, into each configured language and searches the
-translations in addition to the original; the translations can only **add** candidate files, never
+translations in addition to the original; the translations can only **add** candidate files (up to `limit` more), never
 displace one the original question already found, and no language detection is needed.
 
 Measured (`evals/recall.py`, 38 questions, potion-code index; prototype):
@@ -392,8 +392,8 @@ app, never in zjm: **zjm never stores a key**, and a lost key means a lost locke
   `id_ed25519*`, `.npmrc`, `.pypirc`, `.netrc`, `.git-credentials`, `credentials*`.
 - **The floor works on file names only.** Contents are not scanned for secrets: a key pasted into an
   ordinary document is indexed, and sent to OpenRouter with that document when sending is on.
-- Symlinks inside a source are never copied. Gitignored files are never copied (denying a single
-  file inside an allowed repository's own git metadata is not supported; deny the whole directory).
+- Symlinks inside a source are never copied. A file that git ignores and does not track is never copied; a tracked file is copied even if `.gitignore` matches it. Denying a single
+  file inside an allowed repository's own git metadata is not supported; deny the whole directory.
 - **Nothing leaves this machine unless the config allows it.** For a project set up with the skill,
   `"send": true` in `zjm-project.json` turns on ranking and answering. Direct use (the `zjm` CLI, the
   library, the HTTP API and the MCP server) follows `egress`: ranking (Jev/OpenRouter) needs

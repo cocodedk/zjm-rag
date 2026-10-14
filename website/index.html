@@ -110,13 +110,13 @@
   <div class="steps">
     <div>
       <div class="ticks" style="--n:40"></div>
-      <p class="count">Up to 40 hits, at most 8 files</p>
+      <p class="count">Up to 40 hits, at most 8 files (16 if translated)</p>
       <h3>zg finds</h3>
-      <p>A hybrid search, keyword and semantic, over a local <a href="https://www.npmjs.com/package/@zvec/zvec-grep">zg</a> index of your folders. <code>find</code> takes up to 40 hits and keeps the first 8 different files, in zg's order. For each file it keeps every matched section, with overlapping lines merged, not a short preview. <code>--limit</code> changes the 8.</p>
+      <p>A hybrid search, keyword and semantic, over a local <a href="https://www.npmjs.com/package/@zvec/zvec-grep">zg</a> index of your folders. <code>find</code> takes up to 40 hits and keeps the first 8 different files, in zg's order. If the question is also translated (direct use, with <code>egress.translate</code> on and <code>languages</code> set), the translations can add up to 8 more files. For each file it keeps every matched section, with overlapping lines merged, not a short preview. <code>--limit</code> sets both numbers.</p>
     </div>
     <div>
       <div class="ticks" style="--n:8;--c:var(--ink)"></div>
-      <p class="count">Up to 8 files, each with a probability</p>
+      <p class="count">Up to 8 files, or 16 if translated, each with a probability</p>
       <h3>Jev judges</h3>
       <p>Runs only when sending is on: <code>send</code> in a project, <code>egress.rank</code> for direct use. One request to Jev, the OpenRouter Decisions API, asks the same question of every file: does this one hold what the answer needs? Jev judges each file from its path and up to 12,000 characters of its matched text, and returns a probability. Files at 0.5 or above are accepted. The rest are listed as rejected, so none disappears without a trace.</p>
     </div>
@@ -190,7 +190,7 @@
  "send": false, "llm": "deepseek/deepseek-v4-flash", "multilingual": false}</pre></li>
     <li>Add <code>.zvec-grep/</code> to <code>.gitignore</code>, on its own line. Expected: zg's working folder stays out of git.</li>
     <li>Commit <code>zjm-project.json</code> and <code>.gitignore</code>. Expected: git lists both as committed.</li>
-    <li>Build the index with <code>~/.claude/skills/zjm-rag/scripts/zjm-project reindex</code>. Expected: zjm reports what it added, and the prompt returns. Text files are copied with home-folder paths redacted, so <code>/home/&lt;user&gt;/</code> becomes <code>~/</code>. Git-ignored files are not copied. Files whose names match zjm's built-in secret-file patterns (<code>.env*</code>, <code>*.pem</code>, <code>*.key</code>, <code>id_rsa*</code> and the rest of the list) are left out. The contents of documents are not scanned for secrets, so a key pasted into an ordinary document is indexed, and sent to OpenRouter if <code>send</code> is on.</li>
+    <li>Build the index with <code>~/.claude/skills/zjm-rag/scripts/zjm-project reindex</code>. Expected: zjm reports what it added, and the prompt returns. Text files are copied with home-folder paths redacted, so <code>/home/&lt;user&gt;/</code> becomes <code>~/</code>. A file that git ignores and does not track is not copied; a tracked file is copied even if <code>.gitignore</code> matches it. Files whose names match zjm's built-in secret-file patterns (<code>.env*</code>, <code>*.pem</code>, <code>*.key</code>, <code>id_rsa*</code> and the rest of the list) are left out. The contents of documents are not scanned for secrets, so a key pasted into an ordinary document is indexed, and sent to OpenRouter if <code>send</code> is on.</li>
     <li>Search with a full question: <code>~/.claude/skills/zjm-rag/scripts/zjm-project find "who approves a change before it runs?"</code> Expected: a list of file paths. With <code>send</code> set to <code>false</code>, the scores show as <code>-</code> and nothing is ranked. Open each file before you rely on it. A score measures relevance, not truth. No hit does not prove the text is missing, so try other wordings.</li>
     <li>Optional, for answers with citations: set <code>"send": true</code> in <code>zjm-project.json</code>, then run <code>export OPENROUTER_API_KEY=your-key-here</code> with your own key. Expected: <code>~/.claude/skills/zjm-rag/scripts/zjm-project ask "who approves a change before it runs?"</code> prints an answer that names its files. Risk: the text of matching files leaves your computer and goes to OpenRouter. Each search and each answer is a paid call. Keep the key out of git.</li>
   </ol>
