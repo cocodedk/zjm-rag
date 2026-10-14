@@ -44,7 +44,7 @@ function tools() {
     {
       name: 'get_install_command',
       title: 'Install command',
-      description: 'Returns the command that installs the zjm_rag Python library today, its requirements, and whether the one-line installer is available yet; it runs nothing.',
+      description: 'Returns the one-line command that installs zjm-rag, whether it is available, and its requirements; it runs nothing.',
       inputSchema: NO_INPUT,
       annotations: READ_ONLY,
       execute: async () => ({
@@ -52,7 +52,6 @@ function tools() {
         command: $('[data-install]')?.textContent.trim() ?? '',
         status: state($('[data-install]')),
         requirements: $$('[data-requirements] li').map(text),
-        one_line_installer: state($('[data-interface="mcp"]')),
       }),
     },
     {
