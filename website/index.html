@@ -106,7 +106,7 @@
 
 <section aria-labelledby="how">
   <h2 id="how">Three steps, each one narrower</h2>
-  <p class="intro">Search casts a wide net, and, with sending on, a judge sorts the catch. Only the files that pass reach the answer model. It reads each one whole when the file is small, or the parts that matched when it is large.</p>
+  <p class="intro">Search casts a wide net, and, with sending on (<code>send</code> in a project, <code>egress.rank</code> for direct use), a judge sorts the catch. Only the files that pass reach the answer model. It reads each one whole when the file is small, or the parts that matched when it is large.</p>
   <div class="steps">
     <div>
       <div class="ticks" style="--n:40"></div>
@@ -118,26 +118,26 @@
       <div class="ticks" style="--n:8;--c:var(--ink)"></div>
       <p class="count">Up to 8 files, each with a probability</p>
       <h3>Jev judges</h3>
-      <p>Runs only when <code>send</code> is on. One request to Jev, the OpenRouter Decisions API, asks the same question of every file: does this one hold what the answer needs? Jev judges each file from its path and up to 12,000 characters of its matched text, and returns a probability. Files at 0.5 or above are accepted. The rest are listed as rejected, so none disappears without a trace.</p>
+      <p>Runs only when sending is on: <code>send</code> in a project, <code>egress.rank</code> for direct use. One request to Jev, the OpenRouter Decisions API, asks the same question of every file: does this one hold what the answer needs? Jev judges each file from its path and up to 12,000 characters of its matched text, and returns a probability. Files at 0.5 or above are accepted. The rest are listed as rejected, so none disappears without a trace.</p>
     </div>
     <div>
       <div class="ticks" style="--n:3;--c:#e0b800"></div>
       <p class="count">Every accepted file, up to 200,000 characters</p>
       <h3>The LLM answers</h3>
-      <p>Runs only when <code>send</code> is on. <code>ask</code> sends the accepted files to the answer model, by default <code>deepseek/deepseek-v4-flash</code> on OpenRouter, with one instruction: answer from these files only, cite the path and lines, and say so if they do not hold the answer. Small files go whole. Larger files go as their matched parts, until the 200,000-character budget runs out. When no file passes, no model is called.</p>
+      <p>Runs only when sending is on: <code>send</code> in a project, <code>egress.answer</code> for direct use. <code>ask</code> sends the accepted files to the answer model, by default <code>deepseek/deepseek-v4-flash</code> on OpenRouter, with one instruction: answer from these files only, cite the path and lines, and say so if they do not hold the answer. Small files go whole. Larger files go as their matched parts, until the 200,000-character budget runs out. When no file passes, no model is called.</p>
     </div>
   </div>
 </section>
 
 <section aria-labelledby="leaves">
   <h2 id="leaves">What leaves your machine</h2>
-  <p class="intro">Search runs on your computer. Nothing goes to OpenRouter unless a project sets <code>"send": true</code> in its <code>zjm-project.json</code>. Index only folders you would be fine sending to OpenRouter.</p>
+  <p class="intro">Search runs on your computer. Nothing goes to OpenRouter unless a switch allows it. For a project set up with the skill, that switch is <code>"send": true</code> in its <code>zjm-project.json</code>. For direct use (the CLI, library, HTTP API and MCP server), it is <code>egress</code> in your config, <code>{"rank": ..., "answer": ...}</code>, off by default. Index only folders you would be fine sending to OpenRouter.</p>
   <table class="flow">
     <tr><th scope="row">zg</th><td>Runs on your computer, against an index of a copy of your folders. Nothing leaves.</td></tr>
-    <tr><th scope="row">Jev (ranking)</th><td>Only when <code>send</code> is <code>true</code>. Gets the question, and each candidate file's path and up to 12,000 characters of its matched text. Sent to OpenRouter.</td></tr>
-    <tr><th scope="row">Answer model</th><td>Only when <code>send</code> is <code>true</code>. Gets the question and the accepted files, up to 200,000 characters in all. Sent to OpenRouter, which is asked not to keep the prompt.</td></tr>
+    <tr><th scope="row">Jev (ranking)</th><td>Only when <code>send</code> is <code>true</code> in a project, or <code>egress.rank</code> is <code>true</code> for direct use. Gets the question, and each candidate file's path and up to 12,000 characters of its matched text. Sent to OpenRouter.</td></tr>
+    <tr><th scope="row">Answer model</th><td>Only when <code>send</code> is <code>true</code> in a project, or <code>egress.answer</code> is <code>true</code> for direct use. Gets the question and the accepted files, up to 200,000 characters in all. Sent to OpenRouter, which is asked not to keep the prompt.</td></tr>
   </table>
-  <p>The project setup does not send questions for translation.</p>
+  <p>A project never sends questions for translation. Direct use does, only when <code>egress.translate</code> is <code>true</code>.</p>
 </section>
 
 <section aria-labelledby="status">
@@ -148,7 +148,7 @@
       <ul data-state="available">
         <li data-interface="library">The <code>zjm_rag</code> Python package, standard library only, which runs inside the zjm-rag container: lockers, files, <code>find</code>, <code>ask</code>, <code>doctor</code> and <code>help</code>.</li>
         <li data-interface="cli">The <code>zjm</code> command runs the same operations from a shell, plus <code>zjm doctor</code> and <code>zjm help</code>. <code>--json</code> prints the result as one JSON object. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md">Command-line spec</a></li>
-        <li data-interface="http"><code>zjm serve</code>, a JSON API on <code>127.0.0.1:8765</code> for apps in any language: <code>GET /health</code>, and <code>POST /&lt;operation&gt;</code>, such as <code>/find</code> and <code>/ask</code>. It needs sending on in your config. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md">HTTP spec</a></li>
+        <li data-interface="http"><code>zjm serve</code>, a JSON API on <code>127.0.0.1:8765</code> for apps in any language: <code>GET /health</code>, and <code>POST /&lt;operation&gt;</code>, such as <code>/find</code> and <code>/ask</code>. It needs an <code>egress</code> switch on in your config. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md">HTTP spec</a></li>
         <li data-interface="mcp"><code>zjm mcp</code>, an MCP server over stdio for agents, with one tool per operation, such as <code>zjm_file_add</code>, <code>zjm_find</code>, <code>zjm_ask</code> and <code>zjm_help</code>. Agents call <code>zjm_help</code> first. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md">MCP and install spec</a></li>
       </ul>
     </div>
@@ -158,7 +158,7 @@
         <li>A <strong>locker</strong> is a named index. <code>file_add</code> copies files or folders into it and indexes the copy, so your originals stay where they are.</li>
         <li>Each locker is encrypted with a key your app supplies (age), or it is plain, if you ask for that. zjm never stores a key.</li>
         <li><code>find</code> splits files at a threshold into accepted and rejected, and sorts them by score, zg rank, modified time or path.</li>
-        <li>Nothing is read until its folder is listed in the config, and nothing is sent until the config's <code>egress</code> setting allows it.</li>
+        <li>Nothing is read until its folder is listed in the config, and nothing is sent until the config's <code>egress</code> setting allows it. In a project set up with the skill, that setting is <code>send</code>.</li>
         <li>The tests use fakes and never call zg, Jev or an LLM.</li>
       </ul>
     </div>
@@ -189,7 +189,7 @@
  "send": false, "llm": "deepseek/deepseek-v4-flash", "multilingual": false}</pre></li>
     <li>Add <code>.zvec-grep/</code> to <code>.gitignore</code>, on its own line. Expected: zg's working folder stays out of git.</li>
     <li>Commit <code>zjm-project.json</code> and <code>.gitignore</code>. Expected: git lists both as committed.</li>
-    <li>Build the index with <code>~/.claude/skills/zjm-rag/scripts/zjm-project reindex</code>. Expected: zjm reports what it added, and the prompt returns. Text files are copied with home-folder paths redacted, so <code>/home/&lt;user&gt;/</code> becomes <code>~/</code>. Git-ignored files, <code>.env*</code> files and keys are never copied.</li>
+    <li>Build the index with <code>~/.claude/skills/zjm-rag/scripts/zjm-project reindex</code>. Expected: zjm reports what it added, and the prompt returns. Text files are copied with home-folder paths redacted, so <code>/home/&lt;user&gt;/</code> becomes <code>~/</code>. Git-ignored files are not copied. Files whose names match zjm's built-in secret-file patterns (<code>.env*</code>, <code>*.pem</code>, <code>*.key</code>, <code>id_rsa*</code> and the rest of the list) are left out. The contents of documents are not scanned for secrets, so a key pasted into an ordinary document is indexed, and sent to OpenRouter if <code>send</code> is on.</li>
     <li>Search with a full question: <code>~/.claude/skills/zjm-rag/scripts/zjm-project find "who approves a change before it runs?"</code> Expected: a list of file paths. With <code>send</code> set to <code>false</code>, the scores show as <code>-</code> and nothing is ranked. Open each file before you rely on it. A score measures relevance, not truth. No hit does not prove the text is missing, so try other wordings.</li>
     <li>Optional, for answers with citations: set <code>"send": true</code> in <code>zjm-project.json</code>, then run <code>export OPENROUTER_API_KEY=your-key-here</code> with your own key. Expected: <code>~/.claude/skills/zjm-rag/scripts/zjm-project ask "who approves a change before it runs?"</code> prints an answer that names its files. Risk: the text of matching files leaves your computer and goes to OpenRouter. Each search and each answer is a paid call. Keep the key out of git.</li>
   </ol>
@@ -198,7 +198,7 @@
   <p>The Python package, the <code>zjm</code> commands, the HTTP API and the MCP server are described in the <a href="https://github.com/cocodedk/zjm-rag#use">README</a>.</p>
 <pre class="cmd" data-example="cli">zjm doctor                                  <span># checks zg, age, the API key, config, lockers</span>
 zjm locker-list                             <span># names of the lockers in the store</span></pre>
-<pre class="cmd" data-example="http">zjm serve                                   <span># needs sending on in the config; serves 127.0.0.1:8765 until stopped</span></pre>
+<pre class="cmd" data-example="http">zjm serve                                   <span># needs an egress switch on in the config; serves 127.0.0.1:8765 until stopped</span></pre>
 <pre class="cmd" data-example="mcp">claude mcp add zjm -- zjm mcp               <span># agents call zjm_help first</span></pre>
 </section>
 

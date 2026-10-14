@@ -106,7 +106,7 @@
 
 <section aria-labelledby="how">
   <h2 id="how">سه مرحله، هر کدام باریک‌تر از قبلی</h2>
-  <p class="intro">جست‌وجو تور را پهن می‌اندازد و، وقتی ارسال روشن باشد، داور صید را سوا می‌کند. فقط فایل‌هایی که قبول می‌شوند به مدل پاسخ می‌رسند. مدل هر فایل را کامل می‌خواند اگر فایل کوچک باشد، و بخش‌های مرتبطش را اگر بزرگ باشد.</p>
+  <p class="intro">جست‌وجو تور را پهن می‌اندازد و، وقتی ارسال روشن باشد (<code>send</code> در یک پروژه، <code>egress.rank</code> در استفادهٔ مستقیم)، داور صید را سوا می‌کند. فقط فایل‌هایی که قبول می‌شوند به مدل پاسخ می‌رسند. مدل هر فایل را کامل می‌خواند اگر فایل کوچک باشد، و بخش‌های مرتبطش را اگر بزرگ باشد.</p>
   <div class="steps">
     <div>
       <div class="ticks" style="--n:40"></div>
@@ -118,26 +118,26 @@
       <div class="ticks" style="--n:8;--c:var(--ink)"></div>
       <p class="count">حداکثر ۸ فایل، هر کدام با یک احتمال</p>
       <h3>Jev داوری می‌کند</h3>
-      <p>فقط وقتی ارسال روشن است اجرا می‌شود. یک درخواست به Jev، یعنی OpenRouter Decisions API، از همهٔ فایل‌ها یک سؤال می‌پرسد: آیا این فایل چیزی را که پاسخ لازم دارد در خود دارد؟ Jev هر فایل را از روی مسیرش و حداکثر ۱۲٬۰۰۰ نویسه از بخش‌های مرتبطش می‌سنجد و یک احتمال برمی‌گرداند. فایل‌هایی با ۰٫۵ یا بیشتر پذیرفته می‌شوند. بقیه به‌عنوان ردشده فهرست می‌شوند، پس هیچ فایلی بی‌سروصدا گم نمی‌شود.</p>
+      <p>فقط وقتی ارسال روشن است اجرا می‌شود: <code>send</code> در یک پروژه، <code>egress.rank</code> در استفادهٔ مستقیم. یک درخواست به Jev، یعنی OpenRouter Decisions API، از همهٔ فایل‌ها یک سؤال می‌پرسد: آیا این فایل چیزی را که پاسخ لازم دارد در خود دارد؟ Jev هر فایل را از روی مسیرش و حداکثر ۱۲٬۰۰۰ نویسه از بخش‌های مرتبطش می‌سنجد و یک احتمال برمی‌گرداند. فایل‌هایی با ۰٫۵ یا بیشتر پذیرفته می‌شوند. بقیه به‌عنوان ردشده فهرست می‌شوند، پس هیچ فایلی بی‌سروصدا گم نمی‌شود.</p>
     </div>
     <div>
       <div class="ticks" style="--n:3;--c:#e0b800"></div>
       <p class="count">هر فایل پذیرفته، روی هم تا ۲۰۰٬۰۰۰ نویسه</p>
       <h3>LLM جواب می‌دهد</h3>
-      <p>فقط وقتی ارسال روشن است اجرا می‌شود. <code>ask</code> فایل‌های پذیرفته را به مدل پاسخ می‌دهد که به‌طور پیش‌فرض <code>deepseek/deepseek-v4-flash</code> روی OpenRouter است، با یک دستور: فقط از روی همین فایل‌ها جواب بده، مسیر و خط‌ها را ذکر کن، و اگر پاسخ در آن‌ها نیست همین را بگو. فایل‌های کوچک کامل می‌روند. فایل‌های بزرگ‌تر با بخش‌های مرتبطشان می‌روند، تا بودجهٔ ۲۰۰٬۰۰۰ نویسه تمام شود. اگر هیچ فایلی به آستانه نرسد، مدل صدا زده نمی‌شود.</p>
+      <p>فقط وقتی ارسال روشن است اجرا می‌شود: <code>send</code> در یک پروژه، <code>egress.answer</code> در استفادهٔ مستقیم. <code>ask</code> فایل‌های پذیرفته را به مدل پاسخ می‌دهد که به‌طور پیش‌فرض <code>deepseek/deepseek-v4-flash</code> روی OpenRouter است، با یک دستور: فقط از روی همین فایل‌ها جواب بده، مسیر و خط‌ها را ذکر کن، و اگر پاسخ در آن‌ها نیست همین را بگو. فایل‌های کوچک کامل می‌روند. فایل‌های بزرگ‌تر با بخش‌های مرتبطشان می‌روند، تا بودجهٔ ۲۰۰٬۰۰۰ نویسه تمام شود. اگر هیچ فایلی به آستانه نرسد، مدل صدا زده نمی‌شود.</p>
     </div>
   </div>
 </section>
 
 <section aria-labelledby="leaves">
   <h2 id="leaves">چه چیزی از رایانهٔ شما بیرون می‌رود</h2>
-  <p class="intro">جست‌وجو روی رایانهٔ خودتان انجام می‌شود. تا وقتی <code>"send": true</code> در <code>zjm-project.json</code> یک پروژه نباشد، چیزی به OpenRouter فرستاده نمی‌شود. فقط پوشه‌هایی را نمایه کنید که حاضرید به OpenRouter بفرستید.</p>
+  <p class="intro">جست‌وجو روی رایانهٔ خودتان انجام می‌شود. تا وقتی تنظیم ارسال روشن نباشد، چیزی به OpenRouter فرستاده نمی‌شود. برای پروژه‌ای که با مهارت ساخته شده، این تنظیم <code>"send": true</code> در <code>zjm-project.json</code> است. برای استفادهٔ مستقیم (فرمان zjm، کتابخانه، HTTP و سرور MCP)، تنظیم <code>egress</code> در پیکربندی است، به شکل <code>{"rank": ..., "answer": ...}</code>، که به‌طور پیش‌فرض خاموش است. فقط پوشه‌هایی را نمایه کنید که حاضرید به OpenRouter بفرستید.</p>
   <table class="flow">
     <tr><th scope="row">zg</th><td>روی رایانهٔ خودتان اجرا می‌شود، روی نمایهٔ یک کپی از پوشه‌هایتان. چیزی بیرون نمی‌رود.</td></tr>
-    <tr><th scope="row">Jev (رتبه‌بندی)</th><td>فقط وقتی <code>send</code> برابر <code>true</code> باشد. سؤال، و مسیر هر فایل نامزد همراه با حداکثر ۱۲٬۰۰۰ نویسه از بخش مرتبطش، به OpenRouter می‌رود.</td></tr>
-    <tr><th scope="row">مدل پاسخ</th><td>فقط وقتی <code>send</code> برابر <code>true</code> باشد. سؤال و فایل‌های پذیرفته، روی هم حداکثر ۲۰۰٬۰۰۰ نویسه، به OpenRouter می‌رود. از OpenRouter خواسته می‌شود درخواست را نگه ندارد.</td></tr>
+    <tr><th scope="row">Jev (رتبه‌بندی)</th><td>فقط وقتی <code>send</code> در یک پروژه، یا <code>egress.rank</code> در استفادهٔ مستقیم، برابر <code>true</code> باشد. سؤال، و مسیر هر فایل نامزد همراه با حداکثر ۱۲٬۰۰۰ نویسه از بخش مرتبطش، به OpenRouter می‌رود.</td></tr>
+    <tr><th scope="row">مدل پاسخ</th><td>فقط وقتی <code>send</code> در یک پروژه، یا <code>egress.answer</code> در استفادهٔ مستقیم، برابر <code>true</code> باشد. سؤال و فایل‌های پذیرفته، روی هم حداکثر ۲۰۰٬۰۰۰ نویسه، به OpenRouter می‌رود. از OpenRouter خواسته می‌شود درخواست را نگه ندارد.</td></tr>
   </table>
-  <p>تنظیمات پروژه سؤال‌ها را برای ترجمه نمی‌فرستد.</p>
+  <p>یک پروژه هرگز سؤال‌ها را برای ترجمه نمی‌فرستد. استفادهٔ مستقیم این کار را فقط وقتی می‌کند که <code>egress.translate</code> برابر <code>true</code> باشد.</p>
 </section>
 
 <section aria-labelledby="status">
@@ -148,7 +148,7 @@
       <ul data-state="available">
         <li data-interface="library">بستهٔ پایتون <code>zjm_rag</code>، فقط با کتابخانهٔ استاندارد، که داخل کانتینر zjm-rag اجرا می‌شود: لاکر، فایل‌ها، <code>find</code>، <code>ask</code>، <code>doctor</code> و <code>help</code>.</li>
         <li data-interface="cli">فرمان <code>zjm</code> همین کارها را از خط فرمان انجام می‌دهد، به‌علاوهٔ <code>zjm doctor</code> و <code>zjm help</code>. با <code>--json</code> نتیجه به‌شکل یک شیء JSON چاپ می‌شود. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md">مشخصات خط فرمان</a></li>
-        <li data-interface="http"><code>zjm serve</code>، یک API از نوع JSON روی <code>127.0.0.1:8765</code> برای برنامه‌هایی به هر زبانی: <code>GET /health</code> و <code>POST /&lt;operation&gt;</code>، مثل <code>/find</code> و <code>/ask</code>. برای اجرای آن، ارسال باید در تنظیمات روشن باشد. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md">مشخصات HTTP</a></li>
+        <li data-interface="http"><code>zjm serve</code>، یک API از نوع JSON روی <code>127.0.0.1:8765</code> برای برنامه‌هایی به هر زبانی: <code>GET /health</code> و <code>POST /&lt;operation&gt;</code>، مثل <code>/find</code> و <code>/ask</code>. برای اجرای آن، دست‌کم یکی از گزینه‌های <code>egress</code> در پیکربندی باید روشن باشد. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md">مشخصات HTTP</a></li>
         <li data-interface="mcp"><code>zjm mcp</code>، یک سرور MCP روی stdio برای عامل‌های هوش مصنوعی، با یک ابزار برای هر عملیات، مثل <code>zjm_file_add</code>، <code>zjm_find</code>، <code>zjm_ask</code> و <code>zjm_help</code>. عامل‌ها اول <code>zjm_help</code> را صدا می‌زنند. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md">مشخصات MCP و نصب</a></li>
       </ul>
     </div>
@@ -158,7 +158,7 @@
         <li><strong>لاکر</strong> (locker) یک نمایهٔ نام‌دار است. <code>file_add</code> فایل‌ها یا پوشه‌ها را در آن کپی می‌کند و از کپی نمایه می‌سازد، پس اصل فایل‌ها سر جای خودشان می‌مانند.</li>
         <li>هر لاکر یا با کلیدی که برنامهٔ شما می‌دهد رمز می‌شود (با age)، یا اگر خودتان بخواهید، ساده نگه داشته می‌شود. zjm هیچ کلیدی را نگه نمی‌دارد.</li>
         <li><code>find</code> فایل‌ها را با یک آستانه به پذیرفته و ردشده تقسیم می‌کند و بر اساس امتیاز، رتبهٔ zg، زمان تغییر یا مسیر مرتب می‌کند.</li>
-        <li>تا وقتی پوشه‌ای در تنظیمات فهرست نشده باشد، چیزی خوانده نمی‌شود. و تا وقتی <code>egress</code> در تنظیمات اجازه ندهد، چیزی فرستاده نمی‌شود.</li>
+        <li>تا وقتی پوشه‌ای در تنظیمات فهرست نشده باشد، چیزی خوانده نمی‌شود. و تا وقتی <code>egress</code> در تنظیمات اجازه ندهد، چیزی فرستاده نمی‌شود. در پروژه‌ای که با مهارت ساخته شده، این تنظیم <code>send</code> است.</li>
         <li>تست‌ها با نسخه‌های ساختگی کار می‌کنند و هیچ‌وقت zg، Jev یا LLM را صدا نمی‌زنند.</li>
       </ul>
     </div>
@@ -189,7 +189,7 @@
  "send": false, "llm": "deepseek/deepseek-v4-flash", "multilingual": false}</pre></li>
     <li><code>.zvec-grep/</code> را در <code>.gitignore</code> بیفزایید، در یک خط جدا. انتظار: پوشهٔ کاری zg از git بیرون می‌ماند.</li>
     <li><code>zjm-project.json</code> و <code>.gitignore</code> را commit کنید. انتظار: git هر دو را commit‌شده نشان می‌دهد.</li>
-    <li>نمایه را با <code>~/.claude/skills/zjm-rag/scripts/zjm-project reindex</code> بسازید. انتظار: zjm می‌گوید چه چیزی اضافه شده و دوباره prompt برمی‌گردد. فایل‌های متنی با مسیرهای پوشهٔ خانه پاک‌سازی‌شده کپی می‌شوند، یعنی <code>/home/&lt;user&gt;/</code> می‌شود <code>~/</code>. فایل‌های نادیده‌گرفته‌شده در git، فایل‌های <code>.env*</code> و کلیدها هرگز کپی نمی‌شوند.</li>
+    <li>نمایه را با <code>~/.claude/skills/zjm-rag/scripts/zjm-project reindex</code> بسازید. انتظار: zjm می‌گوید چه چیزی اضافه شده و دوباره prompt برمی‌گردد. فایل‌های متنی با مسیرهای پوشهٔ خانه پاک‌سازی‌شده کپی می‌شوند، یعنی <code>/home/&lt;user&gt;/</code> می‌شود <code>~/</code>. فایل‌های نادیده‌گرفته‌شده در git کپی نمی‌شوند. فایل‌هایی که نامشان با الگوهای داخلی فایل‌های حساس جور است (<code>.env*</code>، <code>*.pem</code>، <code>*.key</code>، <code>id_rsa*</code> و بقیهٔ فهرست) کنار گذاشته می‌شوند. محتوای اسناد برای رمز بررسی نمی‌شود، پس کلیدی که در یک سند معمولی چسبانده شده باشد نمایه می‌شود و اگر <code>send</code> روشن باشد، به OpenRouter هم می‌رود.</li>
     <li>با یک سؤال کامل جست‌وجو کنید: <code>~/.claude/skills/zjm-rag/scripts/zjm-project find "who approves a change before it runs?"</code> انتظار: فهرستی از مسیر فایل‌ها. اگر <code>send</code> روی <code>false</code> باشد، امتیازها <code>-</code> نشان داده می‌شوند و چیزی رتبه‌بندی نمی‌شود. هر فایلی را که می‌خواهید به آن تکیه کنید باز کنید: امتیاز یعنی ربط، نه درستی. اگر نتیجه‌ای نیامد، این به آن معنا نیست که متن وجود ندارد؛ با جمله‌بندی‌های دیگر امتحان کنید.</li>
     <li>اختیاری، برای گرفتن پاسخ همراه با ارجاع: <code>"send": true</code> را در <code>zjm-project.json</code> بگذارید، سپس با کلید خودتان، به‌جای جای‌نگهدار، این را اجرا کنید: <code>export OPENROUTER_API_KEY=your-key-here</code>. انتظار: <code>find</code> حالا فایل‌ها را از طریق OpenRouter رتبه‌بندی می‌کند، و این فرمان کار می‌کند: <code>~/.claude/skills/zjm-rag/scripts/zjm-project ask "who approves a change before it runs?"</code> که پاسخی می‌دهد و فایل‌هایی را که از آن‌ها استفاده کرده نام می‌برد. خطر: متن فایل‌های مرتبط رایانهٔ شما را ترک می‌کند و به OpenRouter می‌رود. هر جست‌وجو و هر پاسخ یک تماس پولی است. کلید را در <code>zjm-project.json</code> و در git نگه ندارید.</li>
   </ol>
@@ -198,7 +198,7 @@
   <p>بستهٔ پایتون، فرمان‌های <code>zjm</code>، API مبتنی بر HTTP و سرور MCP در <a href="https://github.com/cocodedk/zjm-rag#use">README</a> توضیح داده شده‌اند.</p>
 <pre class="cmd" data-example="cli">zjm doctor                                  <span># zg، age، کلید API، پیکربندی و لاکرها را بررسی می‌کند</span>
 zjm locker-list                             <span># نام لاکرهای موجود در مخزن مشترک</span></pre>
-<pre class="cmd" data-example="http">zjm serve                                   <span># ارسال باید در تنظیمات روشن باشد؛ تا وقتی متوقفش نکنید روی 127.0.0.1:8765 سرویس می‌دهد</span></pre>
+<pre class="cmd" data-example="http">zjm serve                                   <span># دست‌کم یک گزینهٔ egress باید در پیکربندی روشن باشد؛ تا وقتی متوقفش نکنید روی 127.0.0.1:8765 سرویس می‌دهد</span></pre>
 <pre class="cmd" data-example="mcp">claude mcp add zjm -- zjm mcp               <span># عامل‌ها اول zjm_help را صدا می‌زنند</span></pre>
 </section>
 

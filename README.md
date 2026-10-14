@@ -71,7 +71,7 @@ Then check the install:
 
 `zjm doctor` checks zg, age, the API key, the config, the data folder, outside calls and the lockers.
 It exits with status 1 when a check fails. A missing `OPENROUTER_API_KEY` matters only once you turn
-sending on.
+sending on (`send` in a project, or `egress` in your config).
 
 ### The container
 
@@ -110,7 +110,8 @@ The commands below use `~/.claude/skills/zjm-rag/scripts/zjm-project`. If you se
      symlink, and two folders cannot share a name.
    - `exclude`: files or folders to leave out, by name. End a folder name with `/`.
    - `send`: `false` keeps everything on your machine. `true` lets searches and answers send file text
-     to OpenRouter. Leave it `false` unless the project's owner decides otherwise.
+     to OpenRouter. Leave it `false` unless the project's owner decides otherwise. This switch belongs to
+     the skill's project setup; direct use follows the config's `egress` instead.
    - `llm`: the OpenRouter model that writes answers. It is used only when `send` is `true`.
    - `multilingual`: `true` for documents that are not in English.
 3. Add `.zvec-grep/` to `.gitignore`, on its own line. Expected: zg's working folder stays out of git.
@@ -121,7 +122,10 @@ The commands below use `~/.claude/skills/zjm-rag/scripts/zjm-project`. If you se
 
    Expected: zjm reports what it added, and the prompt returns. Reindex copies each folder into zjm's
    store first. Paths inside text files are redacted (for example `/home/<user>/` becomes `~/`).
-   Git-ignored files, `.env*` files and keys are never copied.
+   Git-ignored files are not copied. Files whose names match zjm's built-in secret-file patterns (`.env*`,
+   `*.pem`, `*.key`, `id_rsa*` and the rest of the list under [Safety](#safety)) are left out. The contents
+   of documents are not scanned for secrets, so a key pasted into an ordinary document is indexed, and
+   sent to OpenRouter if `send` is on.
 6. Search by asking a full question:
 
        ~/.claude/skills/zjm-rag/scripts/zjm-project find "who approves a change before it runs?"
@@ -385,11 +389,16 @@ app, never in zjm: **zjm never stores a key**, and a lost key means a lost locke
   `.venv`, `__pycache__`, `.zvec-grep`, `.zjm`, `.ssh`, `.gnupg`, `.aws`, `.kube`, `.docker`; files
   `.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.kdbx`, `id_rsa*`, `id_dsa*`, `id_ecdsa*`,
   `id_ed25519*`, `.npmrc`, `.pypirc`, `.netrc`, `.git-credentials`, `credentials*`.
+- **The floor works on file names only.** Contents are not scanned for secrets: a key pasted into an
+  ordinary document is indexed, and sent to OpenRouter with that document when sending is on.
 - Symlinks inside a source are never copied. Gitignored files are never copied (denying a single
   file inside an allowed repository's own git metadata is not supported; deny the whole directory).
-- **Nothing leaves this machine unless `egress` says so.** Ranking (Jev/OpenRouter) needs
+- **Nothing leaves this machine unless the config allows it.** For a project set up with the skill,
+  `"send": true` in `zjm-project.json` turns on ranking and answering. Direct use (the `zjm` CLI, the
+  library, the HTTP API and the MCP server) follows `egress`: ranking (Jev/OpenRouter) needs
   `egress.rank`; answering (the OpenRouter model) needs `egress.answer`; translating the question
-  (see [Questions in other languages](#questions-in-other-languages)) needs `egress.translate`. The
+  (see [Questions in other languages](#questions-in-other-languages)) needs `egress.translate`. All three
+  are off by default. The
   answer request has no `tools` key, so the model cannot act; it only ever returns text.
   `OPENROUTER_API_KEY` is sent only in the request's `Authorization` header. It never appears in argv, logs,
   errors, results or the messages sent to the model.
