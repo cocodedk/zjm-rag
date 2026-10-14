@@ -57,6 +57,28 @@ class SkillTest(unittest.TestCase):
         self.assertEqual(r.returncode, 2)
         self.assertIn("not built from these folders", r.stderr)
 
+    def test_refuses_a_configured_folder_reached_through_a_symlink(self):
+        outside = self.tmp / "outside"
+        outside.mkdir()
+        (self.project / "linked").symlink_to(outside)
+        r = self.run_script("reindex", settings={"locker": "mine", "folders": ["linked"]})
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("is a symlink", r.stderr)
+
+    def test_a_dangling_symlink_does_not_break_a_search(self):
+        self.assertEqual(self.run_script("reindex").returncode, 0)
+        (self.project / "docs/gone").symlink_to(self.tmp / "missing")
+        r = self.run_script("find", "who approves?")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("STALE", r.stderr)
+
+    def test_refuses_a_config_override_on_the_command_line(self):
+        self.assertEqual(self.run_script("reindex").returncode, 0)
+        for args in (["--config", "/x.json"], ["--config=/x.json"]):
+            r = self.run_script("find", "who approves?", *args)
+            self.assertEqual(r.returncode, 2, args)
+            self.assertIn("--config", r.stderr)
+
     def mirror(self, src):
         out = self.tmp / "mirror"
         subprocess.run([shutil.which("python3"), str(SKILL / "mirror.py"), str(src), str(out)], env=CLEAN, check=True,

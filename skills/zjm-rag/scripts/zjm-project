@@ -66,6 +66,12 @@ def has_locker(cfg: Path, name: str) -> bool:
 
 
 def reindex(s: dict, root: Path, state: Path) -> None:
+    for f in s["folders"]:  # a symlink anywhere on the way would index its target instead
+        here = root
+        for part in Path(f).parts:
+            here = here / part
+            if here.is_symlink():
+                die(f"{here} is a symlink: index the real folder")
     dirs = [(root / f).resolve() for f in s["folders"]]
     names = [d.name for d in dirs]
     for d in dirs:
@@ -96,13 +102,20 @@ def reindex(s: dict, root: Path, state: Path) -> None:
         (state / "stamp").touch()
 
 
+def changed(path: str, since: float) -> bool:
+    try:  # lstat: a dangling or moved symlink is a file like any other, never followed
+        return os.lstat(path).st_mtime > since
+    except FileNotFoundError:  # removed while we walked: that is a change
+        return True
+
+
 def stale(state: Path) -> list[str]:
     since = (state / "stamp").stat().st_mtime
     out = []
     for d in (state / "dirs").read_text().splitlines():
         for here, subdirs, files in os.walk(d):
             subdirs[:] = [x for x in subdirs if x != ".git"]
-            if any(os.stat(os.path.join(here, x)).st_mtime > since for x in [".", *files]):
+            if any(changed(os.path.join(here, x), since) for x in [".", *files]):
                 out.append(d)
                 break
     return out
@@ -119,6 +132,8 @@ def main() -> None:
         die(__doc__.split("\n\n")[1])
     if not (state / "dirs").is_file():
         die(f"no locker {s['locker']} built by zjm-project: reindex first")
+    if any(a.startswith("--config") for a in rest):
+        die("--config is set by zjm-project.json, never on the command line")
     if cmd == "ask" and s.get("send") is not True:
         die('ask sends file text to OpenRouter: set "send": true in zjm-project.json first')
     for d in stale(state):  # warn, never block: a stale locker misses new text and still shows removed text
