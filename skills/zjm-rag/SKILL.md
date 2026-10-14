@@ -19,7 +19,7 @@ Write `zjm-project.json` at the project root and commit it, so every session use
  "send": false, "llm": "deepseek/deepseek-v4-flash", "multilingual": false}
 ```
 
-- `locker`: a name unique to the project (lowercase `a-z 0-9 . _ -`, up to 64 characters). All projects share one
+- `locker`: a name unique to the project (starts with `a-z` or `0-9`, then `a-z 0-9 . _ -`, up to 64 characters). All projects share one
   store (the Docker volume `zjm-data`); reindex refuses a name built from other folders (`ZJM_FORCE=1` replaces
   it), so check `zjm locker-list` first.
 - `folders`: documents and memory only, relative to the root. A whole code tree makes the index fail and every

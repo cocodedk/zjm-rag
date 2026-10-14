@@ -42,6 +42,7 @@ that container and sets up the rest.
 
 - Docker, installed and running. The installer builds zjm's container with it.
 - python3, version 3.10 or newer. The `zjm` command and the project script use it.
+- git. The project script uses it to find the project's top folder and the files git can see.
 - An OpenRouter API key in `OPENROUTER_API_KEY`, only if you turn on sending for a project (see
   [Set up a project](#set-up-a-project)).
 
@@ -103,8 +104,8 @@ The commands below use `~/.claude/skills/zjm-rag/scripts/zjm-project`. If you se
         "send": false, "llm": "deepseek/deepseek-v4-flash", "multilingual": false}
 
    Expected: the file sits in the top folder. The keys are:
-   - `locker`: the name of this project's index. Use lowercase letters, digits, `.`, `_` and `-`, up to
-     64 characters. All projects share one store, so the name must be unique. Run `zjm locker-list` to
+   - `locker`: the name of this project's index. Start with a lowercase letter or a digit, then use lowercase
+     letters, digits, `.`, `_` and `-`, up to 64 characters in all. All projects share one store, so the name must be unique. Run `zjm locker-list` to
      see the names in use.
    - `folders`: the folders to index, relative to the top folder. Each must be a real folder, not a
      symlink, and two folders cannot share a name.
