@@ -14,35 +14,69 @@ their paths.
 
 zjm works like OpenAI's vector stores: a **locker** is a named index. Files and text go into it,
 and they come out again. `find` and `ask` search the lockers the caller names. zjm has no idea of
-users, chats, organizations or tenants — the app decides who may use which locker.
+users, chats, organizations or tenants. The app decides who may use which locker.
 
 A locker can be **encrypted with its own key**, supplied by the app on every call (see
 [Locker keys](#locker-keys)): at rest it is one `age`-encrypted file, and zjm holds neither the
 key nor the plaintext outside the single request that needs them.
 
 1. **zg finds.** A hybrid search over a locker's zg index returns candidate files, in zg's rank
-   order. zjm keeps every one of zg's hits as a full chunk (its matched heading section, widened
-   and merged, not a truncated preview), so the text that answers a question is never lost between
-   zg and the answer model.
+   order. For the first `limit` candidate files of each locker (plus up to `limit` more from a translated question), zjm keeps every zg hit as a full chunk (the line ranges of its matches, with
+   overlapping or adjacent ranges merged, not a truncated preview), so the text that answers a
+   question is never lost between zg and the answer model.
 2. **Jev ranks.** One request to Jev (the OpenRouter Decisions API) asks, per file, whether it
    contains the information needed to answer the question, judging from those full chunks. Each
    file gets a probability; files at or above a threshold (default `0.5`) are accepted, the rest
    are reported as rejected, never dropped silently.
-3. **An LLM answers.** The top accepted files (`top_k`, default `8`) go to a cheap OpenRouter model
+3. **An LLM answers.** All accepted files (by default; `top_k` caps them) go to a cheap OpenRouter model
    (`deepseek/deepseek-v4-flash` by default) with the instruction to answer from those files only,
    citing the path and lines. Small files are sent whole; larger ones as their chunks, while a
    200 000-character budget lasts. When no file passes the threshold, no LLM is called.
 
 ## Install
 
-zjm runs only inside its hardened container — never natively on the host.
+zjm runs only inside its Docker container, never directly on your computer. The installer builds
+that container and sets up the rest.
+
+### What you need
+
+- Docker, installed and running. The installer builds zjm's container with it.
+- python3, version 3.10 or newer. The `zjm` command and the project script use it.
+- git. The project script uses it to find the project's top folder and the files git can see.
+- An OpenRouter API key in `OPENROUTER_API_KEY`, only if you turn on sending for a project (see
+  [Set up a project](#set-up-a-project)).
+
+### Run the installer
 
     curl -fsSL https://raw.githubusercontent.com/cocodedk/zjm-rag/main/install.sh | sh
 
-It checks for `docker` and `python3`, builds the `zjm-rag:latest` image, and puts the `zjm`
-launcher (a Python script) on `~/.local/bin`. It creates a private, deny-by-default config
-if none exists, preserving existing configuration. From then on, `zjm ...` on the host runs
-`docker run` with the container locked down: `--read-only`, `--cap-drop=ALL`,
+To read the script first, open the same address in a browser. The installer prints four steps,
+`1/4` to `4/4`:
+
+1. Checks that `docker` and `python3` are installed.
+2. Builds the `zjm-rag:latest` Docker image. The first build takes a while.
+3. Puts the `zjm` launcher (a Python script) in `~/.local/bin`. If no config exists, it creates a
+   private one at `~/.config/zjm/config.json` (or `$XDG_CONFIG_HOME/zjm/config.json`) with all
+   outside calls turned off. An existing config is kept.
+4. Installs the Claude Code skill `zjm-rag` into `${CLAUDE_CONFIG_DIR:-~/.claude}/skills/zjm-rag`.
+   It replaces an older copy, so any edits you made to that copy are lost.
+
+If the installer warns that `~/.local/bin` is not on your `PATH`, add this line to your shell profile
+(for example `~/.bashrc`) and open a new terminal:
+
+    export PATH="$HOME/.local/bin:$PATH"
+
+Then check the install:
+
+    zjm doctor
+
+`zjm doctor` checks zg, age, the API key, the config, the data folder, outside calls and the lockers.
+It exits with status 1 when a check fails. A missing `OPENROUTER_API_KEY` matters only once you turn
+sending on (`send` in a project, or `egress` in your config).
+
+### The container
+
+From then on, `zjm ...` on the host runs `docker run` with the container locked down: `--read-only`, `--cap-drop=ALL`,
 `--security-opt=no-new-privileges`, a `2g` memory cap, a `256`-pid limit, persistent data in the
 `zjm-data` Docker volume, and `--network none` unless the config turns `egress` on.
 
@@ -50,15 +84,80 @@ It also installs the Claude Code skill `zjm-rag` into `${CLAUDE_CONFIG_DIR:-~/.c
 replacing any older copy: [skills/zjm-rag/SKILL.md](skills/zjm-rag/SKILL.md) says how to index a project's
 documents, keep the index fresh and search it.
 
-Requirements: `docker` and `python3` on the host; `OPENROUTER_API_KEY` (used for both Jev ranking
-and OpenRouter answers) is needed only once `egress.rank` or `egress.answer` is turned on in the
-config, and is passed through by name, never by value.
+### Set up a project
+
+zjm keeps a **locker** for each project: a private, searchable index of the project's documents.
+The Claude Code skill builds and searches that index. The project is set up by one file,
+`zjm-project.json`, which you commit so every session and every teammate uses the same settings.
+
+Index documents and memory folders, not code. A whole code tree makes the index fail, and then every
+search comes back empty. Search code with `grep` instead.
+
+The commands below use `~/.claude/skills/zjm-rag/scripts/zjm-project`. If you set
+`CLAUDE_CONFIG_DIR`, use that folder instead of `~/.claude`.
+
+1. Open a terminal in the project's top folder: the folder that holds `.git`, or the folder you work
+   in if the project does not use git.
+2. Create `zjm-project.json` there. Use this content, and change `locker` and `folders` to your own:
+
+       {"locker": "myproj", "folders": ["docs", "memory"], "exclude": ["*.pdf", "drafts/"],
+        "send": false, "llm": "deepseek/deepseek-v4-flash", "multilingual": false}
+
+   Expected: the file sits in the top folder. The keys are:
+   - `locker`: the name of this project's index. Start with a lowercase letter or a digit, then use lowercase
+     letters, digits, `.`, `_` and `-`, up to 64 characters in all. All projects share one store, so the name must be unique. Run `zjm locker-list` to
+     see the names in use.
+   - `folders`: the folders to index, relative to the top folder. Each must be a real folder, not a
+     symlink, and two folders cannot share a name.
+   - `exclude`: files or folders to leave out, by name. End a folder name with `/`.
+   - `send`: `false` keeps everything on your machine. `true` lets searches and answers send file text
+     to OpenRouter. Leave it `false` unless the project's owner decides otherwise. This switch belongs to
+     the skill's project setup; direct use follows the config's `egress` instead.
+   - `llm`: the OpenRouter model that writes answers. It is used only when `send` is `true`.
+   - `multilingual`: `true` for documents that are not in English.
+3. Add `.zvec-grep/` to `.gitignore`, on its own line. Expected: zg's working folder stays out of git.
+4. Commit `zjm-project.json` and `.gitignore`. Expected: git lists both as committed.
+5. Build the index:
+
+       ~/.claude/skills/zjm-rag/scripts/zjm-project reindex
+
+   Expected: zjm reports what it added, and the prompt returns. Reindex copies each folder into zjm's
+   store first. Paths inside text files are redacted (for example `/home/<user>/` becomes `~/`).
+   A file that git ignores and does not track is not copied; a tracked file is copied even if `.gitignore` matches it. Files whose names match zjm's built-in secret-file patterns (`.env*`,
+   `*.pem`, `*.key`, `id_rsa*` and the rest of the list under [Safety](#safety)) are left out. The contents
+   of documents are not scanned for secrets, so a key pasted into an ordinary document is indexed, and
+   sent to OpenRouter if `send` is on.
+6. Search by asking a full question:
+
+       ~/.claude/skills/zjm-rag/scripts/zjm-project find "who approves a change before it runs?"
+
+   Expected: a list of file paths, each with a score. The line `rejected: N below 0.5` counts the files
+   the judge turned down. With `send` set to `false`, the scores show as `-` and the list is zg's
+   candidates in zg's order, with no ranking. Open every file you plan to rely on: a score measures
+   relevance, not truth. No hit does not prove that the text is missing, so try other wordings.
+7. Optional: get answers with citations. Set `"send": true` in `zjm-project.json`, then run this in
+   your terminal, with your own key in place of the placeholder:
+
+       export OPENROUTER_API_KEY=your-key-here
+
+   Expected: `find` now ranks the files through OpenRouter, and this command works:
+
+       ~/.claude/skills/zjm-rag/scripts/zjm-project ask "who approves a change before it runs?"
+
+   Expected: an answer that names the files it used. Check each cited passage. Risk: with `send` on,
+   the text of matching files leaves your machine and goes to OpenRouter. Each search and each answer
+   is a paid call. Keep the key out of `zjm-project.json` and out of git.
+
+After every change to an indexed folder (each commit, merge or pull), run `reindex` again before you
+search. If `find` or `ask` prints `STALE:`, a folder changed since the last reindex. Reindex, then
+search again.
 
 ## Use
 
 zjm never reads, keeps or sends anything you have not allowed in the config file (see
-[Config](#config) and [Safety](#safety) below). With `allow: ["~/projects/agent-linters"]` and
-`egress: {"rank": true, "answer": true}` in your config:
+[Config](#config) and [Safety](#safety) below). The `zjm_rag` library runs inside the zjm-rag
+container; the host has the `zjm` launcher. With `allow: ["~/projects/agent-linters"]` and
+`egress: {"rank": true, "answer": true}` in your config, the calls look like this:
 
 ```python
 import os, zjm_rag
@@ -71,16 +170,16 @@ print(reply["answer"], reply["files"])
 ```
 
 - `locker_create(name, key, multilingual=True)` for non-English queries; the embedding is
-  fixed for the locker's lifetime — drop and recreate it to change models. **Lockers are
-  encrypted by default**: `locker_create` needs a key, and a plain directory locker needs an
-  explicit `plain=True` (CLI `--plain`).
+  fixed for the locker's lifetime. Drop and recreate it to change models. The CLI's `locker-create`
+  needs either `--key-file KEY` (an encrypted locker) or `--plain` (a plain directory locker), and
+  fails with neither. The library's `locker_create` needs either `key` or `plain=True`.
 - `file_add(locker, paths, key=None)` copies files or directories in (spec 05's
   allow/deny/exclude/gitignore rules apply); `file_put(locker, name, text, key=None)` writes text
   directly; `file_remove(locker, names, key=None)` removes files or whole directory prefixes;
   `file_list(locker, key=None)` lists what is there. `key` is required exactly when the locker is
   encrypted.
 - `find(query, lockers, keys=None, limit=8, min_score=0.5, sort="score"|"zg"|"mtime"|"path",
-  rank=None, translate=None, file_types=["py"])` searches one or more lockers at once (plain and
+  rank=None, translate=None, file_types=None)` searches one or more lockers at once (plain and
   encrypted mixed freely), interleaving their results; `rank=None` follows the config's
   `egress.rank`, and `rank=True` fails without it. `translate=None` follows `egress.translate` the
   same way, and adds the question's translations into the configured `languages` as further
@@ -94,7 +193,7 @@ print(reply["answer"], reply["files"])
   change between files and directories. Staging temporarily needs space for both versions.
   If indexing fails on a plain locker, copied files remain and the locker is marked unindexed;
   encrypted lockers retain their previous sealed state.
-- `locker_encrypt(name, key)` seals a plain locker into an encrypted one; this is one-way — there
+- `locker_encrypt(name, key)` seals a plain locker into an encrypted one; this is one-way: there
   is no operation that decrypts a locker back to plain.
 - Every call takes `config=` (a path or a `load()`ed dict), plus injectable `runner=` and `jev=`
   for tests.
@@ -115,6 +214,7 @@ zjm file-list LOCKER [--key-file KEY]
 zjm find "which linter checks CSS files" -l LOCKER [-l LOCKER]... [--key-file KEYS.json] [--limit N] [--type py]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank] [--no-translate]
 zjm ask "which linter checks CSS files" -l LOCKER --lang da [--key-file KEYS.json] [--top-k 3] [--no-translate]
 zjm doctor                                   # zg, age, OPENROUTER_API_KEY, config, home, egress, lockers
+zjm help                                     # the workflow guide and this instance's settings; changes nothing
 ```
 
 For `find`/`ask`, `--key-file` holds a JSON object `{"locker": "key"}` (one entry per encrypted
@@ -133,14 +233,14 @@ curl -s localhost:8765/find -H 'Content-Type: application/json' -d '{"query": "w
 ```
 
 `GET /health` returns the `doctor` dict; `POST /<op>` (one per row in `zjm_rag/ops.py`'s `OPS`
-table — `locker_create`, `locker_list`, `locker_drop`, `locker_encrypt`, `file_add`, `file_put`,
+table: `locker_create`, `locker_list`, `locker_drop`, `locker_encrypt`, `file_add`, `file_put`,
 `file_remove`, `file_list`, `find`, `ask`, `doctor`, `help`) takes the library's keyword arguments as a
 JSON body (`home`, `store` and `config` are the server's and cannot be set), including `key` /
 `keys` where a key is needed, and returns its result. Errors are `{"error": "..."}`: `400` bad
 body, `404`, `405`, `413` over 1 MiB, `422` from the library.
 
 For agents, as MCP tools over stdio (`zjm_<op>` for each op above). **Agents: call `zjm_help`
-first** — it returns a guide to the workflow, keys and egress, plus this instance's allowed
+first**. It returns a guide to the workflow, keys and egress, plus this instance's allowed
 paths, egress, languages and lockers, and it changes nothing.
 
 ```sh
@@ -181,9 +281,9 @@ zjm reads one JSON config file. The first of these that exists wins (files are n
 | key | type | default |
 |---|---|---|
 | `home` | string | `$XDG_DATA_HOME/zjm`, else `$HOME/.local/share/zjm`; lockers live under `<home>/lockers/` |
-| `allow` | list of strings | `[]` — nothing is added to a locker until you add paths here |
-| `deny` | list of strings | `[]` — write real paths; symlinked parents are not resolved |
-| `exclude` | list of strings (globs) | `[]` — adds to the built-in floor below, never removes from it |
+| `allow` | list of strings | `[]`. Nothing is added to a locker until you add paths here |
+| `deny` | list of strings | `[]`. Write real paths; symlinked parents are not resolved |
+| `exclude` | list of strings (globs) | `[]`. Entries add to the built-in floor below and never remove from it |
 | `egress` | `{"rank": bool, "answer": bool, "translate": bool}` | `{"rank": false, "answer": false, "translate": false}` |
 | `embedding` | string, must start with `local/` | `local/potion-code-16m-v2` |
 | `llm` | an OpenRouter model id string | `deepseek/deepseek-v4-flash` |
@@ -192,14 +292,14 @@ zjm reads one JSON config file. The first of these that exists wins (files are n
 
 A relative `home`/`allow`/`deny` entry resolves against the config file's own directory; `~`
 expands from `$HOME`. In the container, `home` is fixed to `/data` (the `zjm-data` volume) and
-`allow` names `/sources/<name>` paths — the mount points the launcher creates from `ZJM_SOURCES`.
+`allow` names `/sources/<name>` paths, the mount points the launcher creates from `ZJM_SOURCES`.
 `embedding` must be one of the two models baked into the image:
 `local/potion-code-16m-v2` or `local/potion-multilingual-128m`.
 
 `llm` names the OpenRouter model `ask` answers with; every request sets
 `"provider": {"data_collection": "deny"}`, so OpenRouter itself does not retain the prompt. Avoid
-`:free` model variants as the answer model — OpenRouter's free tier usually logs prompts, and
-`data_collection: deny` cannot change that — which is why the default is a paid, non-`:free` model.
+`:free` model variants as the answer model. OpenRouter's free tier usually logs prompts, and
+`data_collection: deny` cannot change that, which is why the default is a paid, non-`:free` model.
 
 Example config for the launcher (`$XDG_CONFIG_HOME/zjm/config.json`, or `$ZJM_HOST_CONFIG`):
 
@@ -238,7 +338,7 @@ while the published host port stays loopback-only.
 An English question finds the Danish, German, Norwegian or Swedish text that answers it, even when
 they share no words, and a question in any language finds text in the configured `languages`. zjm
 translates the **question**, never the files, into each configured language and searches the
-translations in addition to the original; the translations can only **add** candidate files, never
+translations in addition to the original; the translations can only **add** candidate files (up to `limit` more), never
 displace one the original question already found, and no language detection is needed.
 
 Measured (`evals/recall.py`, 38 questions, potion-code index; prototype):
@@ -246,7 +346,7 @@ Measured (`evals/recall.py`, 38 questions, potion-code index; prototype):
 | approach | English question, foreign text, no shared words | everything else |
 |---|---|---|
 | no translation | 0/4 | 34/34 |
-| local multilingual embeddings | 0–1/4 | 33–34/34 |
+| local multilingual embeddings | 0 to 1/4 | 33 to 34/34 |
 | translations fused into one ranking | 4/4 | 27/34 |
 | **translations add files after the original's** | **4/4** | **34/34** |
 
@@ -255,8 +355,8 @@ Measured (`evals/recall.py`, 38 questions, potion-code index; prototype):
   one `find`/`ask`.
 - `languages` (default `["English", "German", "Danish", "Norwegian", "Swedish"]`); an empty list
   turns translation off even with `egress.translate` on.
-- `translate_model` (default `upstage/solar-mini4`) — the OpenRouter model asked to translate.
-- The translation request sends only the question — never file text, paths or snippets. Ranking
+- `translate_model` (default `upstage/solar-mini4`): the OpenRouter model asked to translate.
+- The translation request sends only the question. It never sends file text, paths or snippets. Ranking
   and answering keep their own `egress` switches and are unaffected by this one.
 - **Why files are not translated:** mixed-language documents work chunk by chunk regardless, the
   model translates a question from any language without first detecting it, and translating one
@@ -273,12 +373,12 @@ app, never in zjm: **zjm never stores a key**, and a lost key means a lost locke
 
 - A plain locker exists only when created with `plain=True` (`--plain`); it is a directory under
   `<home>/lockers/<name>/`, exactly as before.
-- With a key — on `locker_create`, or later via `locker_encrypt` — a locker is exactly one file,
+- With a key (given to `locker_create`, or later to `locker_encrypt`), a locker is exactly one file,
   `<home>/lockers/<name>.age`: the whole locker (its files, zg index and manifest), tarred and
   encrypted. No other per-locker file exists on disk.
 - Every request that touches an encrypted locker decrypts it into a private `/tmp` directory for
   that request only, re-encrypts after a write, and deletes both the plaintext and the key file
-  before returning — even on error.
+  before returning, even on error.
 - The key travels only in files under `/tmp` and in request bodies. It never appears in argv, the
   environment, logs, error messages or results.
 - `find` and `ask` can search plain and encrypted lockers together in one call; pass `keys` (a
@@ -290,13 +390,18 @@ app, never in zjm: **zjm never stores a key**, and a lost key means a lost locke
   `.venv`, `__pycache__`, `.zvec-grep`, `.zjm`, `.ssh`, `.gnupg`, `.aws`, `.kube`, `.docker`; files
   `.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.kdbx`, `id_rsa*`, `id_dsa*`, `id_ecdsa*`,
   `id_ed25519*`, `.npmrc`, `.pypirc`, `.netrc`, `.git-credentials`, `credentials*`.
-- Symlinks inside a source are never copied. Gitignored files are never copied (denying a single
-  file inside an allowed repository's own git metadata is not supported; deny the whole directory).
-- **Nothing leaves this machine unless `egress` says so.** Ranking (Jev/OpenRouter) needs
+- **The floor works on file names only.** Contents are not scanned for secrets: a key pasted into an
+  ordinary document is indexed, and sent to OpenRouter with that document when sending is on.
+- Symlinks inside a source are never copied. A file that git ignores and does not track is never copied; a tracked file is copied even if `.gitignore` matches it. Denying a single
+  file inside an allowed repository's own git metadata is not supported; deny the whole directory.
+- **Nothing leaves this machine unless the config allows it.** For a project set up with the skill,
+  `"send": true` in `zjm-project.json` turns on ranking and answering. Direct use (the `zjm` CLI, the
+  library, the HTTP API and the MCP server) follows `egress`: ranking (Jev/OpenRouter) needs
   `egress.rank`; answering (the OpenRouter model) needs `egress.answer`; translating the question
-  (see [Questions in other languages](#questions-in-other-languages)) needs `egress.translate`. The
+  (see [Questions in other languages](#questions-in-other-languages)) needs `egress.translate`. All three
+  are off by default. The
   answer request has no `tools` key, so the model cannot act; it only ever returns text.
-  `OPENROUTER_API_KEY` is sent only in the request's `Authorization` header — never in argv, logs,
+  `OPENROUTER_API_KEY` is sent only in the request's `Authorization` header. It never appears in argv, logs,
   errors, results or the messages sent to the model.
 - `zjm serve` binds to `127.0.0.1`, `localhost` or `::1` only, and checks `Host`/`Origin` on every
   request (in the container, `0.0.0.0` is also accepted, since the launcher publishes only to
@@ -305,7 +410,7 @@ app, never in zjm: **zjm never stores a key**, and a lost key means a lost locke
 - **The container is the only supported way to run zjm.** It runs read-only, as a non-root user,
   with no Linux capabilities, no swap, no core dumps, `--network none` unless `egress` is on, and
   persistent data confined to the `zjm-data` volume.
-- **Encryption at rest is per locker, opt in.** See [Locker keys](#locker-keys).
+- **Encryption at rest is chosen per locker.** Each locker is created either with a key (encrypted) or with `--plain`. See [Locker keys](#locker-keys).
 
 ## Build from source
 
@@ -359,7 +464,7 @@ website/            the project site (rag.cocode.dk)
 
 ## Author
 
-**Babak Bandpey** — [https://cocode.dk](https://cocode.dk) | [LinkedIn](https://linkedin.com/in/babakbandpey) | [GitHub](https://github.com/cocodedk)
+**Babak Bandpey**: [https://cocode.dk](https://cocode.dk) | [LinkedIn](https://linkedin.com/in/babakbandpey) | [GitHub](https://github.com/cocodedk)
 
 ## License
 

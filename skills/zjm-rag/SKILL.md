@@ -19,7 +19,7 @@ Write `zjm-project.json` at the project root and commit it, so every session use
  "send": false, "llm": "deepseek/deepseek-v4-flash", "multilingual": false}
 ```
 
-- `locker`: a name unique to the project (lowercase `a-z 0-9 . _ -`, up to 64 characters). All projects share one
+- `locker`: a name unique to the project (starts with `a-z` or `0-9`, then `a-z 0-9 . _ -`, up to 64 characters). All projects share one
   store (the Docker volume `zjm-data`); reindex refuses a name built from other folders (`ZJM_FORCE=1` replaces
   it), so check `zjm locker-list` first.
 - `folders`: documents and memory only, relative to the root. A whole code tree makes the index fail and every
@@ -32,8 +32,9 @@ Write `zjm-project.json` at the project root and commit it, so every session use
 - `multilingual`: true for documents not in English.
 
 Either way, paths in text files are redacted (`/home/<user>/`, `/Users/<user>/`, `/root/` → `~/`, `/tmp/...` →
-`<temp>`; PDFs and other binary files go as they are), and git-ignored files, zjm's floor (`.env*`, keys,
-credentials) and anything reached through a symlink are never copied. Keep scratch folders git-ignored. Index from
+`<temp>`; PDFs and other binary files go as they are), and untracked git-ignored files, files named like secrets (zjm's floor:
+`.env*`, `*.key`, `credentials*`, ...) and anything reached through a symlink are never copied. File contents are
+not scanned: a secret pasted into an ordinary document is indexed, and sent if `send` is on. Keep scratch folders git-ignored and untracked: a tracked file stays eligible even when `.gitignore` matches it. Index from
 a checkout that stays (the main folder after a pull), not a temporary worktree. Add `.zvec-grep/` to `.gitignore`:
 zg leaves that folder where it runs directly; zjm itself writes nothing in the project. Then run
 `scripts/zjm-project reindex`.
