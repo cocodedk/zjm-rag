@@ -4,9 +4,8 @@ import json
 import os
 import sys
 
-from . import cli_keys
+from . import cli_keys, search
 from . import config as config_module
-from . import search
 from .cli_human import human as _human
 from .errors import ZjmError
 from .ops import OPS, check
@@ -76,6 +75,7 @@ def _parser():
         if name == "find":
             p.add_argument("--sort", choices=list(search.SORTS))
         p.add_argument("--no-rank", action="store_true")
+        p.add_argument("--model", help="Decision model override (not the answer model)")
         p.add_argument("--no-translate", action="store_true")
         if name == "ask":
             p.add_argument("--top-k", type=int)
@@ -119,6 +119,8 @@ def _args_to_body(cmd, args):
     if cmd == "file-list":
         return {"locker": args.locker}
     body = {"query": args.query, "lockers": args.lockers, "limit": args.limit, "min_score": args.min_score}
+    if args.model:
+        body["model"] = args.model
     if args.types:
         body["file_types"] = args.types
     if args.no_rank:
@@ -144,6 +146,17 @@ def main(argv=None, *, runner=None, jev=None, llm=None):
         args = _parser().parse_args(argv)
     except SystemExit as e:
         return e.code
+    try:
+        return _execute(args, runner=runner, jev=jev, llm=llm)
+    except (ZjmError, ValueError, OSError) as e:
+        if getattr(args, "json", False):
+            print(json.dumps({"error": str(e)}))
+        else:
+            print(f"zjm: {e}", file=sys.stderr)
+        return 1
+
+
+def _execute(args, *, runner, jev, llm):
     allowed_hosts = ("127.0.0.1", "localhost", "::1")
     if os.environ.get("ZJM_IN_CONTAINER") == "1":
         allowed_hosts += ("0.0.0.0",)
@@ -182,17 +195,9 @@ def main(argv=None, *, runner=None, jev=None, llm=None):
     cli_keys.add_to_body(args.cmd, key_file, body)
     error = check(op, body)
     if error:
-        print(f"zjm: {error}", file=sys.stderr)
-        return 1
+        raise ZjmError(error)
     cfg = config_module.resolve(args.config)
-    try:
-        result = OPS[op][0](body, config=cfg, runner=runner, jev=jev, llm=llm)
-    except (ZjmError, ValueError) as e:
-        if args.json:
-            print(json.dumps({"error": str(e)}))
-        else:
-            print(f"zjm: {e}", file=sys.stderr)
-        return 1
+    result = OPS[op][0](body, config=cfg, runner=runner, jev=jev, llm=llm)
     lines = [json.dumps(result)] if args.json else _human(args.cmd, result)
     if lines:
         print("\n".join(lines))

@@ -42,6 +42,27 @@ else
     || die "cannot download the zjm launcher"
 fi
 run chmod +x "$bin_dir/zjm" || die "cannot make the zjm launcher executable"
+config_path="${ZJM_HOST_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/zjm/config.json}"
+if [ "${ZJM_INSTALL_DRY_RUN:-}" = 1 ]; then
+  echo "+ create default config if absent: $config_path"
+else
+  python3 - "$config_path" <<'PYCONFIG' || die "cannot create default config"
+import json
+import os
+import sys
+from pathlib import Path
+path = Path(sys.argv[1]).expanduser()
+path.parent.mkdir(parents=True, exist_ok=True)
+try:
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+except FileExistsError:
+    pass
+else:
+    with os.fdopen(fd, "w") as f:
+        json.dump({"home": "/data", "allow": [], "egress": {"rank": False, "answer": False}}, f)
+        f.write("\n")
+PYCONFIG
+fi
 if [ "${ZJM_INSTALL_DRY_RUN:-}" != 1 ]; then
   have zjm || echo "warning: $bin_dir is not on PATH; add it to use zjm"
 fi

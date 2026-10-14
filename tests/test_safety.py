@@ -67,7 +67,7 @@ class SafetyTest(unittest.TestCase):
         real_scandir = os.scandir
 
         def guarded(path="."):
-            if os.path.abspath(path) == str(secret):
+            if not isinstance(path, int) and os.path.abspath(path) == str(secret):
                 raise AssertionError("must not scandir a denied directory")
             return real_scandir(path)
 
@@ -110,7 +110,7 @@ class SafetyTest(unittest.TestCase):
         copy = lockers_mod.locker_dir(cfg, "lib") / "corpus" / "proj"
         self.assertTrue((copy / "keep.md").exists())
         self.assertFalse((copy / "drop.md").exists())
-        git_call = [c for c in runner.calls if c[0][0] == "git"][0]
+        git_call = next(c for c in runner.calls if c[0][0] == "git" and c[1] == str(src))
         names = [n for n in git_call[3].split("\0") if n]
         self.assertEqual(set(names), {"keep.md", "drop.md"})
 
@@ -119,7 +119,8 @@ class SafetyTest(unittest.TestCase):
         (src3 / "a.md").write_text("a")
         (src3 / ".git").mkdir()
         with self.assertRaises(ZjmError):
-            files_mod.file_add("lib", [str(src3)], config=cfg, runner=FakeRunner())
+            files_mod.file_add("lib", [str(src3)], config=cfg,
+                               runner=mock.Mock(return_value=(128, "", "git unavailable")))
 
     def test_egress_ceiling(self):
         cfg_off = make_config(self, egress={"rank": False, "answer": False})

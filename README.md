@@ -40,7 +40,8 @@ zjm runs only inside its hardened container — never natively on the host.
     curl -fsSL https://raw.githubusercontent.com/cocodedk/zjm-rag/main/install.sh | sh
 
 It checks for `docker` and `python3`, builds the `zjm-rag:latest` image, and puts the `zjm`
-launcher (a POSIX `sh` script) on `~/.local/bin`. From then on, `zjm ...` on the host runs
+launcher (a Python script) on `~/.local/bin`. It creates a private, deny-by-default config
+if none exists, preserving existing configuration. From then on, `zjm ...` on the host runs
 `docker run` with the container locked down: `--read-only`, `--cap-drop=ALL`,
 `--security-opt=no-new-privileges`, a `2g` memory cap, a `256`-pid limit, persistent data in the
 `zjm-data` Docker volume, and `--network none` unless the config turns `egress` on.
@@ -84,6 +85,11 @@ print(reply["answer"], reply["files"])
 - `ask(..., top_k=None, llm=zjm_rag.llm.post)` fails unless the config's `egress.answer` is on.
   `top_k=None` (the default) sends every accepted file, still bounded by the context budget; an
   integer still caps the count. `llm` is injectable, like `jev`, for tests.
+- `file_add` prepares the whole batch before replacing existing content, so copy errors leave
+  the old files intact; ignored sources leave existing entries unchanged, and replacements may
+  change between files and directories. Staging temporarily needs space for both versions.
+  If indexing fails on a plain locker, copied files remain and the locker is marked unindexed;
+  encrypted lockers retain their previous sealed state.
 - `locker_encrypt(name, key)` seals a plain locker into an encrypted one; this is one-way — there
   is no operation that decrypts a locker back to plain.
 - Every call takes `config=` (a path or a `load()`ed dict), plus injectable `runner=` and `jev=`
@@ -118,8 +124,8 @@ Over HTTP (needs `egress` on; the launcher publishes it to loopback only):
 
 ```sh
 zjm serve   # the launcher publishes 127.0.0.1:${ZJM_PORT:-8765} -> the container's :8765
-curl -s localhost:8765/file_add -d '{"locker": "linters", "paths": ["/sources/agent-linters"]}'
-curl -s localhost:8765/find -d '{"query": "which linter checks CSS files", "lockers": ["linters"]}'
+curl -s localhost:8765/file_add -H 'Content-Type: application/json' -d '{"locker": "linters", "paths": ["/sources/agent-linters"]}'
+curl -s localhost:8765/find -H 'Content-Type: application/json' -d '{"query": "which linter checks CSS files", "lockers": ["linters"]}'
 ```
 
 `GET /health` returns the `doctor` dict; `POST /<op>` (one per row in `zjm_rag/ops.py`'s `OPS`
@@ -136,6 +142,27 @@ paths, egress, languages and lockers, and it changes nothing.
 ```sh
 claude mcp add zjm -- zjm mcp          # add --config PATH after `zjm mcp` for another config
 ```
+
+## Decision models
+
+Ranking uses OpenRouter's Decisions endpoint and tries these models in order, moving on only
+when a request fails:
+
+1. `perplexity/pplx-decider-v1.1-27b` (default)
+2. `~typesafe/jev-latest`
+3. `openai/gpt-6-luna-decisions`
+4. `microsoft/microsoft-decision-1`
+
+Selection precedence is `--model` (or `jev.post(..., model=...)`), request `model`, `JEV_MODEL`,
+then the default above. A selected model in the list starts at that position and falls through
+its remaining models; a custom model gets one attempt. Each attempt has a 30-second socket
+timeout, with at most four attempts; low scores do not trigger fallback.
+
+`find` and `ask` accept `model=` in Python or JSON requests; the CLI accepts `--model` on both
+commands, and the launcher passes `JEV_MODEL` into online containers. These select the ranking
+model; config `llm` still selects the answer-writing model. Results include `returned_model`
+from the provider response, also shown in human output; it is null when ranking is skipped or
+the response supplies no model identity, never guessed from an alias.
 
 ## Config
 
@@ -182,6 +209,25 @@ Example config for the launcher (`$XDG_CONFIG_HOME/zjm/config.json`, or `$ZJM_HO
 
 Set `ZJM_SOURCES` to a colon-separated list of host folders to mount, one becomes
 `/sources/<basename>`: `ZJM_SOURCES=/home/you/projects/agent-linters zjm file-add linters /sources/agent-linters`.
+
+For a first offline search after installation, put a text file in a host folder, set
+`allow` to `["/sources/docs"]` in the generated config, then run:
+
+```sh
+mkdir -p "$HOME/docs"
+printf 'The office opens at nine.\n' > "$HOME/docs/hours.txt"
+zjm locker-create demo --plain
+ZJM_SOURCES="$HOME/docs" zjm file-add demo /sources/docs
+zjm find "office hours" -l demo --no-rank
+```
+
+The launcher treats `--config PATH` and `--key-file PATH` as host paths and mounts the selected
+files read-only from a private host temporary directory, removed when Docker exits, so the
+container can read private files without changing their original permissions; `--key-file -`
+still reads stdin and cannot accompany `file-put`.
+For `serve`, `--port` selects the container port and defaults the published host port;
+`ZJM_PORT` overrides the host port only; the container bind host must remain `0.0.0.0`,
+while the published host port stays loopback-only.
 
 ## Questions in other languages
 

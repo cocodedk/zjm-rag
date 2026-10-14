@@ -29,6 +29,12 @@ def check_source_allowed(source, config):
     r = os.path.realpath(p)
     if _denied(r, config["deny"], config["home"]) or is_inside(r, os.path.realpath(config["home"])):
         raise ZjmError(f"{source} is denied by {config['path']}")
+    # Check the requested root and its ancestors, not just children visited by _walk.
+    for candidate in (p, r):
+        parts = candidate.split(os.sep)
+        for i, part in enumerate(parts):
+            if part and (i < len(parts) - 1 or os.path.isdir(candidate)) and _floor_excluded(part, True, config["exclude"]):
+                raise ZjmError(f"{source} is excluded by {config['path']}")
     for entry in config["allow"]:
         if is_inside(r, os.path.realpath(entry)):
             return r

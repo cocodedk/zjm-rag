@@ -10,6 +10,7 @@ import urllib.request
 from unittest import mock
 
 from fakes import FakeRunner, fake_jev, fake_llm, make_config, make_locker
+
 from zjm_rag.cli import main
 from zjm_rag.http import MAX_BODY, make_server
 
@@ -73,7 +74,7 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertEqual(runner.calls[0][0][-4:], ["-t", "py", "--", "q"])
         self.assertEqual(set(r), {"query", "min_score", "sort", "accepted", "rejected", "translations",
-                                  "translate_error"})
+                                  "translate_error", "returned_model"})
         self.assertEqual((r["min_score"], r["sort"]), (0.7, "path"))
         self.assertEqual([h["path"] for h in r["accepted"]], ["proj/a.py", "proj/b.md"])
         code, r = self.call("/locker_create", {"name": "lib2", "multilingual": True, "plain": True})

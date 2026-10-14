@@ -7,6 +7,7 @@ import urllib.error
 from unittest import mock
 
 from fakes import PATHS, FakeRunner, fake_jev, make_config, make_locker
+
 from zjm_rag import ZjmError, find, jev
 from zjm_rag import lockers as lockers_mod
 
@@ -117,9 +118,9 @@ class FindTest(unittest.TestCase):
         def opener(result):
             return mock.patch.object(jev.urllib.request, "build_opener", return_value=Opener(result))
 
-        with mock.patch.dict(os.environ, {}, clear=True), opener(b"{}"):
-            with self.assertRaisesRegex(ZjmError, "OPENROUTER_API_KEY is not set"):
-                jev.post({})
+        with mock.patch.dict(os.environ, {}, clear=True), opener(b"{}"), \
+                self.assertRaisesRegex(ZjmError, "OPENROUTER_API_KEY is not set"):
+            jev.post({})
         self.assertEqual(sent, [])
         with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-secret"}, clear=True):
             with opener(b'{"answers": {}}') as build:
@@ -129,7 +130,7 @@ class FindTest(unittest.TestCase):
             self.assertEqual((req.full_url, req.get_method(), timeout), (jev.URL, "POST", 30))
             self.assertEqual(req.get_header("Authorization"), "Bearer sk-secret")
             self.assertEqual(req.get_header("Content-type"), "application/json")
-            self.assertEqual(json.loads(req.data), {"questions": {}, "model": "typesafe/jev-1.13"})
+            self.assertEqual(json.loads(req.data), {"questions": {}, "model": "perplexity/pplx-decider-v1.1-27b"})
             body = io.BytesIO(b"secret body")
             for failure in (urllib.error.HTTPError(jev.URL, 500, "err", {}, body),
                             urllib.error.URLError("no route"), http.client.IncompleteRead(b"")):

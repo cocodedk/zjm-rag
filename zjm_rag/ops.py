@@ -1,12 +1,7 @@
 """OPS: the single table the CLI, HTTP and MCP surfaces are generated from (spec 06)."""
-from . import core
-from . import files
-from . import guide
+from . import core, files, guide, lockers, search, zg
 from . import jev as jev_client
 from . import llm as llm_client
-from . import lockers
-from . import search
-from . import zg
 
 _STR = {"type": "string"}
 _STR_ARR = {"type": "array", "items": {"type": "string"}}
@@ -26,7 +21,7 @@ def _wrap(func, *, needs_runner=False, needs_jev=False, needs_llm=False):
     return call
 
 
-_FIND_PROPS = {"query": _STR, "lockers": {**_STR_ARR, "minItems": 1}, "keys": _KEYS,
+_FIND_PROPS = {"query": _STR, "model": _STR, "lockers": {**_STR_ARR, "minItems": 1}, "keys": _KEYS,
               "limit": {"type": "integer", "minimum": 1},
               "file_types": _STR_ARR, "min_score": {"type": "number", "minimum": 0, "maximum": 1},
               "sort": {"type": "string", "enum": list(search.SORTS)}, "rank": {"type": "boolean"},

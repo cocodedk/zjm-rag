@@ -51,11 +51,12 @@ def human(cmd, r):
         return [f"removed {n}" for n in r["removed"]]
     if cmd == "file-list":
         return [f"{f['name']}  {f['size']} bytes" for f in r["files"]]
+    model_line = [f"decision model: {r['returned_model']}"] if r.get("returned_model") else []
     if cmd == "find":
         lines = [f"{'-' if h['score'] is None else format(h['score'], '.2f')}  {_where(h)}" for h in r["accepted"]]
-        return lines + ([f"rejected: {len(r['rejected'])} below {r['min_score']}"] if r["rejected"] else [])
+        return model_line + lines + ([f"rejected: {len(r['rejected'])} below {r['min_score']}"] if r["rejected"] else [])
     if cmd == "ask":
-        return [r["answer"] or r["reason"], "", f"sources: {', '.join(r['files'])}"]
+        return model_line + [r["answer"] or r["reason"], "", f"sources: {', '.join(r['files'])}"]
     lines = [f"{'ok' if ok else 'missing'} {name}" for name, ok in r["checks"].items()]
     lines.append(f"config {r['config'] or '(built-in defaults)'}")
     lines.append(f"home {r['home']}")
