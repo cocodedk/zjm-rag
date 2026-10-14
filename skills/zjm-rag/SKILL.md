@@ -17,7 +17,8 @@ it indexes. Run them; don't read them.
    replaces it, so check `zjm locker-list` first.
 2. Choose the folders: documents and memory only (e.g. `docs governance memory`). A whole code tree makes the index
    fail and every search come back empty; search code with grep. Two folders with the same name are refused.
-3. Only index what may leave the machine: ranking and `ask` send the text of files to OpenRouter. Paths in text
+3. Nothing leaves the machine unless you set `ZJM_SEND=1`: then ranking and `ask` send the text of files to
+   OpenRouter, so with it set, index only what may leave. Paths in text
    files are redacted (`/home/<user>/`, `/Users/<user>/`, `/root/` → `~/`, `/tmp/...` → `<temp>`; PDFs and other
    binary files go as they are), git-ignored files and zjm's floor (`.env*`, keys,
    credentials) are never copied, but anything else in a git-visible file is. Keep scratch folders git-ignored.
@@ -29,7 +30,6 @@ it indexes. Run them; don't read them.
 
 Choosing files: name the folders to index; inside them, leave files and folders out by name with
 `ZJM_EXCLUDE="*.pdf,drafts/"` (a trailing `/` means a folder). Put it on every reindex, or the next one indexes them.
-For folders that must never leave the machine, search with `ZJM_LOCAL=1` (zg only, no ranking, no `ask`).
 
 ## Refresh
 
@@ -39,12 +39,14 @@ change to an indexed folder (each commit, merge or pull) and before the next sea
 
 ## Search
 
-- `scripts/zjm-project find <locker> "<question>" [--limit 30] [--min-score 0.3] [--no-rank]`. Write a full
+- `scripts/zjm-project find <locker> "<question>" [--limit 30] [--min-score 0.3]`: without `ZJM_SEND=1` it lists
+  zg's candidates unranked; with it, Jev ranks them and rejects the weak ones. Write a full
   question as a person would ask it ("who approves a change before it runs?"); a bare phrase is often rejected.
 - Jev scores relevance, not truth: read every accepted hit in the file on disk before acting on it.
 - No hit is not proof of absence. For "every document that says X": ask two or three phrasings, raise `--limit`,
-  lower `--min-score`, and grep the exact words too. `--no-rank` lists zg's candidates and is the only search that sends nothing out.
-- `ask <locker> "<question>"` answers from the accepted files with citations; check each cited passage.
+  lower `--min-score`, and grep the exact words too.
+- `ZJM_SEND=1 scripts/zjm-project ask <locker> "<question>"` answers from the accepted files with citations;
+  check each cited passage.
 - Hits name `<locker>/<folder>/<path>`: the same path under the indexed folder.
 - Each ranked search and each answer is a paid OpenRouter call: search with intent, not in loops.
 - When a rule changes: search its old wording, fix every accepted hit, reindex, search again until none are left.

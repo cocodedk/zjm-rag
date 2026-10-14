@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # Index folders into a zjm-rag locker from redacted copies, and search it.
 #   zjm-project reindex LOCKER DIR...            (re)build LOCKER from DIRs; run after every change to them
-#   zjm-project find LOCKER "QUERY" [ZJM-ARGS]   e.g. --limit 30 --min-score 0.3 --no-rank
+#   zjm-project find LOCKER "QUERY" [ZJM-ARGS]   e.g. --limit 30 --min-score 0.3
 #   zjm-project ask LOCKER "QUESTION" [ZJM-ARGS] an answer from the accepted files, with citations
 # ZJM_MULTILINGUAL=1 on reindex builds the locker for non-English text; ZJM_EXCLUDE="*.pdf,drafts/" leaves out
-# files and folders (trailing /) by name; ZJM_LOCAL=1 keeps a search on this machine (no ranking, no ask).
+# files and folders (trailing /) by name. Nothing leaves the machine unless ZJM_SEND=1 (ranking and ask via OpenRouter).
 # Each DIR mounts read-only as /sources/<its folder name>, so names must differ. ZJM_FORCE=1 replaces a locker built from other folders.
 set -euo pipefail
 CMD=${1:-} LOCKER=${2:-}; shift 2 || { sed -n 2,6p "$0" >&2; exit 2; }
 HERE=$(cd "$(dirname "$0")" && pwd)
 STATE="${XDG_CACHE_HOME:-$HOME/.cache}/zjm-project/$LOCKER"
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
-config() {  # $1: the allow list; ZJM_EXCLUDE: comma-separated name globs; ZJM_LOCAL=1: nothing leaves the machine
-  local out=true ex=""; [ -n "${ZJM_LOCAL:-}" ] && out=false
+config() {  # $1: the allow list; ZJM_EXCLUDE: comma-separated name globs; ZJM_SEND=1: ranking and ask may use OpenRouter
+  local out=false ex=""; [ "${ZJM_SEND:-}" = 1 ] && out=true
   local pats=(); [ -n "${ZJM_EXCLUDE:-}" ] && IFS=, read -ra pats <<< "$ZJM_EXCLUDE" && ex=$(printf '"%s",' "${pats[@]}") && ex=${ex%,}
   printf '{"home": "/data", "allow": [%s], "exclude": [%s], "egress": {"rank": %s, "answer": %s}}\n' "$1" "$ex" $out $out > "$TMP/config.json"
   export ZJM_HOST_CONFIG="$TMP/config.json"; }
@@ -22,7 +22,7 @@ case $CMD in
     for d in "$@"; do
       d=$(realpath "$d"); n=$(basename "$d")
       [ -d "$d" ] || { echo "$d is not a folder: index folders only" >&2; exit 2; }
-      case "/$d/" in */.git/*|*/node_modules/*|*/.venv/*|*/__pycache__/*|*/.zvec-grep/*|*/.zjm/*|*/.ssh/*|*/.gnupg/*|*/.aws/*|*/.kube/*|*/.docker/*)
+      case "/${d,,}/" in */.git/*|*/node_modules/*|*/.venv/*|*/__pycache__/*|*/.zvec-grep/*|*/.zjm/*|*/.ssh/*|*/.gnupg/*|*/.aws/*|*/.kube/*|*/.docker/*)
         echo "$d is inside a folder zjm never indexes" >&2; exit 2 ;; esac
       [[ " ${names[*]} " == *" $n "* ]] && { echo "two folders named $n: rename one or index it separately" >&2; exit 2; }
       python3 "$HERE/mirror.py" "$d" "$TMP/$n"
