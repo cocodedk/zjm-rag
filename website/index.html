@@ -79,8 +79,8 @@
 <div class="hero">
   <header>
     <h1>Find the file that holds the answer</h1>
-    <p class="lede">zjm-rag is RAG over local files. zg searches your folders, Jev reads what comes back and judges which files actually contain the answer, and an LLM answers from those files alone, citing their paths.</p>
-    <p class="hero-note">The <code>zjm_rag</code> library, the <code>zjm</code> command with <code>--json</code> output, a local HTTP API (<code>zjm serve</code>) and an MCP server (<code>zjm mcp</code>) all work today, and one line installs them.</p>
+    <p class="lede">zjm-rag is RAG (retrieval-augmented generation, answers drawn from documents you hand over) over local files. zg searches an index of your folders, Jev judges which files actually contain the answer, and an LLM answers from those files alone, citing their paths.</p>
+    <p class="hero-note">The <code>zjm</code> command (with <code>--json</code> output), a local HTTP API (<code>zjm serve</code>) and an MCP server for agents (<code>zjm mcp</code>) work today. One line installs them, in a Docker container on your computer.</p>
     <div class="actions">
       <a class="btn btn-primary" href="https://github.com/cocodedk/zjm-rag">Read the source on GitHub</a>
       <a class="btn" href="#run">Install and try it</a>
@@ -88,17 +88,16 @@
   </header>
 
   <figure class="run">
-    <pre class="ask"><span>&gt;&gt;&gt;</span> zjm_rag.ask("which linter checks CSS files")</pre>
+    <pre class="ask"><span>&gt;&gt;&gt;</span> zjm ask "which linter checks CSS files" -l linters</pre>
     <ol class="ranked">
       <li class="sent" style="--p:.96;--i:0"><b>0.96</b><code>agent-linters/README.md</code></li>
       <li class="sent" style="--p:.81;--i:1"><b>0.81</b><code>agent-linters/bin/lintp</code></li>
       <li class="sent" style="--p:.58;--i:2"><b>0.58</b><code>agent-linters/llms.txt</code></li>
-      <li class="cut-note">Threshold 0.5: files below it come back as rejected. The best three accepted files go to the LLM.</li>
+      <li class="cut-note">Threshold 0.5: files below it are listed as rejected. The accepted files go to the answer model.</li>
       <li style="--p:.22"><b>0.22</b><code>agent-linters/shell/linters.fish</code></li>
       <li style="--p:.14"><b>0.14</b><code>agent-linters/website/index.html</code></li>
       <li style="--p:.09"><b>0.09</b><code>agent-linters/install.sh</code></li>
       <li style="--p:.03"><b>0.03</b><code>message-test-plugin/CONTRIBUTING.md</code></li>
-      <li style="--p:.02"><b>0.02</b><code>message-test-plugin/scripts/validate-plugin.py</code></li>
     </ol>
     <p class="answer">Biome checks <code>.css</code> and <code>.scss</code> files. It is listed in the linter table in <code>agent-linters/README.md</code>.</p>
     <figcaption>An illustration, not a recorded run. The paths come from the repo's test fixture; the scores are made up to show the shape of the result.</figcaption>
@@ -107,37 +106,38 @@
 
 <section aria-labelledby="how">
   <h2 id="how">Three steps, each one narrower</h2>
-  <p class="intro">Search casts a wide net, and a judge sorts the catch. Only the files the judge accepts reach the model, so it reads the files themselves, up to 20,000 characters each, instead of a pile of loose snippets.</p>
+  <p class="intro">Search casts a wide net, and, with sending on, a judge sorts the catch. Only the files that pass reach the answer model. It reads each one whole when the file is small, or the parts that matched when it is large.</p>
   <div class="steps">
     <div>
       <div class="ticks" style="--n:40"></div>
-      <p class="count">40 hits, grouped into at most 8 files</p>
+      <p class="count">Up to 40 hits, at most 8 files</p>
       <h3>zg finds</h3>
-      <p>A hybrid search, keyword and semantic, over a local <a href="https://www.npmjs.com/package/@zvec/zvec-grep">zg</a> index. <code>find</code> takes up to 40 hits and groups them by file, keeping two short snippets from each.</p>
+      <p>A hybrid search, keyword and semantic, over a local <a href="https://www.npmjs.com/package/@zvec/zvec-grep">zg</a> index of your folders. <code>find</code> takes up to 40 hits and keeps the first 8 different files, in zg's order. For each file it keeps every matched section, with overlapping lines merged, not a short preview. <code>--limit</code> changes the 8.</p>
     </div>
     <div>
       <div class="ticks" style="--n:8;--c:var(--ink)"></div>
-      <p class="count">8 files, each with a probability</p>
+      <p class="count">Up to 8 files, each with a probability</p>
       <h3>Jev judges</h3>
-      <p>One request to Jev, the OpenRouter Decisions API, asks the same question of every file: does this one contain what the answer needs? Jev judges each file from its path and snippets and returns a probability. Files at 0.5 or above are accepted. The rest come back as rejected, so none disappears without a trace.</p>
+      <p>Runs only when <code>send</code> is on. One request to Jev, the OpenRouter Decisions API, asks the same question of every file: does this one hold what the answer needs? Jev judges each file from its path and up to 12,000 characters of its matched text, and returns a probability. Files at 0.5 or above are accepted. The rest are listed as rejected, so none disappears without a trace.</p>
     </div>
     <div>
       <div class="ticks" style="--n:3;--c:#e0b800"></div>
-      <p class="count">Up to 3 accepted files, one answer</p>
+      <p class="count">Every accepted file, up to 200,000 characters</p>
       <h3>The LLM answers</h3>
-      <p><code>ask</code> sends the three best accepted files to the <code>claude</code> CLI with one instruction: answer from these files only, cite the path, and say so if they don't hold the answer. When no file passes the threshold, no LLM is called.</p>
+      <p>Runs only when <code>send</code> is on. <code>ask</code> sends the accepted files to the answer model, by default <code>deepseek/deepseek-v4-flash</code> on OpenRouter, with one instruction: answer from these files only, cite the path and lines, and say so if they do not hold the answer. Small files go whole. Larger files go as their matched parts, until the 200,000-character budget runs out. When no file passes, no model is called.</p>
     </div>
   </div>
 </section>
 
 <section aria-labelledby="leaves">
   <h2 id="leaves">What leaves your machine</h2>
-  <p class="intro">Search is local, but judging and answering are not. Point it at folders you would be fine pasting into a chat with those services.</p>
+  <p class="intro">Search runs on your computer. Nothing goes to OpenRouter unless a project sets <code>"send": true</code> in its <code>zjm-project.json</code>. Index only folders you would be fine sending to OpenRouter.</p>
   <table class="flow">
-    <tr><th scope="row">zg</th><td>Runs on your machine, against an index of a copy of your folders.</td></tr>
-    <tr><th scope="row">Jev</th><td>Gets the question, plus the path and up to two snippets of each of up to 8 files, sent to OpenRouter.</td></tr>
-    <tr><th scope="row"><code>claude</code></th><td>Gets the question, plus the path and first 20,000 characters of each file it answers from, three at most, sent to Anthropic.</td></tr>
+    <tr><th scope="row">zg</th><td>Runs on your computer, against an index of a copy of your folders. Nothing leaves.</td></tr>
+    <tr><th scope="row">Jev (ranking)</th><td>Only when <code>send</code> is <code>true</code>. Gets the question, and each candidate file's path and up to 12,000 characters of its matched text. Sent to OpenRouter.</td></tr>
+    <tr><th scope="row">Answer model</th><td>Only when <code>send</code> is <code>true</code>. Gets the question and the accepted files, up to 200,000 characters in all. Sent to OpenRouter, which is asked not to keep the prompt.</td></tr>
   </table>
+  <p>The project setup does not send questions for translation.</p>
 </section>
 
 <section aria-labelledby="status">
@@ -146,17 +146,19 @@
     <div>
       <h3>Four ways to call it</h3>
       <ul data-state="available">
-        <li data-interface="library">The <code>zjm_rag</code> library, standard library only: <code>index</code>, <code>find</code> and <code>ask</code>.</li>
-        <li data-interface="cli">The <code>zjm</code> command runs the same operations from a shell, plus <code>zjm doctor</code>. <code>--json</code> prints the result as one JSON object. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md">Command-line spec</a></li>
-        <li data-interface="http"><code>zjm serve</code>, a JSON API on <code>127.0.0.1:8765</code> for apps in any language: <code>GET /health</code>, and <code>POST /index</code>, <code>/find</code> and <code>/ask</code>. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md">HTTP spec</a></li>
-        <li data-interface="mcp"><code>zjm mcp</code>, an MCP server over stdio for agents, with the tools <code>zjm_index</code>, <code>zjm_find</code>, <code>zjm_ask</code> and <code>zjm_doctor</code>. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md">MCP and install spec</a></li>
+        <li data-interface="library">The <code>zjm_rag</code> Python package, standard library only, which runs inside the zjm-rag container: lockers, files, <code>find</code>, <code>ask</code>, <code>doctor</code> and <code>help</code>.</li>
+        <li data-interface="cli">The <code>zjm</code> command runs the same operations from a shell, plus <code>zjm doctor</code> and <code>zjm help</code>. <code>--json</code> prints the result as one JSON object. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md">Command-line spec</a></li>
+        <li data-interface="http"><code>zjm serve</code>, a JSON API on <code>127.0.0.1:8765</code> for apps in any language: <code>GET /health</code>, and <code>POST /&lt;operation&gt;</code>, such as <code>/find</code> and <code>/ask</code>. It needs sending on in your config. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md">HTTP spec</a></li>
+        <li data-interface="mcp"><code>zjm mcp</code>, an MCP server over stdio for agents, with one tool per operation, such as <code>zjm_file_add</code>, <code>zjm_find</code>, <code>zjm_ask</code> and <code>zjm_help</code>. Agents call <code>zjm_help</code> first. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md">MCP and install spec</a></li>
       </ul>
     </div>
     <div>
       <h3>What it does</h3>
       <ul data-state="available">
-        <li><code>index</code> copies your folders into a store (a temp directory by default) and indexes the copy, so your projects stay untouched. <code>multilingual=True</code> picks a model for non-English content.</li>
+        <li>A <strong>locker</strong> is a named index. <code>file_add</code> copies files or folders into it and indexes the copy, so your originals stay where they are.</li>
+        <li>Each locker is encrypted with a key your app supplies (age), or it is plain, if you ask for that. zjm never stores a key.</li>
         <li><code>find</code> splits files at a threshold into accepted and rejected, and sorts them by score, zg rank, modified time or path.</li>
+        <li>Nothing is read until its folder is listed in the config, and nothing is sent until the config's <code>egress</code> setting allows it.</li>
         <li>The tests use fakes and never call zg, Jev or an LLM.</li>
       </ul>
     </div>
@@ -164,29 +166,40 @@
 </section>
 
 <section id="run" aria-labelledby="try">
-  <h2 id="try">Install and try it</h2>
+  <h2 id="try">Install zjm, then set up a project</h2>
+  <p class="intro">zjm runs in a Docker container on your computer. One installer builds the container, adds the <code>zjm</code> command and installs a Claude Code skill. The skill builds and searches a project's index for you.</p>
+  <h3>What you need</h3>
   <ul class="req" data-requirements>
-    <li>Python 3.10 or newer. The package has no dependencies.</li>
-    <li><code>zg</code> on your <code>PATH</code>: <code>npm install -g @zvec/zvec-grep</code></li>
-    <li><code>OPENROUTER_API_KEY</code> set in your environment, for Jev's ranking.</li>
-    <li>The <code>claude</code> CLI, for answers.</li>
+    <li><code>docker</code>, installed and running. The installer builds zjm's container with it.</li>
+    <li><code>python3</code>, version 3.10 or newer.</li>
+    <li><code>OPENROUTER_API_KEY</code> in your terminal, only if you turn on sending for a project (step 7 below).</li>
   </ul>
-  <p class="cmd-label">Install it with one line</p>
+  <h3>Install</h3>
+  <p class="cmd-label">Run the installer</p>
 <pre class="cmd" data-install data-state="available">curl -fsSL https://raw.githubusercontent.com/cocodedk/zjm-rag/main/install.sh | sh</pre>
-  <p class="cmd-label">Index a folder, then ask, from the shell or from Python</p>
-<pre class="cmd" data-example="cli">zjm index ~/projects/some-repo              <span># copy, then index the copy</span>
-zjm find "which linter checks CSS files"    <span># accepted and rejected files</span>
-zjm ask "which linter checks CSS files"     <span># the answer and its sources</span>
-zjm doctor                                  <span># checks zg, claude and the API key</span></pre>
-<pre class="cmd" data-example="library">import os, zjm_rag
-zjm_rag.index([os.path.expanduser("~/projects/some-repo")])   <span># copy, then index the copy</span>
-hits = zjm_rag.find("which linter checks CSS files")          <span># accepted and rejected files</span>
-reply = zjm_rag.ask("which linter checks CSS files")
-print(reply["answer"], reply["files"])</pre>
-  <p class="cmd-label">Or call it over HTTP, or from an agent over MCP</p>
-<pre class="cmd" data-example="http">zjm serve                                   <span># serves 127.0.0.1:8765 until stopped</span>
-curl -s 127.0.0.1:8765/find -d '{"query": "which linter checks CSS files"}'</pre>
-<pre class="cmd" data-example="mcp">claude mcp add zjm -- zjm mcp               <span># zjm_index, zjm_find, zjm_ask, zjm_doctor</span></pre>
+  <p>The installer checks for <code>docker</code> and <code>python3</code>, builds the <code>zjm-rag:latest</code> image, and puts <code>zjm</code> in <code>~/.local/bin</code>. If no config exists, it creates one with all outside calls turned off. Last, it installs the skill into <code>~/.claude/skills/zjm-rag</code>, replacing any older copy. It prints steps <code>1/4</code> to <code>4/4</code>.</p>
+  <p>If it warns that <code>~/.local/bin</code> is not on your <code>PATH</code>, add <code>export PATH="$HOME/.local/bin:$PATH"</code> to your shell profile and open a new terminal. Then run <code>zjm doctor</code>. It checks the install and exits with status 1 when a check fails.</p>
+  <h3>Set up a project</h3>
+  <p>A <strong>locker</strong> is the private, searchable index of one project. The settings live in one file, <code>zjm-project.json</code>, at the project's top folder. Commit it so every session uses the same settings. Index documents and memory folders, not code: a code tree makes the index fail and every search come back empty.</p>
+  <p>The commands below use <code>~/.claude/skills/zjm-rag/scripts/zjm-project</code>. If you set <code>CLAUDE_CONFIG_DIR</code>, use that folder instead of <code>~/.claude</code>.</p>
+  <ol class="req">
+    <li>Open a terminal in the project's top folder: the folder that holds <code>.git</code>, or the folder you work in if the project does not use git.</li>
+    <li>Create <code>zjm-project.json</code> there, and change <code>locker</code> and <code>folders</code> to your own. Use a <code>locker</code> name no other project uses; <code>zjm locker-list</code> shows the names in use. Leave <code>send</code> at <code>false</code> for now. Expected: the file sits in the top folder.
+<pre class="cmd">{"locker": "myproj", "folders": ["docs", "memory"], "exclude": ["*.pdf", "drafts/"],
+ "send": false, "llm": "deepseek/deepseek-v4-flash", "multilingual": false}</pre></li>
+    <li>Add <code>.zvec-grep/</code> to <code>.gitignore</code>, on its own line. Expected: zg's working folder stays out of git.</li>
+    <li>Commit <code>zjm-project.json</code> and <code>.gitignore</code>. Expected: git lists both as committed.</li>
+    <li>Build the index with <code>~/.claude/skills/zjm-rag/scripts/zjm-project reindex</code>. Expected: zjm reports what it added, and the prompt returns. Text files are copied with home-folder paths redacted, so <code>/home/&lt;user&gt;/</code> becomes <code>~/</code>. Git-ignored files, <code>.env*</code> files and keys are never copied.</li>
+    <li>Search with a full question: <code>~/.claude/skills/zjm-rag/scripts/zjm-project find "who approves a change before it runs?"</code> Expected: a list of file paths. With <code>send</code> set to <code>false</code>, the scores show as <code>-</code> and nothing is ranked. Open each file before you rely on it. A score measures relevance, not truth. No hit does not prove the text is missing, so try other wordings.</li>
+    <li>Optional, for answers with citations: set <code>"send": true</code> in <code>zjm-project.json</code>, then run <code>export OPENROUTER_API_KEY=your-key-here</code> with your own key. Expected: <code>~/.claude/skills/zjm-rag/scripts/zjm-project ask "who approves a change before it runs?"</code> prints an answer that names its files. Risk: the text of matching files leaves your computer and goes to OpenRouter. Each search and each answer is a paid call. Keep the key out of git.</li>
+  </ol>
+  <p>After every change to an indexed folder, run <code>reindex</code> again before you search. If <code>find</code> or <code>ask</code> prints <code>STALE:</code>, a folder changed since the last reindex. Reindex, then search again.</p>
+  <h3>Use it directly</h3>
+  <p>The Python package, the <code>zjm</code> commands, the HTTP API and the MCP server are described in the <a href="https://github.com/cocodedk/zjm-rag#use">README</a>.</p>
+<pre class="cmd" data-example="cli">zjm doctor                                  <span># checks zg, age, the API key, config, lockers</span>
+zjm locker-list                             <span># names of the lockers in the store</span></pre>
+<pre class="cmd" data-example="http">zjm serve                                   <span># needs sending on in the config; serves 127.0.0.1:8765 until stopped</span></pre>
+<pre class="cmd" data-example="mcp">claude mcp add zjm -- zjm mcp               <span># agents call zjm_help first</span></pre>
 </section>
 
 <footer class="site-foot">

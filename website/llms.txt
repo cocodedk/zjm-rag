@@ -1,12 +1,20 @@
 # zjm-rag
 
-> A small open-source RAG tool for local folders. zg (zvec-grep) finds candidate files, Jev (the OpenRouter Decisions API) judges which of them contain the answer, and an LLM answers from those files only, citing their paths.
+> zjm-rag is RAG over local folders. zg (zvec-grep) finds candidate files, Jev (the OpenRouter Decisions API) judges which of them contain the answer, and an LLM answers from those files only, citing their paths.
 
-The Python library `zjm_rag` is in: stdlib only, Python 3.10+, with `index`, `find` and `ask`. `index` copies source folders into a store and builds the zg index there. `find` asks zg for up to 40 hits, groups them into at most 8 files, has Jev score each file from its path and snippets, and splits them at a threshold (0.5 by default) into accepted and rejected. `ask` sends the best three accepted files to the `claude` CLI and returns the answer with the paths it used; when no file passes, no LLM is called. zg runs locally; snippets go to OpenRouter (`OPENROUTER_API_KEY`) and the chosen files' text goes to the LLM provider.
+zjm-rag keeps a named index, a **locker**, for each project. `file_add` copies files or folders into a locker and indexes the copy, so the originals stay where they are. `find` asks zg for up to 40 hits, keeps the first 8 different files in zg's order (`--limit` changes the 8), and returns them split at a threshold (0.5 by default) into accepted and rejected. With sending on, Jev scores each file from its path and up to 12,000 characters of its matched text. `ask` sends the accepted files to an OpenRouter model (`deepseek/deepseek-v4-flash` by default) and returns the answer with the paths it used; small files go whole, the rest as matched parts, within 200,000 characters. When no file passes, no model is called. Lockers are encrypted with an age key the app supplies, or plain. zjm never stores a key.
 
-The `zjm` command runs the same operations from a shell (`zjm index`, `find`, `ask`, `doctor`), and `--json` prints the library's result as one JSON object. `zjm serve` is a local HTTP JSON API on 127.0.0.1:8765 (`GET /health`, `POST /index`, `/find`, `/ask`), and `zjm mcp` is an MCP server over stdio with the tools `zjm_index`, `zjm_find`, `zjm_ask` and `zjm_doctor` (`claude mcp add zjm -- zjm mcp`).
+It runs only in its Docker container. Nothing leaves the machine unless sending is on: ranking and answering use OpenRouter (`OPENROUTER_API_KEY`), and the question is sent for translation only when that setting is on, which the project setup leaves off.
 
-Install with one line: `curl -fsSL https://raw.githubusercontent.com/cocodedk/zjm-rag/main/install.sh | sh`. It checks for Python 3.10+, installs zg with npm when missing, installs the package with uv, pipx or pip --user, and runs `zjm doctor`.
+Interfaces, all inside the container:
+- The `zjm_rag` Python package (standard library only): lockers, files, `find`, `ask`, `doctor`, `help`.
+- The `zjm` command: the same operations from a shell, plus `zjm doctor` and `zjm help`. `--json` prints the result as one JSON object.
+- `zjm serve`: a local JSON API on 127.0.0.1:8765, with `GET /health` and `POST /<operation>` (for example `/find`). It needs sending on in the config.
+- `zjm mcp`: an MCP server over stdio, one tool per operation (`zjm_file_add`, `zjm_find`, `zjm_ask`, `zjm_help`, and so on). Agents call `zjm_help` first. Add it to Claude Code with `claude mcp add zjm -- zjm mcp`.
+
+Install with one line: `curl -fsSL https://raw.githubusercontent.com/cocodedk/zjm-rag/main/install.sh | sh`. It needs Docker and python3 (3.10+). The installer builds the `zjm-rag:latest` image, puts the `zjm` command in `~/.local/bin`, creates a config with all outside calls off if none exists, and installs the Claude Code skill `zjm-rag` into `~/.claude/skills/zjm-rag` (or `$CLAUDE_CONFIG_DIR`). Then run `zjm doctor` to check the install.
+
+Set up a project by creating `zjm-project.json` at its top folder (the git top level, or the working folder without git), with `locker`, `folders`, `exclude`, `send`, `llm` and `multilingual`. Keep `send` at `false` until you want answers. Add `.zvec-grep/` to `.gitignore`. Then run `~/.claude/skills/zjm-rag/scripts/zjm-project reindex` after every change to an indexed folder, and `find` or `ask` to search. If a search prints `STALE:`, reindex first. `ask` is refused unless `send` is true.
 
 ## WebMCP tools
 
@@ -14,21 +22,23 @@ This site has WebMCP tools. Both pages, [/](https://rag.cocode.dk/) and [/fa/](h
 
 - `describe`: Returns what this zjm-rag page is about, its language, its sections and the other tools, in the page language.
 - `get_install_command`: Returns the one-line command that installs zjm-rag, whether it is available, and its requirements; it runs nothing.
-- `list_interfaces`: Lists the four ways to call zjm-rag (Python library, CLI, HTTP JSON API, MCP server), each with whether it is available or planned, a summary, its spec link and an example if there is one.
+- `list_interfaces`: Lists the four ways to call zjm-rag (Python package, CLI, HTTP JSON API, MCP server), each with whether it is available, a summary, its spec link and an example if there is one.
 
 ## Docs
 
-- [README](https://github.com/cocodedk/zjm-rag/blob/main/README.md): what it does, requirements, install and usage
-- [zjm_rag/core.py](https://github.com/cocodedk/zjm-rag/blob/main/zjm_rag/core.py): `index`, `find` and `ask`
+- [README](https://github.com/cocodedk/zjm-rag/blob/main/README.md): what it does, requirements, install, project setup, config, safety and usage
+- [skills/zjm-rag/SKILL.md](https://github.com/cocodedk/zjm-rag/blob/main/skills/zjm-rag/SKILL.md): the Claude Code skill: project setup, reindex, search and ask
+- [zjm_rag/search.py](https://github.com/cocodedk/zjm-rag/blob/main/zjm_rag/search.py): `find` and `ask`
+- [zjm_rag/ops.py](https://github.com/cocodedk/zjm-rag/blob/main/zjm_rag/ops.py): the operations table that the CLI, HTTP API and MCP server are generated from
 - [Website (English)](https://rag.cocode.dk/): how it works and what exists today
 - [Website (Persian)](https://rag.cocode.dk/fa/): the same page in Persian
 
 ## Specs
 
-- [01 Library](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/01-library.md): `index`, `find`, `ask`, threshold and sort options (built)
-- [02 CLI](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md): the `zjm` command with `--json` and `zjm doctor` (built)
-- [03 HTTP](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md): `zjm serve`, a JSON API on 127.0.0.1 (built)
-- [04 MCP and install](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md): `zjm mcp` over stdio and `install.sh` (built)
+- [01 Library](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/01-library.md): the `zjm_rag` package
+- [02 CLI](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md): the `zjm` command with `--json` and `zjm doctor`
+- [03 HTTP](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md): `zjm serve`, a JSON API on 127.0.0.1
+- [04 MCP and install](https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md): `zjm mcp` over stdio and `install.sh`
 
 ## Optional
 

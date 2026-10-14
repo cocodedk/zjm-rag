@@ -2,7 +2,7 @@
 lean_status: pr_open
 lean_pr: https://github.com/cocodedk/zjm-rag/pull/1
 ---
-# 01 — `zjm_rag` library: index, find, rank, ask
+# 01 — `zjm_rag` library: lockers, files, find, ask
 
 ## Goal
 

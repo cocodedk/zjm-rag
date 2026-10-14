@@ -79,8 +79,8 @@
 <div class="hero">
   <header>
     <h1>فایلی را پیدا کنید که پاسخ در آن است</h1>
-    <p class="lede">zjm-rag یعنی RAG روی فایل‌های خودتان. zg پوشه‌هایتان را می‌گردد، Jev نتیجه‌ها را می‌خواند و می‌سنجد کدام فایل‌ها واقعاً پاسخ را در خود دارند، و بعد یک LLM فقط از روی همان فایل‌ها جواب می‌دهد و مسیرشان را هم می‌آورد.</p>
-    <p class="hero-note">کتابخانهٔ <code>zjm_rag</code>، فرمان <code>zjm</code> با خروجی <code>--json</code>، یک API محلی روی HTTP (<code>zjm serve</code>) و یک سرور MCP (<code>zjm mcp</code>) امروز همه کار می‌کنند و با یک خط نصب می‌شوند.</p>
+    <p class="lede">zjm-rag یعنی RAG روی فایل‌های خودتان: پاسخ ساختن از روی اسنادی که خودتان می‌دهید. zg در نمایه‌ای از پوشه‌هایتان جست‌وجو می‌کند، Jev می‌سنجد کدام فایل‌ها واقعاً پاسخ را در خود دارند، و بعد یک LLM فقط از روی همان فایل‌ها جواب می‌دهد و مسیرشان را هم می‌آورد.</p>
+    <p class="hero-note">فرمان <code>zjm</code> (با خروجی <code>--json</code>)، یک API محلی روی HTTP (<code>zjm serve</code>) و یک سرور MCP برای عامل‌ها (<code>zjm mcp</code>) امروز کار می‌کنند. با یک خط نصب می‌شوند، داخل یک کانتینر Docker روی رایانهٔ شما.</p>
     <div class="actions">
       <a class="btn btn-primary" href="https://github.com/cocodedk/zjm-rag">کد منبع در GitHub</a>
       <a class="btn" href="#run">نصب کنید و امتحانش کنید</a>
@@ -88,17 +88,16 @@
   </header>
 
   <figure class="run" dir="ltr">
-    <pre class="ask"><span>&gt;&gt;&gt;</span> zjm_rag.ask("which linter checks CSS files")</pre>
+    <pre class="ask"><span>&gt;&gt;&gt;</span> zjm ask "which linter checks CSS files" -l linters</pre>
     <ol class="ranked">
       <li class="sent" style="--p:.96;--i:0"><b>0.96</b><code>agent-linters/README.md</code></li>
       <li class="sent" style="--p:.81;--i:1"><b>0.81</b><code>agent-linters/bin/lintp</code></li>
       <li class="sent" style="--p:.58;--i:2"><b>0.58</b><code>agent-linters/llms.txt</code></li>
-      <li class="cut-note" dir="rtl">آستانه ۰٫۵: فایل‌های زیر آن به‌عنوان ردشده برمی‌گردند. سه فایل برتر از میان پذیرفته‌ها به LLM می‌رسند.</li>
+      <li class="cut-note" dir="rtl">آستانه ۰٫۵: فایل‌های زیر آن به‌عنوان ردشده فهرست می‌شوند. فایل‌های پذیرفته به مدل پاسخ می‌رسند.</li>
       <li style="--p:.22"><b>0.22</b><code>agent-linters/shell/linters.fish</code></li>
       <li style="--p:.14"><b>0.14</b><code>agent-linters/website/index.html</code></li>
       <li style="--p:.09"><b>0.09</b><code>agent-linters/install.sh</code></li>
       <li style="--p:.03"><b>0.03</b><code>message-test-plugin/CONTRIBUTING.md</code></li>
-      <li style="--p:.02"><b>0.02</b><code>message-test-plugin/scripts/validate-plugin.py</code></li>
     </ol>
     <p class="answer">Biome checks <code>.css</code> and <code>.scss</code> files. It is listed in the linter table in <code>agent-linters/README.md</code>.</p>
     <figcaption dir="rtl">این یک نمونهٔ نمایشی است، نه خروجی یک اجرای واقعی. مسیرها از فایل آزمون خود مخزن آمده‌اند و امتیازها ساختگی‌اند تا شکل نتیجه را نشان دهند.</figcaption>
@@ -107,37 +106,38 @@
 
 <section aria-labelledby="how">
   <h2 id="how">سه مرحله، هر کدام باریک‌تر از قبلی</h2>
-  <p class="intro">جست‌وجو تور را پهن می‌اندازد و یک داور صید را سوا می‌کند. فقط فایل‌هایی که داور می‌پذیرد به مدل می‌رسند، پس مدل خود فایل‌ها را می‌خواند، از هر کدام تا ۲۰٬۰۰۰ نویسه، نه انبوهی از تکه‌های پراکنده.</p>
+  <p class="intro">جست‌وجو تور را پهن می‌اندازد و، وقتی ارسال روشن باشد، داور صید را سوا می‌کند. فقط فایل‌هایی که قبول می‌شوند به مدل پاسخ می‌رسند. مدل هر فایل را کامل می‌خواند اگر فایل کوچک باشد، و بخش‌های مرتبطش را اگر بزرگ باشد.</p>
   <div class="steps">
     <div>
       <div class="ticks" style="--n:40"></div>
-      <p class="count">۴۰ نتیجه، در حداکثر ۸ فایل</p>
+      <p class="count">حداکثر ۴۰ نتیجه، در حداکثر ۸ فایل</p>
       <h3>zg پیدا می‌کند</h3>
-      <p>یک جست‌وجوی ترکیبی، هم کلیدواژه‌ای و هم معنایی، روی نمایهٔ محلی <a href="https://www.npmjs.com/package/@zvec/zvec-grep">zg</a>. <code>find</code> تا ۴۰ نتیجه برمی‌دارد، آن‌ها را بر اساس فایل گروه می‌کند و از هر فایل دو تکهٔ کوتاه نگه می‌دارد.</p>
+      <p>یک جست‌وجوی ترکیبی، هم کلیدواژه‌ای و هم معنایی، روی نمایهٔ <a href="https://www.npmjs.com/package/@zvec/zvec-grep">zg</a> از پوشه‌هایتان. <code>find</code> تا ۴۰ نتیجه برمی‌دارد و ۸ فایل متفاوت اول را به ترتیب zg نگه می‌دارد. از هر فایل همهٔ بخش‌های مرتبط را نگه می‌دارد، با خط‌هایی که به هم می‌چسبند ادغام شده‌اند، نه یک پیش‌نمایش کوتاه. <code>--limit</code> عدد ۸ را عوض می‌کند.</p>
     </div>
     <div>
       <div class="ticks" style="--n:8;--c:var(--ink)"></div>
-      <p class="count">۸ فایل، هر کدام با یک احتمال</p>
+      <p class="count">حداکثر ۸ فایل، هر کدام با یک احتمال</p>
       <h3>Jev داوری می‌کند</h3>
-      <p>یک درخواست به Jev، یعنی OpenRouter Decisions API، از همهٔ فایل‌ها یک سؤال را می‌پرسد: آیا این فایل چیزی را که پاسخ لازم دارد در خود دارد؟ Jev هر فایل را از روی مسیر و تکه‌هایش می‌سنجد و یک احتمال برمی‌گرداند. فایل‌هایی با ۰٫۵ یا بیشتر پذیرفته می‌شوند. بقیه به‌عنوان ردشده برمی‌گردند، پس هیچ فایلی بی‌سروصدا گم نمی‌شود.</p>
+      <p>فقط وقتی ارسال روشن است اجرا می‌شود. یک درخواست به Jev، یعنی OpenRouter Decisions API، از همهٔ فایل‌ها یک سؤال می‌پرسد: آیا این فایل چیزی را که پاسخ لازم دارد در خود دارد؟ Jev هر فایل را از روی مسیرش و حداکثر ۱۲٬۰۰۰ نویسه از بخش‌های مرتبطش می‌سنجد و یک احتمال برمی‌گرداند. فایل‌هایی با ۰٫۵ یا بیشتر پذیرفته می‌شوند. بقیه به‌عنوان ردشده فهرست می‌شوند، پس هیچ فایلی بی‌سروصدا گم نمی‌شود.</p>
     </div>
     <div>
       <div class="ticks" style="--n:3;--c:#e0b800"></div>
-      <p class="count">حداکثر ۳ فایل پذیرفته، یک پاسخ</p>
+      <p class="count">هر فایل پذیرفته، روی هم تا ۲۰۰٬۰۰۰ نویسه</p>
       <h3>LLM جواب می‌دهد</h3>
-      <p><code>ask</code> سه فایل پذیرفتهٔ برتر را با یک دستور به <code>claude</code> CLI می‌دهد: فقط از روی همین فایل‌ها جواب بده، مسیر فایل را بیاور، و اگر پاسخ در آن‌ها نیست همین را بگو. اگر هیچ فایلی به آستانه نرسد، سراغ LLM نمی‌رود.</p>
+      <p>فقط وقتی ارسال روشن است اجرا می‌شود. <code>ask</code> فایل‌های پذیرفته را به مدل پاسخ می‌دهد که به‌طور پیش‌فرض <code>deepseek/deepseek-v4-flash</code> روی OpenRouter است، با یک دستور: فقط از روی همین فایل‌ها جواب بده، مسیر و خط‌ها را ذکر کن، و اگر پاسخ در آن‌ها نیست همین را بگو. فایل‌های کوچک کامل می‌روند. فایل‌های بزرگ‌تر با بخش‌های مرتبطشان می‌روند، تا بودجهٔ ۲۰۰٬۰۰۰ نویسه تمام شود. اگر هیچ فایلی به آستانه نرسد، مدل صدا زده نمی‌شود.</p>
     </div>
   </div>
 </section>
 
 <section aria-labelledby="leaves">
   <h2 id="leaves">چه چیزی از رایانهٔ شما بیرون می‌رود</h2>
-  <p class="intro">جست‌وجو محلی است، اما داوری و پاسخ نه. فقط پوشه‌هایی را به آن بدهید که حاضرید محتوایشان را در گفت‌وگو با همین سرویس‌ها بچسبانید.</p>
+  <p class="intro">جست‌وجو روی رایانهٔ خودتان انجام می‌شود. تا وقتی <code>"send": true</code> در <code>zjm-project.json</code> یک پروژه نباشد، چیزی به OpenRouter فرستاده نمی‌شود. فقط پوشه‌هایی را نمایه کنید که حاضرید به OpenRouter بفرستید.</p>
   <table class="flow">
-    <tr><th scope="row">zg</th><td>روی رایانهٔ خودتان اجرا می‌شود، روی نمایهٔ یک کپی از پوشه‌هایتان.</td></tr>
-    <tr><th scope="row">Jev</th><td>سؤال، همراه با مسیر و حداکثر دو تکه از هر فایل، از حداکثر ۸ فایل، به OpenRouter می‌رود.</td></tr>
-    <tr><th scope="row"><code>claude</code></th><td>سؤال، همراه با مسیر و ۲۰٬۰۰۰ نویسهٔ اول هر فایلی که پاسخ از آن می‌آید، حداکثر سه فایل، به Anthropic می‌رود.</td></tr>
+    <tr><th scope="row">zg</th><td>روی رایانهٔ خودتان اجرا می‌شود، روی نمایهٔ یک کپی از پوشه‌هایتان. چیزی بیرون نمی‌رود.</td></tr>
+    <tr><th scope="row">Jev (رتبه‌بندی)</th><td>فقط وقتی <code>send</code> برابر <code>true</code> باشد. سؤال، و مسیر هر فایل نامزد همراه با حداکثر ۱۲٬۰۰۰ نویسه از بخش مرتبطش، به OpenRouter می‌رود.</td></tr>
+    <tr><th scope="row">مدل پاسخ</th><td>فقط وقتی <code>send</code> برابر <code>true</code> باشد. سؤال و فایل‌های پذیرفته، روی هم حداکثر ۲۰۰٬۰۰۰ نویسه، به OpenRouter می‌رود. از OpenRouter خواسته می‌شود درخواست را نگه ندارد.</td></tr>
   </table>
+  <p>تنظیمات پروژه سؤال‌ها را برای ترجمه نمی‌فرستد.</p>
 </section>
 
 <section aria-labelledby="status">
@@ -146,17 +146,19 @@
     <div>
       <h3>چهار راه استفاده از آن</h3>
       <ul data-state="available">
-        <li data-interface="library">کتابخانهٔ <code>zjm_rag</code>، فقط با کتابخانهٔ استاندارد پایتون: <code>index</code>، <code>find</code> و <code>ask</code>.</li>
-        <li data-interface="cli">فرمان <code>zjm</code> همین کارها را از خط فرمان انجام می‌دهد، به‌علاوهٔ <code>zjm doctor</code>. با <code>--json</code> نتیجه به شکل یک شیء JSON چاپ می‌شود. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md">مشخصات خط فرمان</a></li>
-        <li data-interface="http"><code>zjm serve</code>، یک API از نوع JSON روی <code>127.0.0.1:8765</code> برای برنامه‌هایی به هر زبانی: <code>GET /health</code> و <code>POST /index</code>، <code>/find</code> و <code>/ask</code>. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md">مشخصات HTTP</a></li>
-        <li data-interface="mcp"><code>zjm mcp</code>، یک سرور MCP روی stdio برای عامل‌های هوش مصنوعی، با ابزارهای <code>zjm_index</code>، <code>zjm_find</code>، <code>zjm_ask</code> و <code>zjm_doctor</code>. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md">مشخصات MCP و نصب</a></li>
+        <li data-interface="library">بستهٔ پایتون <code>zjm_rag</code>، فقط با کتابخانهٔ استاندارد، که داخل کانتینر zjm-rag اجرا می‌شود: لاکر، فایل‌ها، <code>find</code>، <code>ask</code>، <code>doctor</code> و <code>help</code>.</li>
+        <li data-interface="cli">فرمان <code>zjm</code> همین کارها را از خط فرمان انجام می‌دهد، به‌علاوهٔ <code>zjm doctor</code> و <code>zjm help</code>. با <code>--json</code> نتیجه به‌شکل یک شیء JSON چاپ می‌شود. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/02-cli.md">مشخصات خط فرمان</a></li>
+        <li data-interface="http"><code>zjm serve</code>، یک API از نوع JSON روی <code>127.0.0.1:8765</code> برای برنامه‌هایی به هر زبانی: <code>GET /health</code> و <code>POST /&lt;operation&gt;</code>، مثل <code>/find</code> و <code>/ask</code>. برای اجرای آن، ارسال باید در تنظیمات روشن باشد. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/03-http.md">مشخصات HTTP</a></li>
+        <li data-interface="mcp"><code>zjm mcp</code>، یک سرور MCP روی stdio برای عامل‌های هوش مصنوعی، با یک ابزار برای هر عملیات، مثل <code>zjm_file_add</code>، <code>zjm_find</code>، <code>zjm_ask</code> و <code>zjm_help</code>. عامل‌ها اول <code>zjm_help</code> را صدا می‌زنند. <a class="spec" href="https://github.com/cocodedk/zjm-rag/blob/main/docs/lean/04-mcp-install.md">مشخصات MCP و نصب</a></li>
       </ul>
     </div>
     <div>
       <h3>چه کار می‌کند</h3>
       <ul data-state="available">
-        <li><code>index</code> پوشه‌هایتان را در یک پوشهٔ جدا (به‌طور پیش‌فرض در پوشهٔ موقت سیستم) کپی می‌کند و از کپی نمایه می‌سازد، پس به پروژه‌هایتان دست نمی‌زند. <code>multilingual=True</code> مدلی برای محتوای غیرانگلیسی انتخاب می‌کند.</li>
+        <li><strong>لاکر</strong> (locker) یک نمایهٔ نام‌دار است. <code>file_add</code> فایل‌ها یا پوشه‌ها را در آن کپی می‌کند و از کپی نمایه می‌سازد، پس اصل فایل‌ها سر جای خودشان می‌مانند.</li>
+        <li>هر لاکر یا با کلیدی که برنامهٔ شما می‌دهد رمز می‌شود (با age)، یا اگر خودتان بخواهید، ساده نگه داشته می‌شود. zjm هیچ کلیدی را نگه نمی‌دارد.</li>
         <li><code>find</code> فایل‌ها را با یک آستانه به پذیرفته و ردشده تقسیم می‌کند و بر اساس امتیاز، رتبهٔ zg، زمان تغییر یا مسیر مرتب می‌کند.</li>
+        <li>تا وقتی پوشه‌ای در تنظیمات فهرست نشده باشد، چیزی خوانده نمی‌شود. و تا وقتی <code>egress</code> در تنظیمات اجازه ندهد، چیزی فرستاده نمی‌شود.</li>
         <li>تست‌ها با نسخه‌های ساختگی کار می‌کنند و هیچ‌وقت zg، Jev یا LLM را صدا نمی‌زنند.</li>
       </ul>
     </div>
@@ -164,29 +166,40 @@
 </section>
 
 <section id="run" aria-labelledby="try">
-  <h2 id="try">نصب کنید و امتحانش کنید</h2>
+  <h2 id="try">zjm را نصب کنید، بعد یک پروژه را تنظیم کنید</h2>
+  <p class="intro">zjm داخل یک کانتینر Docker روی رایانهٔ شما اجرا می‌شود. یک نصب‌کننده کانتینر را می‌سازد، فرمان <code>zjm</code> را اضافه می‌کند و یک مهارت Claude Code نصب می‌کند. این مهارت نمایهٔ پروژه را برای شما می‌سازد و در آن جست‌وجو می‌کند.</p>
+  <h3>آنچه لازم دارید</h3>
   <ul class="req" data-requirements>
-    <li>پایتون ۳٫۱۰ یا جدیدتر. بسته هیچ وابستگی‌ای ندارد.</li>
-    <li><code>zg</code> روی <code>PATH</code>: <code>npm install -g @zvec/zvec-grep</code></li>
-    <li><code>OPENROUTER_API_KEY</code> در محیط شما، برای رتبه‌بندی Jev.</li>
-    <li><code>claude</code> CLI، برای پاسخ‌ها.</li>
+    <li><code>docker</code>، نصب‌شده و در حال اجرا. نصب‌کننده کانتینر zjm را با آن می‌سازد.</li>
+    <li><code>python3</code>، نسخهٔ ۳٫۱۰ یا جدیدتر.</li>
+    <li><code>OPENROUTER_API_KEY</code> در ترمینال شما، فقط اگر برای یک پروژه ارسال را روشن کنید (مرحلهٔ ۷ پایین).</li>
   </ul>
-  <p class="cmd-label">با یک خط نصبش کنید</p>
+  <h3>نصب</h3>
+  <p class="cmd-label">نصب‌کننده را اجرا کنید</p>
 <pre class="cmd" data-install data-state="available">curl -fsSL https://raw.githubusercontent.com/cocodedk/zjm-rag/main/install.sh | sh</pre>
-  <p class="cmd-label">یک پوشه را نمایه کنید، بعد بپرسید، از خط فرمان یا از پایتون</p>
-<pre class="cmd" data-example="cli">zjm index ~/projects/some-repo              <span># copy, then index the copy</span>
-zjm find "which linter checks CSS files"    <span># accepted and rejected files</span>
-zjm ask "which linter checks CSS files"     <span># the answer and its sources</span>
-zjm doctor                                  <span># checks zg, claude and the API key</span></pre>
-<pre class="cmd" data-example="library">import os, zjm_rag
-zjm_rag.index([os.path.expanduser("~/projects/some-repo")])   <span># copy, then index the copy</span>
-hits = zjm_rag.find("which linter checks CSS files")          <span># accepted and rejected files</span>
-reply = zjm_rag.ask("which linter checks CSS files")
-print(reply["answer"], reply["files"])</pre>
-  <p class="cmd-label">یا آن را از راه HTTP صدا بزنید، یا از یک عامل هوش مصنوعی با MCP</p>
-<pre class="cmd" data-example="http">zjm serve                                   <span># serves 127.0.0.1:8765 until stopped</span>
-curl -s 127.0.0.1:8765/find -d '{"query": "which linter checks CSS files"}'</pre>
-<pre class="cmd" data-example="mcp">claude mcp add zjm -- zjm mcp               <span># zjm_index, zjm_find, zjm_ask, zjm_doctor</span></pre>
+  <p>نصب‌کننده وجود <code>docker</code> و <code>python3</code> را بررسی می‌کند، ایمیج <code>zjm-rag:latest</code> را می‌سازد و فرمان <code>zjm</code> را در <code>~/.local/bin</code> قرار می‌دهد. اگر پیکربندی‌ای نباشد، یکی می‌سازد که همهٔ تماس‌های بیرونی در آن خاموش است. در پایان، مهارت را در <code>~/.claude/skills/zjm-rag</code> نصب می‌کند و هر نسخهٔ قدیمی را جایگزین می‌کند. مراحل <code>1/4</code> تا <code>4/4</code> چاپ می‌شوند.</p>
+  <p>اگر نصب‌کننده هشدار داد که <code>~/.local/bin</code> در <code>PATH</code> نیست، خط <code>export PATH="$HOME/.local/bin:$PATH"</code> را به فایل پروفایل شل خود اضافه کنید، یک ترمینال تازه باز کنید و بعد <code>zjm doctor</code> را اجرا کنید. این فرمان نصب را بررسی می‌کند و اگر یک بررسی شکست بخورد، با وضعیت ۱ خارج می‌شود.</p>
+  <h3>یک پروژه را تنظیم کنید</h3>
+  <p><strong>لاکر</strong> نمایهٔ خصوصی و قابل جست‌وجوی یک پروژه است. تنظیمات آن در یک فایل، <code>zjm-project.json</code>، در پوشهٔ بالای پروژه قرار دارد. آن را commit کنید تا هر جلسه از همان تنظیمات استفاده کند. اسناد و پوشه‌های یادداشت را نمایه کنید، نه کد: درخت کد کل نمایه را خراب می‌کند و بعد هر جست‌وجو خالی برمی‌گردد.</p>
+  <p>دستورهای زیر از <code>~/.claude/skills/zjm-rag/scripts/zjm-project</code> استفاده می‌کنند. اگر <code>CLAUDE_CONFIG_DIR</code> را تنظیم کرده‌اید، به‌جای <code>~/.claude</code> همان پوشه را به کار ببرید.</p>
+  <ol class="req">
+    <li>ترمینال را در پوشهٔ بالای پروژه باز کنید: پوشه‌ای که <code>.git</code> در آن است، یا اگر پروژه از git استفاده نمی‌کند، پوشه‌ای که در آن کار می‌کنید.</li>
+    <li>فایل <code>zjm-project.json</code> را همان‌جا بسازید و <code>locker</code> و <code>folders</code> را به مقدار خودتان تغییر دهید. برای <code>locker</code> نامی انتخاب کنید که پروژهٔ دیگری استفاده نکند؛ <code>zjm locker-list</code> نام‌های در استفاده را نشان می‌دهد. تا مرحلهٔ ۷ مقدار <code>send</code> را روی <code>false</code> نگه دارید. انتظار: فایل در پوشهٔ بالای پروژه قرار می‌گیرد.
+<pre class="cmd">{"locker": "myproj", "folders": ["docs", "memory"], "exclude": ["*.pdf", "drafts/"],
+ "send": false, "llm": "deepseek/deepseek-v4-flash", "multilingual": false}</pre></li>
+    <li><code>.zvec-grep/</code> را در <code>.gitignore</code> بیفزایید، در یک خط جدا. انتظار: پوشهٔ کاری zg از git بیرون می‌ماند.</li>
+    <li><code>zjm-project.json</code> و <code>.gitignore</code> را commit کنید. انتظار: git هر دو را commit‌شده نشان می‌دهد.</li>
+    <li>نمایه را با <code>~/.claude/skills/zjm-rag/scripts/zjm-project reindex</code> بسازید. انتظار: zjm می‌گوید چه چیزی اضافه شده و دوباره prompt برمی‌گردد. فایل‌های متنی با مسیرهای پوشهٔ خانه پاک‌سازی‌شده کپی می‌شوند، یعنی <code>/home/&lt;user&gt;/</code> می‌شود <code>~/</code>. فایل‌های نادیده‌گرفته‌شده در git، فایل‌های <code>.env*</code> و کلیدها هرگز کپی نمی‌شوند.</li>
+    <li>با یک سؤال کامل جست‌وجو کنید: <code>~/.claude/skills/zjm-rag/scripts/zjm-project find "who approves a change before it runs?"</code> انتظار: فهرستی از مسیر فایل‌ها. اگر <code>send</code> روی <code>false</code> باشد، امتیازها <code>-</code> نشان داده می‌شوند و چیزی رتبه‌بندی نمی‌شود. هر فایلی را که می‌خواهید به آن تکیه کنید باز کنید: امتیاز یعنی ربط، نه درستی. اگر نتیجه‌ای نیامد، این به آن معنا نیست که متن وجود ندارد؛ با جمله‌بندی‌های دیگر امتحان کنید.</li>
+    <li>اختیاری، برای گرفتن پاسخ همراه با ارجاع: <code>"send": true</code> را در <code>zjm-project.json</code> بگذارید، سپس با کلید خودتان، به‌جای جای‌نگهدار، این را اجرا کنید: <code>export OPENROUTER_API_KEY=your-key-here</code>. انتظار: <code>find</code> حالا فایل‌ها را از طریق OpenRouter رتبه‌بندی می‌کند، و این فرمان کار می‌کند: <code>~/.claude/skills/zjm-rag/scripts/zjm-project ask "who approves a change before it runs?"</code> که پاسخی می‌دهد و فایل‌هایی را که از آن‌ها استفاده کرده نام می‌برد. خطر: متن فایل‌های مرتبط رایانهٔ شما را ترک می‌کند و به OpenRouter می‌رود. هر جست‌وجو و هر پاسخ یک تماس پولی است. کلید را در <code>zjm-project.json</code> و در git نگه ندارید.</li>
+  </ol>
+  <p>بعد از هر تغییر در یک پوشهٔ نمایه‌شده (هر commit، merge یا pull)، پیش از جست‌وجو دوباره <code>reindex</code> را اجرا کنید. اگر <code>find</code> یا <code>ask</code> <code>STALE:</code> را چاپ کرد، یعنی یک پوشه از آخرین reindex تغییر کرده است. دوباره reindex کنید و بعد جست‌وجو کنید.</p>
+  <h3>مستقیم استفاده کنید</h3>
+  <p>بستهٔ پایتون، فرمان‌های <code>zjm</code>، API مبتنی بر HTTP و سرور MCP در <a href="https://github.com/cocodedk/zjm-rag#use">README</a> توضیح داده شده‌اند.</p>
+<pre class="cmd" data-example="cli">zjm doctor                                  <span># zg، age، کلید API، پیکربندی و لاکرها را بررسی می‌کند</span>
+zjm locker-list                             <span># نام لاکرهای موجود در مخزن مشترک</span></pre>
+<pre class="cmd" data-example="http">zjm serve                                   <span># ارسال باید در تنظیمات روشن باشد؛ تا وقتی متوقفش نکنید روی 127.0.0.1:8765 سرویس می‌دهد</span></pre>
+<pre class="cmd" data-example="mcp">claude mcp add zjm -- zjm mcp               <span># عامل‌ها اول zjm_help را صدا می‌زنند</span></pre>
 </section>
 
 <footer class="site-foot">
