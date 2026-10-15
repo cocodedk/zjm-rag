@@ -14,14 +14,14 @@ from .ops import OPS, check
 def _common(p):
     p.add_argument("--config", default=None)
     p.add_argument("--json", action="store_true")
+    return p
 
 
 def _parser():
     parser = argparse.ArgumentParser(prog="zjm", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p = sub.add_parser("locker-create")
-    _common(p)
+    p = _common(sub.add_parser("locker-create"))
     p.add_argument("name")
     p.add_argument("--key-file", metavar="PATH")
     p.add_argument("--multilingual", action="store_true")
@@ -30,42 +30,24 @@ def _parser():
 
     _common(sub.add_parser("locker-list"))
 
-    p = sub.add_parser("locker-drop")
-    _common(p)
-    p.add_argument("name")
-    p.add_argument("--key-file", metavar="PATH")
+    for name in ("locker-drop", "locker-encrypt"):
+        p = _common(sub.add_parser(name))
+        p.add_argument("name")
+        p.add_argument("--key-file", metavar="PATH", required=name == "locker-encrypt")
 
-    p = sub.add_parser("locker-encrypt")
-    _common(p)
-    p.add_argument("name")
-    p.add_argument("--key-file", metavar="PATH", required=True)
-
-    p = sub.add_parser("file-add")
-    _common(p)
-    p.add_argument("locker")
-    p.add_argument("--key-file", metavar="PATH")
-    p.add_argument("paths", nargs="+", metavar="PATH")
-
-    p = sub.add_parser("file-put")
-    _common(p)
-    p.add_argument("locker")
-    p.add_argument("--key-file", metavar="PATH")
-    p.add_argument("name")
-
-    p = sub.add_parser("file-remove")
-    _common(p)
-    p.add_argument("locker")
-    p.add_argument("--key-file", metavar="PATH")
-    p.add_argument("names", nargs="+", metavar="NAME")
-
-    p = sub.add_parser("file-list")
-    _common(p)
-    p.add_argument("locker")
-    p.add_argument("--key-file", metavar="PATH")
+    for name in ("file-add", "file-put", "file-remove", "file-list"):
+        p = _common(sub.add_parser(name))
+        p.add_argument("locker")
+        p.add_argument("--key-file", metavar="PATH")
+        if name == "file-add":
+            p.add_argument("paths", nargs="+", metavar="PATH")
+        elif name == "file-put":
+            p.add_argument("name")
+        elif name == "file-remove":
+            p.add_argument("names", nargs="+", metavar="NAME")
 
     for name in ("find", "ask"):
-        p = sub.add_parser(name)
-        _common(p)
+        p = _common(sub.add_parser(name))
         p.add_argument("query")
         p.add_argument("-l", "--locker", action="append", dest="lockers", required=True, metavar="LOCKER")
         p.add_argument("--key-file", metavar="PATH")
@@ -133,7 +115,6 @@ def _args_to_body(cmd, args):
         if args.lang:
             body["answer_language"] = args.lang
     return body
-
 
 
 def main(argv=None, *, runner=None, jev=None, llm=None):

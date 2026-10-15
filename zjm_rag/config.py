@@ -66,13 +66,12 @@ def _validate(raw, used_path):
     if unknown:
         raise ZjmError(f"unknown key {unknown[0]!r} in {used_path}")
     _check_type(raw, "home", lambda v: isinstance(v, str), "a string", used_path)
-    _check_type(raw, "allow", _is_str_list, "a list of strings", used_path)
-    _check_type(raw, "deny", _is_str_list, "a list of strings", used_path)
-    _check_type(raw, "exclude", _is_str_list, "a list of strings", used_path)
+    for key in ("allow", "deny", "exclude"):
+        _check_type(raw, key, _is_str_list, "a list of strings", used_path)
     _check_type(raw, "embedding", lambda v: isinstance(v, str), "a string", used_path)
-    if "embedding" in raw and not raw["embedding"].startswith("local/"):
-        raise ZjmError(f"embedding must start with local/ in {used_path}")
     if "embedding" in raw:
+        if not raw["embedding"].startswith("local/"):
+            raise ZjmError(f"embedding must start with local/ in {used_path}")
         check_embedding_baked(raw["embedding"])
     if "llm" in raw and not (isinstance(raw["llm"], str) and raw["llm"]):
         raise ZjmError(f'llm is an OpenRouter model id now, e.g. "deepseek/deepseek-v4-flash", in {used_path}')
