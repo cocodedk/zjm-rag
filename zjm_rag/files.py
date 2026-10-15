@@ -146,5 +146,4 @@ def file_list(locker, key=None, *, config=None, runner=None, jev=None):
         manifest = lockers.read_manifest(ldir)
     files = [{"name": k, "source": v["source"], "size": v["size"], "sha256": v["sha256"], "added": v["added"]}
              for k, v in manifest["files"].items()]
-    files.sort(key=lambda f: f["name"])
-    return {"files": files}
+    return {"files": sorted(files, key=lambda f: f["name"])}
