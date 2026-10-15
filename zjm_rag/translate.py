@@ -22,7 +22,7 @@ def _norm(s):
 def _parse(reply, query, languages):
     """The usable translations in `reply`, in order, or None when nothing can be salvaged."""
     start, end = reply.find("{"), reply.rfind("}")
-    if start == -1 or end == -1 or end < start:
+    if start == -1 or end < start:
         return None
     try:
         obj = json.loads(reply[start:end + 1])
@@ -61,6 +61,4 @@ def translate(query, languages, model, *, llm):
         result = _parse(reply, query, languages)
     except Exception:
         result = None
-    if not result:
-        return [], "translation reply not usable"
-    return result, None
+    return (result, None) if result else ([], "translation reply not usable")

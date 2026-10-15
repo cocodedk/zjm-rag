@@ -2,6 +2,7 @@
 import fnmatch
 import os
 import shutil
+from pathlib import Path
 
 from .errors import ZjmError
 
@@ -35,24 +36,17 @@ def check_source_allowed(source, config):
         for i, part in enumerate(parts):
             if part and (i < len(parts) - 1 or os.path.isdir(candidate)) and _floor_excluded(part, True, config["exclude"]):
                 raise ZjmError(f"{source} is excluded by {config['path']}")
-    for entry in config["allow"]:
-        if is_inside(r, os.path.realpath(entry)):
-            return r
+    if any(is_inside(r, os.path.realpath(entry)) for entry in config["allow"]):
+        return r
     raise ZjmError(f'{source} is outside the allowed paths in {config["path"]}; add it to "allow"')
 
 
 def _floor_excluded(name, is_dir, extra):
     lname = name.lower()
     patterns = FLOOR_DIRS if is_dir else FLOOR_FILES
-    if any(fnmatch.fnmatch(lname, pat) for pat in patterns):
-        return True
-    for pat in extra:
-        want_dir = pat.endswith("/")
-        if want_dir != is_dir:
-            continue
-        if fnmatch.fnmatch(lname, (pat[:-1] if want_dir else pat).lower()):
-            return True
-    return False
+    return any(fnmatch.fnmatch(lname, pat) for pat in patterns) or any(
+        fnmatch.fnmatch(lname, pat.removesuffix("/").lower())
+        for pat in extra if pat.endswith("/") == is_dir)
 
 
 def _walk(src, dest, config, files, count_excluded, root=None):
@@ -64,31 +58,21 @@ def _walk(src, dest, config, files, count_excluded, root=None):
         if _denied(p, config["deny"], config["home"]) or entry.is_symlink():
             count_excluded[0] += 1
             continue
-        if entry.is_dir(follow_symlinks=False):
-            if _floor_excluded(entry.name, True, config["exclude"]):
-                count_excluded[0] += 1
-                continue
+        is_dir = entry.is_dir(follow_symlinks=False)
+        if (not is_dir and not entry.is_file(follow_symlinks=False)) or _floor_excluded(entry.name, is_dir, config["exclude"]):
+            count_excluded[0] += 1
+            continue
+        if is_dir:
             os.makedirs(os.path.join(dest, entry.name), exist_ok=True)
             _walk(entry.path, os.path.join(dest, entry.name), config, files, count_excluded, root)
-        elif entry.is_file(follow_symlinks=False):
-            if _floor_excluded(entry.name, False, config["exclude"]):
-                count_excluded[0] += 1
-                continue
+        else:
             rel = os.path.relpath(entry.path, root)
             files.append((rel, entry.path, os.path.join(dest, entry.name)))
-        else:
-            count_excluded[0] += 1
 
 
 def _has_git_ancestor(path):
-    cur = path
-    while True:
-        if os.path.isdir(os.path.join(cur, ".git")):
-            return True
-        parent = os.path.dirname(cur)
-        if parent == cur:
-            return False
-        cur = parent
+    path = Path(path)
+    return any(os.path.isdir(p / ".git") for p in (path, *path.parents))
 
 
 def _gitignored(src, rel_paths, runner):

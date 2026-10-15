@@ -122,7 +122,7 @@ def open_locker(cfg, name, key, *, write, runner, create=False):
 
     lockers_mod.check_name(name)
     norm_key = keys_mod.check_key(key) if key is not None else None
-    home, lockers_dir = lockers_mod.home_dirs(cfg)
+    _, lockers_dir = lockers_mod.home_dirs(cfg)
     age_path = lockers_dir / f"{name}.age"
     plain_dir = lockers_dir / name
 
@@ -132,13 +132,12 @@ def open_locker(cfg, name, key, *, write, runner, create=False):
         if create:
             if age_exists or plain_exists:
                 raise ZjmError(f"locker {name} already exists")
-        else:
-            if not age_exists and not plain_exists:
-                raise ZjmError(f"no locker {name}")
-            if age_exists and norm_key is None:
-                raise ZjmError(f"locker {name} needs its key")
-            if plain_exists and norm_key is not None:
-                raise ZjmError(f"locker {name} is not encrypted")
+        elif not age_exists and not plain_exists:
+            raise ZjmError(f"no locker {name}")
+        elif age_exists and norm_key is None:
+            raise ZjmError(f"locker {name} needs its key")
+        elif plain_exists and norm_key is not None:
+            raise ZjmError(f"locker {name} is not encrypted")
 
         if age_exists or (create and norm_key is not None):
             session_dir, key_file = session_paths(name)

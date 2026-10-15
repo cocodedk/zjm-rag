@@ -44,9 +44,8 @@ def post(payload, *, model=None, timeout=30):
     if not isinstance(selected, str) or not selected.strip():
         raise ZjmError("decision model must be a nonempty string")
     models = DEFAULT_MODELS[DEFAULT_MODELS.index(selected):] if selected in DEFAULT_MODELS else (selected,)
-    attempts = []
-    for url, env, name in map(route, models):
-        attempts.append((url, env, json.dumps({**payload, "model": name}, allow_nan=False).encode()))
+    attempts = [(url, env, json.dumps({**payload, "model": name}, allow_nan=False).encode())
+                for url, env, name in map(route, models)]
     if any(len(body) > MAX_REQUEST_BYTES for _, _, body in attempts):
         raise ZjmError("jev request exceeds 512 KiB; reduce evidence")
     for url, env, body in attempts:

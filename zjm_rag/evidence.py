@@ -32,22 +32,16 @@ def select_candidates(hits, manifest_files, limit, *, by_path=None):
     return order, by_path
 
 
-def _widen_clamp(hit, n_lines):
-    """(start, end) widened by WIDEN and clamped to the file, or None if it starts past EOF."""
-    start = max(1, hit["start"] - WIDEN)
-    end = min(n_lines, hit["end"] + WIDEN)
-    return None if start > n_lines else (start, end)
-
-
 def build_passages(hits, lines):
     """Merged passages for one file's hits (its text split on "\\n" only), ordered by the best
     (lowest) rank merged into each."""
     n_lines = len(lines)
     ranges = []
     for hit in hits:
-        widened = _widen_clamp(hit, n_lines)
-        if widened is not None:
-            ranges.append((widened[0], widened[1], hit["rank"]))
+        start = max(1, hit["start"] - WIDEN)
+        end = min(n_lines, hit["end"] + WIDEN)
+        if start <= n_lines:
+            ranges.append((start, end, hit["rank"]))
     ranges.sort(key=lambda r: (r[0], r[1]))
     merged = []
     for start, end, rank in ranges:
@@ -65,10 +59,9 @@ def _whole_text(path, text):
     if len(text) > ASK_CHARS:
         return None
     try:
-        size = path.stat().st_size
+        return text if path.stat().st_size <= 4 * ASK_CHARS else None
     except OSError:
         return None
-    return text if size <= 4 * ASK_CHARS else None
 
 
 def read_candidates(hits, manifest_files, corpus_dir, limit, *, want_text, translated_hits=None):
@@ -79,15 +72,14 @@ def read_candidates(hits, manifest_files, corpus_dir, limit, *, want_text, trans
     via = {path: "query" for path in order}
     if translated_hits:
         order2, by_path = select_candidates(translated_hits, manifest_files, limit, by_path=by_path)
-        order = order + order2
         via.update({path: "translation" for path in order2})
     records = {}
-    for path in order:
+    for path, origin in via.items():
         full = corpus_dir / path
         with open(full, encoding="utf-8", errors="replace", newline="") as f:
             text = f.read()
         records[path] = {"passages": build_passages(by_path[path], text.split("\n")),
-                          "whole": _whole_text(full, text) if want_text else None, "via": via[path]}
+                          "whole": _whole_text(full, text) if want_text else None, "via": origin}
     return records
 
 
@@ -117,13 +109,12 @@ def build_ask_context(accepted, per_locker, top_k, ask_chars=None):
             break
         rec = per_locker[hit["locker"]][hit["path"]]
         label = f"{hit['locker']}/{hit['path']}"
-        contributed = False
+        previous_parts = len(parts)
         whole = rec.get("whole")
         whole_block = f"=== {label} ===\n{whole}" if whole is not None else None
         if whole_block is not None and len(whole_block) <= budget:
             parts.append(whole_block)
             budget -= len(whole_block)
-            contributed = True
         else:
             for p in rec["passages"]:
                 if budget <= 0:
@@ -136,7 +127,6 @@ def build_ask_context(accepted, per_locker, top_k, ask_chars=None):
                 # it is dropped rather than left in the prompt as a dangling, content-free header.
                 if len(block) > len(header):
                     parts.append(block)
-                    contributed = True
-        if contributed:
+        if len(parts) > previous_parts:
             files.append(label)
     return "\n\n".join(parts), files

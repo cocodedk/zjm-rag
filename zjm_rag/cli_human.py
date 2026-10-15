@@ -40,13 +40,11 @@ def human(cmd, r):
         return [f"dropped {r['name']} ({r['files']} files)"]
     if cmd == "locker-encrypt":
         return [f"encrypted {r['name']}"]
-    if cmd == "file-add":
+    if cmd in ("file-add", "file-put"):
         lines = [f"added {n}" for n in r["added"]] + [f"replaced {n}" for n in r["replaced"]]
-        if r["excluded"]:
+        if cmd == "file-add" and r["excluded"]:
             lines.append(f"excluded {r['excluded']} entries")
         return lines
-    if cmd == "file-put":
-        return [f"added {n}" for n in r["added"]] + [f"replaced {n}" for n in r["replaced"]]
     if cmd == "file-remove":
         return [f"removed {n}" for n in r["removed"]]
     if cmd == "file-list":

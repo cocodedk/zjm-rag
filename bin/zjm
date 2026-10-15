@@ -25,21 +25,16 @@ def option(args, name, default=None):
 
 
 def replace_option(args, name, value):
-    out, i = [], 0
-    while i < len(args):
-        arg = args[i]
+    out = []
+    args = iter(args)
+    for arg in args:
         if arg == "--":
-            out.extend(args[i:])
-            break
+            return out + [arg, *args]
         if arg == name:
             out.extend([name, value])
-            i += 2
-        elif arg.startswith(name + "="):
-            out.append(name + "=" + value)
-            i += 1
+            next(args, None)
         else:
-            out.append(arg)
-            i += 1
+            out.append(name + "=" + value if arg.startswith(name + "=") else arg)
     return out
 
 
@@ -69,14 +64,12 @@ def typesafe_key():
 
 
 def main(args, directory):
-    config = option(args, "--config", os.environ.get("ZJM_HOST_CONFIG"))
-    if not config:
-        config = str(Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "zjm/config.json")
+    config = option(args, "--config", os.environ.get("ZJM_HOST_CONFIG")) or str(
+        Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "zjm/config.json")
     config = Path(config).expanduser().resolve()
     if not config.is_file():
         raise ValueError(f"host config not found: {config}; run install.sh to create the default config")
-    raw = json.loads(config.read_text())
-    egress = raw.get("egress", {})
+    egress = json.loads(config.read_text()).get("egress", {})
     online = any(egress.get(key) is True for key in ("rank", "answer", "translate"))
     args = replace_option(args, "--config", "/etc/zjm/config.json")
     command = ["docker", "run", "--rm", "-i", "--user", "10001:10001", "--read-only",
@@ -118,9 +111,8 @@ def main(args, directory):
     command += [os.environ.get("ZJM_IMAGE", "zjm-rag:latest"), *args]
     if os.environ.get("ZJM_LAUNCH_DRY_RUN") == "1":
         print("+ " + shlex.join(command))
-    else:
-        return subprocess.run(command, check=False).returncode
-    return 0
+        return 0
+    return subprocess.run(command, check=False).returncode
 
 
 if __name__ == "__main__":

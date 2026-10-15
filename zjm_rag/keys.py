@@ -11,8 +11,8 @@ def check_key(key):
     """The key, with any single trailing newline stripped, or raise ZjmError("invalid key")."""
     if not isinstance(key, str):
         raise ZjmError("invalid key")
-    k = key[:-1] if key.endswith("\n") else key
-    if "\n" in k or not KEY_RE.match(k):
+    k = key.removesuffix("\n")
+    if not KEY_RE.fullmatch(k):
         raise ZjmError("invalid key")
     return k
 

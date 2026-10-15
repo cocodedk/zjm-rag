@@ -24,9 +24,7 @@ def _check_put_name(name, cfg):
         raise ZjmError(f"bad file name: {name!r}")
     segs = name.split("/")
     for i, seg in enumerate(segs):
-        if seg in ("", ".", ".."):
-            raise ZjmError(f"bad file name: {name!r}")
-        if _floor_excluded(seg, i < len(segs) - 1, cfg["exclude"]):
+        if seg in ("", ".", "..") or _floor_excluded(seg, i < len(segs) - 1, cfg["exclude"]):
             raise ZjmError(f"bad file name: {name!r}")
 
 
@@ -133,14 +131,13 @@ def file_remove(locker, names, key=None, *, config=None, runner=zg.run, jev=None
         if missing:
             raise ZjmError(f"no such file(s) in locker {locker}: {', '.join(missing)}")
         corpus = ldir / "corpus"
-        removed = list(matches)
         for k in sorted({k for ks in matches.values() for k in ks}):
             path = corpus / k
             if path.exists():
                 path.unlink()
             del manifest["files"][k]
         lockers.run_index(ldir, manifest, runner)
-    return {"removed": removed}
+    return {"removed": list(matches)}
 
 
 def file_list(locker, key=None, *, config=None, runner=None, jev=None):
@@ -149,5 +146,4 @@ def file_list(locker, key=None, *, config=None, runner=None, jev=None):
         manifest = lockers.read_manifest(ldir)
     files = [{"name": k, "source": v["source"], "size": v["size"], "sha256": v["sha256"], "added": v["added"]}
              for k, v in manifest["files"].items()]
-    files.sort(key=lambda f: f["name"])
-    return {"files": files}
+    return {"files": sorted(files, key=lambda f: f["name"])}

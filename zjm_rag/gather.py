@@ -44,13 +44,12 @@ def gather(cfg, names, keys, query, file_types, limit, translations, runner, *, 
                 if translations:
                     argv = zg.query_argv_translations(translations, file_types)
                     translated_hits = _run_zg_query(argv, corpus, ldir, runner)
-                built = evidence.read_candidates(hits, manifest["files"], corpus, limit, want_text=want_text,
-                                                 translated_hits=translated_hits)
-                for path, rec in built.items():
+                record = evidence.read_candidates(hits, manifest["files"], corpus, limit, want_text=want_text,
+                                                  translated_hits=translated_hits)
+                for path, rec in record.items():
                     entry = manifest["files"].get(path)
-                    record[path] = {"passages": rec["passages"], "whole": rec["whole"], "via": rec["via"],
-                                    "source": entry["source"] if entry else None,
-                                    "mtime": (corpus / path).stat().st_mtime}
+                    rec["source"] = entry["source"] if entry else None
+                    rec["mtime"] = (corpus / path).stat().st_mtime
             per_locker[name] = record
     return per_locker
 
@@ -75,11 +74,9 @@ def interleave(per_locker, limit):
     """[(locker, path, passages, via)], the spec 06 interleave run twice (spec 10): first over the
     "query" candidates, cut to `limit`, then over the "translation" ones, cut to `limit`. The
     second block always follows the first."""
-    groups = {"query": {}, "translation": {}}
-    for name, recs in per_locker.items():
-        for via in groups:
-            groups[via][name] = [(p, r["passages"]) for p, r in recs.items() if r["via"] == via]
     merged = []
     for via in ("query", "translation"):
-        merged += [(n, p, s, via) for n, p, s in _round_robin(groups[via], limit)]
+        lists = {name: [(p, r["passages"]) for p, r in recs.items() if r["via"] == via]
+                 for name, recs in per_locker.items()}
+        merged += [(n, p, s, via) for n, p, s in _round_robin(lists, limit)]
     return merged
