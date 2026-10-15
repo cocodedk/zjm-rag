@@ -46,13 +46,8 @@ def _floor_excluded(name, is_dir, extra):
     patterns = FLOOR_DIRS if is_dir else FLOOR_FILES
     if any(fnmatch.fnmatch(lname, pat) for pat in patterns):
         return True
-    for pat in extra:
-        want_dir = pat.endswith("/")
-        if want_dir != is_dir:
-            continue
-        if fnmatch.fnmatch(lname, (pat[:-1] if want_dir else pat).lower()):
-            return True
-    return False
+    return any(fnmatch.fnmatch(lname, pat.removesuffix("/").lower())
+               for pat in extra if pat.endswith("/") == is_dir)
 
 
 def _walk(src, dest, config, files, count_excluded, root=None):

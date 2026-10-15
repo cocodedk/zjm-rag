@@ -117,9 +117,8 @@ def main(args, directory):
     command += [os.environ.get("ZJM_IMAGE", "zjm-rag:latest"), *args]
     if os.environ.get("ZJM_LAUNCH_DRY_RUN") == "1":
         print("+ " + shlex.join(command))
-    else:
-        return subprocess.run(command, check=False).returncode
-    return 0
+        return 0
+    return subprocess.run(command, check=False).returncode
 
 
 if __name__ == "__main__":

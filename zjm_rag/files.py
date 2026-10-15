@@ -24,9 +24,7 @@ def _check_put_name(name, cfg):
         raise ZjmError(f"bad file name: {name!r}")
     segs = name.split("/")
     for i, seg in enumerate(segs):
-        if seg in ("", ".", ".."):
-            raise ZjmError(f"bad file name: {name!r}")
-        if _floor_excluded(seg, i < len(segs) - 1, cfg["exclude"]):
+        if seg in ("", ".", "..") or _floor_excluded(seg, i < len(segs) - 1, cfg["exclude"]):
             raise ZjmError(f"bad file name: {name!r}")
 
 

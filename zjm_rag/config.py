@@ -101,9 +101,7 @@ def _resolve_path(value, *, base_dir, home_env):
 
 def resolve(config):
     """`config` as a dict (as-is), a path to load, or None (load defaults)."""
-    if isinstance(config, dict):
-        return config
-    return load(config)
+    return config if isinstance(config, dict) else load(config)
 
 
 def load(path=None, *, cwd=None, environ=None):

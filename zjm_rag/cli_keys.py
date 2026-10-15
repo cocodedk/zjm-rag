@@ -28,4 +28,4 @@ def add_to_body(cmd, key_file, body):
     if cmd in KEYS_CMDS:
         body["keys"] = json.loads(text)
     else:
-        body["key"] = text[:-1] if text.endswith("\n") else text
+        body["key"] = text.removesuffix("\n")
