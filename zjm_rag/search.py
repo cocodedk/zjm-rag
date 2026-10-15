@@ -67,15 +67,12 @@ def _resolve_rank_sort(cfg, rank, sort):
     return effective_rank, sort
 
 
-def _resolve_translate(cfg, translate):
-    if translate and not cfg["egress"]["translate"]:
-        raise ZjmError(f'translating sends the question to OpenRouter; set egress.translate in {cfg["path"]}')
-    return cfg["egress"]["translate"] if translate is None else translate
-
-
-def _translate_query(cfg, query, effective_translate, llm):
+def _translate_query(cfg, query, translate, llm):
     """(translations, translate_error): the one translation call per find/ask, before any locker
     session opens (spec 10). `([], None)` when translation is off or no language is configured."""
+    if translate and not cfg["egress"]["translate"]:
+        raise ZjmError(f'translating sends the question to OpenRouter; set egress.translate in {cfg["path"]}')
+    effective_translate = cfg["egress"]["translate"] if translate is None else translate
     if not effective_translate or not cfg["languages"]:
         return [], None
     return translate_module.translate(query, cfg["languages"], cfg["translate_model"], llm=llm)
@@ -88,8 +85,7 @@ def find(query, lockers, keys=None, *, limit=8, file_types=None, min_score=0.5, 
     if not lockers:
         raise ZjmError("find requires at least one locker")
     effective_rank, sort = _resolve_rank_sort(cfg, rank, sort)
-    effective_translate = _resolve_translate(cfg, translate)
-    translations, translate_error = _translate_query(cfg, query, effective_translate, llm)
+    translations, translate_error = _translate_query(cfg, query, translate, llm)
     per_locker = gather_module.gather(cfg, lockers, keys, query, file_types, limit, translations, runner,
                                       want_text=False)
     result = _build_result(query, per_locker, limit, min_score, sort, effective_rank, jev, model)
@@ -107,8 +103,7 @@ def ask(query, lockers, keys=None, *, limit=8, file_types=None, min_score=0.5, s
     if not lockers:
         raise ZjmError("find requires at least one locker")
     effective_rank, sort = _resolve_rank_sort(cfg, rank, sort)
-    effective_translate = _resolve_translate(cfg, translate)
-    translations, translate_error = _translate_query(cfg, query, effective_translate, llm)
+    translations, translate_error = _translate_query(cfg, query, translate, llm)
     per_locker = gather_module.gather(cfg, lockers, keys, query, file_types, limit, translations, runner,
                                       want_text=True)
     found = _build_result(query, per_locker, limit, min_score, sort, effective_rank, jev, model)
