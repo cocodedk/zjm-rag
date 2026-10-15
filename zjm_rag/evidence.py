@@ -79,15 +79,14 @@ def read_candidates(hits, manifest_files, corpus_dir, limit, *, want_text, trans
     via = {path: "query" for path in order}
     if translated_hits:
         order2, by_path = select_candidates(translated_hits, manifest_files, limit, by_path=by_path)
-        order = order + order2
         via.update({path: "translation" for path in order2})
     records = {}
-    for path in order:
+    for path, origin in via.items():
         full = corpus_dir / path
         with open(full, encoding="utf-8", errors="replace", newline="") as f:
             text = f.read()
         records[path] = {"passages": build_passages(by_path[path], text.split("\n")),
-                          "whole": _whole_text(full, text) if want_text else None, "via": via[path]}
+                          "whole": _whole_text(full, text) if want_text else None, "via": origin}
     return records
 
 

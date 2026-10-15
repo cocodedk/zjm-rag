@@ -29,9 +29,7 @@ def replace_option(args, name, value):
     args = iter(args)
     for arg in args:
         if arg == "--":
-            out.append(arg)
-            out.extend(args)
-            break
+            return out + [arg, *args]
         if arg == name:
             out.extend([name, value])
             next(args, None)

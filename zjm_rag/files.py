@@ -131,14 +131,13 @@ def file_remove(locker, names, key=None, *, config=None, runner=zg.run, jev=None
         if missing:
             raise ZjmError(f"no such file(s) in locker {locker}: {', '.join(missing)}")
         corpus = ldir / "corpus"
-        removed = list(matches)
         for k in sorted({k for ks in matches.values() for k in ks}):
             path = corpus / k
             if path.exists():
                 path.unlink()
             del manifest["files"][k]
         lockers.run_index(ldir, manifest, runner)
-    return {"removed": removed}
+    return {"removed": list(matches)}
 
 
 def file_list(locker, key=None, *, config=None, runner=None, jev=None):
