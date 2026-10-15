@@ -66,9 +66,8 @@ def typesafe_key():
 
 
 def main(args, directory):
-    config = option(args, "--config", os.environ.get("ZJM_HOST_CONFIG"))
-    if not config:
-        config = str(Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "zjm/config.json")
+    config = option(args, "--config", os.environ.get("ZJM_HOST_CONFIG")) or str(
+        Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "zjm/config.json")
     config = Path(config).expanduser().resolve()
     if not config.is_file():
         raise ValueError(f"host config not found: {config}; run install.sh to create the default config")

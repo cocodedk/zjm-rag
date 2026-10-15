@@ -36,9 +36,8 @@ def _find_file(path, *, cwd, environ):
     cwd_path = os.path.join(cwd, ".zjm", "config.json")
     if os.path.isfile(cwd_path):
         return cwd_path
-    xdg = environ.get("XDG_CONFIG_HOME")
-    xdg_path = os.path.join(xdg, "zjm", "config.json") if xdg else os.path.join(
-        environ.get("HOME", ""), ".config", "zjm", "config.json")
+    xdg = environ.get("XDG_CONFIG_HOME") or os.path.join(environ.get("HOME", ""), ".config")
+    xdg_path = os.path.join(xdg, "zjm", "config.json")
     return xdg_path if os.path.isfile(xdg_path) else None
 
 
@@ -132,8 +131,7 @@ def load(path=None, *, cwd=None, environ=None):
         "allow": [resolve(p) for p in raw.get("allow", [])],
         "deny": [resolve(p) for p in raw.get("deny", [])],
         "exclude": list(raw.get("exclude", [])),
-        "egress": {"rank": bool(egress_raw.get("rank", False)), "answer": bool(egress_raw.get("answer", False)),
-                  "translate": bool(egress_raw.get("translate", False))},
+        "egress": {key: bool(egress_raw.get(key, False)) for key in ("rank", "answer", "translate")},
         "embedding": raw.get("embedding", DEFAULT_EMBEDDING),
         "llm": raw.get("llm", DEFAULT_LLM),
         "languages": list(raw.get("languages", DEFAULT_LANGUAGES)),

@@ -44,10 +44,9 @@ def check_source_allowed(source, config):
 def _floor_excluded(name, is_dir, extra):
     lname = name.lower()
     patterns = FLOOR_DIRS if is_dir else FLOOR_FILES
-    if any(fnmatch.fnmatch(lname, pat) for pat in patterns):
-        return True
-    return any(fnmatch.fnmatch(lname, pat.removesuffix("/").lower())
-               for pat in extra if pat.endswith("/") == is_dir)
+    return any(fnmatch.fnmatch(lname, pat) for pat in patterns) or any(
+        fnmatch.fnmatch(lname, pat.removesuffix("/").lower())
+        for pat in extra if pat.endswith("/") == is_dir)
 
 
 def _walk(src, dest, config, files, count_excluded, root=None):
@@ -60,10 +59,7 @@ def _walk(src, dest, config, files, count_excluded, root=None):
             count_excluded[0] += 1
             continue
         is_dir = entry.is_dir(follow_symlinks=False)
-        if not is_dir and not entry.is_file(follow_symlinks=False):
-            count_excluded[0] += 1
-            continue
-        if _floor_excluded(entry.name, is_dir, config["exclude"]):
+        if (not is_dir and not entry.is_file(follow_symlinks=False)) or _floor_excluded(entry.name, is_dir, config["exclude"]):
             count_excluded[0] += 1
             continue
         if is_dir:

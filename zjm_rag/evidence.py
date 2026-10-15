@@ -65,10 +65,9 @@ def _whole_text(path, text):
     if len(text) > ASK_CHARS:
         return None
     try:
-        size = path.stat().st_size
+        return text if path.stat().st_size <= 4 * ASK_CHARS else None
     except OSError:
         return None
-    return text if size <= 4 * ASK_CHARS else None
 
 
 def read_candidates(hits, manifest_files, corpus_dir, limit, *, want_text, translated_hits=None):
