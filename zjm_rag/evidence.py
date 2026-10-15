@@ -32,22 +32,16 @@ def select_candidates(hits, manifest_files, limit, *, by_path=None):
     return order, by_path
 
 
-def _widen_clamp(hit, n_lines):
-    """(start, end) widened by WIDEN and clamped to the file, or None if it starts past EOF."""
-    start = max(1, hit["start"] - WIDEN)
-    end = min(n_lines, hit["end"] + WIDEN)
-    return None if start > n_lines else (start, end)
-
-
 def build_passages(hits, lines):
     """Merged passages for one file's hits (its text split on "\\n" only), ordered by the best
     (lowest) rank merged into each."""
     n_lines = len(lines)
     ranges = []
     for hit in hits:
-        widened = _widen_clamp(hit, n_lines)
-        if widened is not None:
-            ranges.append((widened[0], widened[1], hit["rank"]))
+        start = max(1, hit["start"] - WIDEN)
+        end = min(n_lines, hit["end"] + WIDEN)
+        if start <= n_lines:
+            ranges.append((start, end, hit["rank"]))
     ranges.sort(key=lambda r: (r[0], r[1]))
     merged = []
     for start, end, rank in ranges:
