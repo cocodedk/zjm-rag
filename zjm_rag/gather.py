@@ -44,13 +44,12 @@ def gather(cfg, names, keys, query, file_types, limit, translations, runner, *, 
                 if translations:
                     argv = zg.query_argv_translations(translations, file_types)
                     translated_hits = _run_zg_query(argv, corpus, ldir, runner)
-                built = evidence.read_candidates(hits, manifest["files"], corpus, limit, want_text=want_text,
-                                                 translated_hits=translated_hits)
-                for path, rec in built.items():
+                record = evidence.read_candidates(hits, manifest["files"], corpus, limit, want_text=want_text,
+                                                  translated_hits=translated_hits)
+                for path, rec in record.items():
                     entry = manifest["files"].get(path)
-                    record[path] = {"passages": rec["passages"], "whole": rec["whole"], "via": rec["via"],
-                                    "source": entry["source"] if entry else None,
-                                    "mtime": (corpus / path).stat().st_mtime}
+                    rec["source"] = entry["source"] if entry else None
+                    rec["mtime"] = (corpus / path).stat().st_mtime
             per_locker[name] = record
     return per_locker
 
