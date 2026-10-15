@@ -64,7 +64,7 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         line = r.stdout.strip()
         self.assertIn("-p 127.0.0.1:8765:8765", line)
-        self.assertIn("-e OPENROUTER_API_KEY", line)
+        self.assertIn("-e OPENROUTER_API_KEY -e TYPESAFE_API_KEY", line)
         self.assertNotIn("ANTHROPIC_API_KEY", line)
         self.assertNotIn("--network none", line)
         self.assertTrue(line.endswith("zjm-rag:latest serve --host 0.0.0.0 --port 8765"))

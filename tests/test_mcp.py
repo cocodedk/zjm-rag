@@ -56,7 +56,7 @@ class McpTest(unittest.TestCase):
         self.assertEqual(create["result"]["structuredContent"]["name"], "lib2")
         self.assertEqual(ask["result"]["structuredContent"]["answer"], "the answer")
         self.assertIn("Answer in da.", llm.calls[-1][1][-1]["content"])
-        self.assertEqual(set(doc["result"]["structuredContent"]["checks"]), {"zg", "age", "openrouter_key"})
+        self.assertEqual(set(doc["result"]["structuredContent"]["checks"]), {"zg", "age", "openrouter_key", "typesafe_key"})
         self.assertIs(doc_args["result"]["isError"], True)
 
     def test_errors(self):

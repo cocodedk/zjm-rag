@@ -24,7 +24,7 @@ key nor the plaintext outside the single request that needs them.
    order. For the first `limit` candidate files of each locker (plus up to `limit` more from a translated question), zjm keeps every zg hit as a full chunk (the line ranges of its matches, with
    overlapping or adjacent ranges merged, not a truncated preview), so the text that answers a
    question is never lost between zg and the answer model.
-2. **Jev ranks.** One request to Jev (the OpenRouter Decisions API) asks, per file, whether it
+2. **Jev ranks.** One request to Jev (TypeSafe's decisions API) asks, per file, whether it
    contains the information needed to answer the question, judging from those full chunks. Each
    file gets a probability; files at or above a threshold (default `0.5`) are accepted, the rest
    are reported as rejected, never dropped silently.
@@ -43,8 +43,8 @@ that container and sets up the rest.
 - Docker, installed and running. The installer builds zjm's container with it.
 - python3, version 3.10 or newer. The `zjm` command and the project script use it.
 - git. The project script uses it to find the project's top folder and the files git can see.
-- An OpenRouter API key in `OPENROUTER_API_KEY`, only if you turn on sending for a project (see
-  [Set up a project](#set-up-a-project)).
+- An OpenRouter API key in `OPENROUTER_API_KEY` and a TypeSafe API key in `TYPESAFE_API_KEY` (Jev),
+  only if you turn on sending for a project (see [Set up a project](#set-up-a-project)).
 
 ### Run the installer
 
@@ -143,8 +143,9 @@ The commands below use `~/.claude/skills/zjm-rag/scripts/zjm-project`. If you se
    your terminal, with your own key in place of the placeholder:
 
        export OPENROUTER_API_KEY=your-key-here
+       export TYPESAFE_API_KEY=your-typesafe-key-here
 
-   Expected: `find` now ranks the files through OpenRouter, and this command works:
+   Expected: `find` now ranks the files through Jev, and this command works:
 
        ~/.claude/skills/zjm-rag/scripts/zjm-project ask "who approves a change before it runs?"
 
@@ -217,7 +218,7 @@ zjm file-remove LOCKER NAME... [--key-file KEY]
 zjm file-list LOCKER [--key-file KEY]
 zjm find "which linter checks CSS files" -l LOCKER [-l LOCKER]... [--key-file KEYS.json] [--limit N] [--type py]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank] [--no-translate]
 zjm ask "which linter checks CSS files" -l LOCKER --lang da [--key-file KEYS.json] [--top-k 3] [--no-translate]
-zjm doctor                                   # zg, age, OPENROUTER_API_KEY, config, home, egress, lockers
+zjm doctor                                   # zg, age, OPENROUTER_API_KEY, TYPESAFE_API_KEY, config, home, egress, lockers
 zjm help                                     # the workflow guide and this instance's settings; changes nothing
 ```
 
@@ -253,16 +254,19 @@ claude mcp add zjm -- zjm mcp          # add --config PATH after `zjm mcp` for a
 
 ## Decision models
 
-Ranking uses OpenRouter's Decisions endpoint and tries these models in order, moving on only
-when a request fails:
+Ranking tries these models in order, moving on only when a request fails:
 
 1. `perplexity/pplx-decider-v1.1-27b` (default)
-2. `~typesafe/jev-latest`
+2. `~typesafe/jev-latest`, sent as `jev-1.14.0`
 3. `openai/gpt-6-luna-decisions`
 4. `microsoft/microsoft-decision-1`
 
 Selection precedence is `--model` (or `jev.post(..., model=...)`), request `model`, `JEV_MODEL`,
-then the default above. A selected model in the list starts at that position and falls through
+then the default above. Jev goes straight to TypeSafe (`https://api.typesafe.ai/v1/systemone`,
+key `TYPESAFE_API_KEY`) under TypeSafe's own name: `~typesafe/jev-latest` becomes the pinned
+`jev-1.14.0`, `typesafe/jev-X.Y` becomes `jev-X.Y.0`, and a bare `jev-*` name is sent as is. Every
+other model goes through OpenRouter's Decisions endpoint (`OPENROUTER_API_KEY`). A model whose key is
+not set counts as a failed attempt. A selected model in the list starts at that position and falls through
 its remaining models; a custom model gets one attempt. Each attempt has a 30-second socket
 timeout, with at most four attempts; low scores do not trigger fallback.
 
@@ -400,12 +404,12 @@ app, never in zjm: **zjm never stores a key**, and a lost key means a lost locke
   file inside an allowed repository's own git metadata is not supported; deny the whole directory.
 - **Nothing leaves this machine unless the config allows it.** For a project set up with the skill,
   `"send": true` in `zjm-project.json` turns on ranking and answering. Direct use (the `zjm` CLI, the
-  library, the HTTP API and the MCP server) follows `egress`: ranking (Jev/OpenRouter) needs
+  library, the HTTP API and the MCP server) follows `egress`: ranking (Jev via TypeSafe, other decision models via OpenRouter) needs
   `egress.rank`; answering (the OpenRouter model) needs `egress.answer`; translating the question
   (see [Questions in other languages](#questions-in-other-languages)) needs `egress.translate`. All three
   are off by default. The
   answer request has no `tools` key, so the model cannot act; it only ever returns text.
-  `OPENROUTER_API_KEY` is sent only in the request's `Authorization` header. It never appears in argv, logs,
+  `OPENROUTER_API_KEY` and `TYPESAFE_API_KEY` are sent only in the request's `Authorization` header. It never appears in argv, logs,
   errors, results or the messages sent to the model.
 - `zjm serve` binds to `127.0.0.1`, `localhost` or `::1` only, and checks `Host`/`Origin` on every
   request (in the container, `0.0.0.0` is also accepted, since the launcher publishes only to
@@ -462,7 +466,7 @@ website/            the project site (rag.cocode.dk)
 | Part | Technology |
 |---|---|
 | Search | zg (zvec-grep), local hybrid index per locker |
-| Ranking | Jev via the OpenRouter Decisions API |
+| Ranking | Jev via TypeSafe; fallback decision models via the OpenRouter Decisions API |
 | Answer | an OpenRouter model (`deepseek/deepseek-v4-flash` by default) |
 | Code | Python 3.10+, standard library only |
 

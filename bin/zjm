@@ -90,7 +90,7 @@ def main(args, directory):
             raise ValueError(f"key file not found: {key}")
         command += mount(stage(key, directory, "key"), "/run/zjm-key")
         args = replace_option(args, "--key-file", "/run/zjm-key")
-    command += ["-e", "OPENROUTER_API_KEY"] if online else ["--network", "none"]
+    command += ["-e", "OPENROUTER_API_KEY", "-e", "TYPESAFE_API_KEY"] if online else ["--network", "none"]
     if online and os.environ.get("JEV_MODEL"):
         command += ["-e", "JEV_MODEL"]
     if args and args[0] == "serve":

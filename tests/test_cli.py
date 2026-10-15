@@ -86,13 +86,14 @@ class CliTest(unittest.TestCase):
         self.assertIn("usage:", err)
 
     def test_doctor_hides_key(self):
-        with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "secret-value"}), \
+        with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "secret-value", "TYPESAFE_API_KEY": ""}), \
                 mock.patch("shutil.which", return_value="/usr/bin/x"):
             code, out, err = run(["doctor", "--config", self.config_path, "--json"])
             self.assertEqual(code, 0)
             r = json.loads(out)
             self.assertEqual(r["ok"], True)
-            self.assertEqual(r["checks"], {"zg": True, "age": True, "openrouter_key": True})
+            self.assertEqual(r["checks"], {"zg": True, "age": True, "openrouter_key": True,
+                                           "typesafe_key": False})
             human = run(["doctor", "--config", self.config_path])
         self.assertEqual(human[0], 0)
         self.assertTrue(human[1].startswith("ok zg\nok age\nok openrouter_key\n"))
