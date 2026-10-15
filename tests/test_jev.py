@@ -16,16 +16,18 @@ from zjm_rag.ops import OPS, check
 
 class JevTest(unittest.TestCase):
     def setUp(self):
-        patcher = mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-secret"}, clear=True)
+        patcher = mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-secret", "TYPESAFE_API_KEY": "ts-secret"}, clear=True)
         patcher.start()
         self.addCleanup(patcher.stop)
         self.sent = []
+        self.urls = []
 
     def transport(self, responses):
         responses = iter(responses)
 
         def send(req, timeout):
             self.sent.append(json.loads(req.data))
+            self.urls.append((req.full_url, req.get_header('Authorization')))
             response = next(responses)
             if isinstance(response, Exception):
                 raise response
@@ -40,7 +42,28 @@ class JevTest(unittest.TestCase):
         failures = [urllib.error.URLError('secret transport detail'), {'error': 'secret body'}, []]
         with self.transport([*failures, response]):
             self.assertEqual(jev.post({'questions': {}}), response)
-        self.assertEqual([p['model'] for p in self.sent], list(jev.DEFAULT_MODELS))
+        self.assertEqual([p['model'] for p in self.sent], [
+            'perplexity/pplx-decider-v1.1-27b', 'jev-1.14.0', 'openai/gpt-6-luna-decisions',
+            'microsoft/microsoft-decision-1'])
+        self.assertEqual(self.urls[1], (jev.TYPESAFE_URL, 'Bearer ts-secret'))
+        self.assertEqual({u for i, u in enumerate(self.urls) if i != 1}, {(jev.URL, 'Bearer test-secret')})
+
+    def test_jev_goes_to_typesafe_others_to_openrouter(self):
+        for given, expected in (('~typesafe/jev-latest', (jev.TYPESAFE_URL, 'TYPESAFE_API_KEY', 'jev-1.14.0')),
+                                ('typesafe/jev-1.13', (jev.TYPESAFE_URL, 'TYPESAFE_API_KEY', 'jev-1.13.0')),
+                                ('typesafe/jev-1.14.0', (jev.TYPESAFE_URL, 'TYPESAFE_API_KEY', 'jev-1.14.0')),
+                                ('jev-1.14.0', (jev.TYPESAFE_URL, 'TYPESAFE_API_KEY', 'jev-1.14.0')),
+                                ('openai/gpt-6-luna-decisions',
+                                 (jev.URL, 'OPENROUTER_API_KEY', 'openai/gpt-6-luna-decisions'))):
+            with self.subTest(given=given):
+                self.assertEqual(jev.route(given), expected)
+        with mock.patch.dict(os.environ, {'TYPESAFE_API_KEY': ''}), \
+                self.transport([{'answers': {}, 'model': 'luna'}]):
+            jev.post({}, model='jev-1.14.0')   # listed: a missing key hands over to the next model
+        self.assertEqual([p['model'] for p in self.sent], ['openai/gpt-6-luna-decisions'])
+        with mock.patch.dict(os.environ, {'TYPESAFE_API_KEY': ''}), self.transport([]), \
+                self.assertRaisesRegex(ZjmError, 'TYPESAFE_API_KEY is not set'):
+            jev.post({}, model='jev-preview')   # unlisted: one attempt
 
     def test_precedence_and_custom_model_single_attempt(self):
         for argument, requested, environment, expected in (
@@ -74,6 +97,7 @@ class JevTest(unittest.TestCase):
             jev.post({})
         self.assertEqual(len(self.sent), 4)
         self.assertNotIn('test-secret', str(caught.exception))
+        self.assertNotIn('ts-secret', str(caught.exception))
         with self.transport([]), self.assertRaisesRegex(ZjmError, '512 KiB'):
             jev.post({'state': 'x' * jev.MAX_REQUEST_BYTES})
         self.sent.clear()

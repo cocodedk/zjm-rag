@@ -72,7 +72,7 @@ OPS = {
            "Answer a question with an LLM from the top accepted files across lockers."),
     "doctor": (_wrap(core.doctor),
               {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
-              "Report whether zg, age, OPENROUTER_API_KEY and lockers are present."),
+              "Report whether zg, age, OPENROUTER_API_KEY, TYPESAFE_API_KEY and lockers are present."),
     "help": (_wrap(guide.help),
             {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
             "Explain how to use zjm and what this instance allows: workflow, keys, egress, allowed "

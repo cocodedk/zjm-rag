@@ -64,7 +64,7 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         line = r.stdout.strip()
         self.assertIn("-p 127.0.0.1:8765:8765", line)
-        self.assertIn("-e OPENROUTER_API_KEY", line)
+        self.assertIn("-e OPENROUTER_API_KEY -e TYPESAFE_API_KEY", line)
         self.assertNotIn("ANTHROPIC_API_KEY", line)
         self.assertNotIn("--network none", line)
         self.assertTrue(line.endswith("zjm-rag:latest serve --host 0.0.0.0 --port 8765"))
@@ -151,3 +151,21 @@ class LauncherTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TypesafeKeyTest(unittest.TestCase):
+    def test_env_wins_else_the_central_conf_file(self):
+        import importlib.util
+        from importlib.machinery import SourceFileLoader
+        from unittest import mock
+        loader = SourceFileLoader("zjm_launcher", str(SCRIPT))
+        zjm = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+        loader.exec_module(zjm)
+        with tempfile.TemporaryDirectory() as home, mock.patch.dict("os.environ", {"HOME": home}, clear=True):
+            self.assertEqual(zjm.typesafe_key(), "")
+            conf = Path(home, ".config/environment.d/60-typesafe.conf")
+            conf.parent.mkdir(parents=True)
+            conf.write_text("TYPESAFE_API_KEY=from-file\n")
+            self.assertEqual(zjm.typesafe_key(), "from-file")
+            with mock.patch.dict("os.environ", {"TYPESAFE_API_KEY": "from-env"}):
+                self.assertEqual(zjm.typesafe_key(), "from-env")

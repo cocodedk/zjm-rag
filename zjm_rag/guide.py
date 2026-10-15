@@ -36,7 +36,7 @@ means a lost locker.
 
 ## Egress
 
-- `rank` sends the question, locker names, file paths and passages to OpenRouter (Jev).
+- `rank` sends the question, locker names, file paths and passages to Jev (TypeSafe; the other decision models via OpenRouter).
 - `answer` sends the question, locker names, file paths and file text to OpenRouter (`llm`).
 - `translate` sends only the question to OpenRouter (`translate_model`).
 

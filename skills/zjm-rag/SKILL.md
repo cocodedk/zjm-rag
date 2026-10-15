@@ -30,8 +30,8 @@ Write `zjm-project.json` at the project root and commit it, so every session use
   Absolute paths, `..` and symlinks are refused in both lists.
 - `exclude`: files and folders (trailing `/`) left out by name.
 - `send`: off unless the project's owner decides otherwise. Off, nothing leaves the machine: searches list zg's
-  candidates unranked and `ask` is refused. On, ranking and `ask` send the text of matching files to OpenRouter
-  (`OPENROUTER_API_KEY` in the shell), so index only what may leave. `llm` picks the answer model among those
+  candidates unranked and `ask` is refused. On, ranking and `ask` send the text of matching files to TypeSafe (Jev)
+  and OpenRouter (`TYPESAFE_API_KEY` and `OPENROUTER_API_KEY` in the shell), so index only what may leave. `llm` picks the answer model among those
   OpenRouter offers.
 - `multilingual`: true for documents not in English.
 
