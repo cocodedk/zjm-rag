@@ -106,9 +106,7 @@ def _args_to_body(cmd, args):
         return body
     if cmd in ("locker-list", "doctor", "help"):
         return {}
-    if cmd == "locker-drop":
-        return {"name": args.name}
-    if cmd == "locker-encrypt":
+    if cmd in ("locker-drop", "locker-encrypt"):
         return {"name": args.name}
     if cmd == "file-add":
         return {"locker": args.locker, "paths": args.paths}

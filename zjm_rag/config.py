@@ -21,22 +21,18 @@ def check_embedding_baked(model):
 
 
 def _default_home(environ):
-    xdg = environ.get("XDG_DATA_HOME")
-    base = xdg if xdg else os.path.join(environ.get("HOME", ""), ".local/share")
+    base = environ.get("XDG_DATA_HOME") or os.path.join(environ.get("HOME", ""), ".local/share")
     return os.path.join(base, "zjm")
 
 
 def _find_file(path, *, cwd, environ):
     """The config file to use, or None for the built-in defaults."""
+    if path is None:
+        path = environ.get("ZJM_CONFIG") or None
     if path is not None:
         if not os.path.isfile(path):
             raise ZjmError(f"config file not found: {path}")
         return path
-    env_path = environ.get("ZJM_CONFIG")
-    if env_path:
-        if not os.path.isfile(env_path):
-            raise ZjmError(f"config file not found: {env_path}")
-        return env_path
     cwd_path = os.path.join(cwd, ".zjm", "config.json")
     if os.path.isfile(cwd_path):
         return cwd_path

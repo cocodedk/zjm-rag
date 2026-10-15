@@ -25,21 +25,20 @@ def option(args, name, default=None):
 
 
 def replace_option(args, name, value):
-    out, i = [], 0
-    while i < len(args):
-        arg = args[i]
+    out = []
+    args = iter(args)
+    for arg in args:
         if arg == "--":
-            out.extend(args[i:])
+            out.append(arg)
+            out.extend(args)
             break
         if arg == name:
             out.extend([name, value])
-            i += 2
+            next(args, None)
         elif arg.startswith(name + "="):
             out.append(name + "=" + value)
-            i += 1
         else:
             out.append(arg)
-            i += 1
     return out
 
 
