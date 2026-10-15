@@ -19,7 +19,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 DEFAULT_MODELS = (
     "perplexity/pplx-decider-v1.1-27b",
-    "~typesafe/jev-latest",
+    TYPESAFE_JEV,
     "openai/gpt-6-luna-decisions",
     "microsoft/microsoft-decision-1",
 )
@@ -28,14 +28,13 @@ MAX_RESPONSE_BYTES = 1024 * 1024
 
 
 def route(model):
-    """(url, key variable, provider model name): Jev goes to TypeSafe under its own name, the rest to OpenRouter."""
-    if model == "~typesafe/jev-latest":
-        return TYPESAFE_URL, "TYPESAFE_API_KEY", TYPESAFE_JEV
-    if model.startswith("typesafe/jev-"):
-        name = model[len("typesafe/"):]
-        return TYPESAFE_URL, "TYPESAFE_API_KEY", name + ".0" if name.count(".") == 1 else name
+    """(url, key variable, provider model name): Jev goes to TypeSafe under its own name, the rest to OpenRouter.
+    An OpenRouter-style Jev name is translated: TypeSafe rejects `jev-1.14` and its own `jev-latest` lags."""
     if model.startswith("jev-"):
         return TYPESAFE_URL, "TYPESAFE_API_KEY", model
+    if model.removeprefix("~").startswith("typesafe/jev-"):
+        version = model.split("/jev-", 1)[1]
+        return TYPESAFE_URL, "TYPESAFE_API_KEY", TYPESAFE_JEV if version == "latest" else f"jev-{version}.0"
     return URL, "OPENROUTER_API_KEY", model
 
 

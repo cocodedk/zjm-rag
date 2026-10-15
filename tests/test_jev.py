@@ -58,11 +58,11 @@ class JevTest(unittest.TestCase):
                 self.assertEqual(jev.route(given), expected)
         with mock.patch.dict(os.environ, {'TYPESAFE_API_KEY': ''}), \
                 self.transport([{'answers': {}, 'model': 'luna'}]):
-            jev.post({}, model='~typesafe/jev-latest')
+            jev.post({}, model='jev-1.14.0')   # listed: a missing key hands over to the next model
         self.assertEqual([p['model'] for p in self.sent], ['openai/gpt-6-luna-decisions'])
         with mock.patch.dict(os.environ, {'TYPESAFE_API_KEY': ''}), self.transport([]), \
                 self.assertRaisesRegex(ZjmError, 'TYPESAFE_API_KEY is not set'):
-            jev.post({}, model='jev-1.14.0')
+            jev.post({}, model='jev-preview')   # unlisted: one attempt
 
     def test_precedence_and_custom_model_single_attempt(self):
         for argument, requested, environment, expected in (

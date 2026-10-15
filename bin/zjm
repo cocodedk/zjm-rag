@@ -59,6 +59,15 @@ def stage(source, directory, name):
     return target
 
 
+def typesafe_key():
+    """TYPESAFE_API_KEY from the environment, else from its one central store (as jev-decisions reads it)."""
+    conf = Path.home() / ".config/environment.d/60-typesafe.conf"
+    if os.environ.get("TYPESAFE_API_KEY") or not conf.is_file():
+        return os.environ.get("TYPESAFE_API_KEY", "")
+    return next((line.split("=", 1)[1].strip() for line in conf.read_text().splitlines()
+                 if line.startswith("TYPESAFE_API_KEY=")), "")
+
+
 def main(args, directory):
     config = option(args, "--config", os.environ.get("ZJM_HOST_CONFIG"))
     if not config:
@@ -90,6 +99,8 @@ def main(args, directory):
             raise ValueError(f"key file not found: {key}")
         command += mount(stage(key, directory, "key"), "/run/zjm-key")
         args = replace_option(args, "--key-file", "/run/zjm-key")
+    if online and typesafe_key():
+        os.environ["TYPESAFE_API_KEY"] = typesafe_key()   # `-e NAME` passes it from this process
     command += ["-e", "OPENROUTER_API_KEY", "-e", "TYPESAFE_API_KEY"] if online else ["--network", "none"]
     if online and os.environ.get("JEV_MODEL"):
         command += ["-e", "JEV_MODEL"]
