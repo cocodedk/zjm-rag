@@ -150,8 +150,9 @@ The commands below use `~/.claude/skills/zjm-rag/scripts/zjm-project`. If you se
        ~/.claude/skills/zjm-rag/scripts/zjm-project ask "who approves a change before it runs?"
 
    Expected: an answer that names the files it used. Check each cited passage. Risk: with `send` on,
-   the text of matching files leaves your machine and goes to OpenRouter. Each search and each answer
-   is a paid call. Keep the key out of `zjm-project.json` and out of git.
+   matching file text leaves your machine: ranking sends passages to TypeSafe for Jev and to OpenRouter
+   for the other decision models, and answering sends accepted file text to OpenRouter. Each search
+   and each answer is a paid call. Keep the key out of `zjm-project.json` and out of git.
 
 After every change to an indexed folder (each commit, merge or pull), run `reindex` again before you
 search. If `find` or `ask` prints `STALE:`, a folder changed since the last reindex. Reindex, then

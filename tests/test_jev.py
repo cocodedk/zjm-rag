@@ -51,6 +51,7 @@ class JevTest(unittest.TestCase):
     def test_jev_goes_to_typesafe_others_to_openrouter(self):
         for given, expected in (('~typesafe/jev-latest', (jev.TYPESAFE_URL, 'TYPESAFE_API_KEY', 'jev-1.14.0')),
                                 ('typesafe/jev-1.13', (jev.TYPESAFE_URL, 'TYPESAFE_API_KEY', 'jev-1.13.0')),
+                                ('typesafe/jev-1.14.0', (jev.TYPESAFE_URL, 'TYPESAFE_API_KEY', 'jev-1.14.0')),
                                 ('jev-1.14.0', (jev.TYPESAFE_URL, 'TYPESAFE_API_KEY', 'jev-1.14.0')),
                                 ('openai/gpt-6-luna-decisions',
                                  (jev.URL, 'OPENROUTER_API_KEY', 'openai/gpt-6-luna-decisions'))):

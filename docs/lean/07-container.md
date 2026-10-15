@@ -49,11 +49,11 @@ The launcher is POSIX `sh`. It is installed on the host as `zjm` and runs `docke
   - If the file is missing, the launcher stops with exit `1` and a message.
 - One `-v <dir>:/sources/<basename>:ro` for each directory in the colon-separated
   `ZJM_SOURCES`. A basename clash, or a directory that doesn't exist, stops with exit `1`.
-- `--network none` when both `egress.rank` and `egress.answer` in the host config are
-  `false` or missing; otherwise the default network. It reads egress with
+- `--network none` when `egress.rank`, `egress.answer` and `egress.translate` in the host config
+  are all `false` or missing; otherwise the default network. It reads egress with
   `python3 -c` and `json` on the host.
-- `-e OPENROUTER_API_KEY -e TYPESAFE_API_KEY` when `egress.rank` is on, and `-e ANTHROPIC_API_KEY` when
-  `egress.answer` is on. It passes the variable names only, never the values in argv.
+- `-e OPENROUTER_API_KEY -e TYPESAFE_API_KEY` whenever the network is on (rank, answer or
+  translate), and `-e ANTHROPIC_API_KEY` when `egress.answer` is on. It passes the variable names only, never the values in argv.
 - When the first argument is `serve`, it also adds `-p 127.0.0.1:${ZJM_PORT:-8765}:8765`, and the
   command becomes `serve --host 0.0.0.0 --port 8765`. `serve` with `--network none` stops with
   exit `1`: "HTTP needs egress on, or use MCP".

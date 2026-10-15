@@ -34,7 +34,7 @@ def route(model):
         return TYPESAFE_URL, "TYPESAFE_API_KEY", model
     if model.removeprefix("~").startswith("typesafe/jev-"):
         version = model.split("/jev-", 1)[1]
-        return TYPESAFE_URL, "TYPESAFE_API_KEY", TYPESAFE_JEV if version == "latest" else f"jev-{version}.0"
+        return TYPESAFE_URL, "TYPESAFE_API_KEY", TYPESAFE_JEV if version == "latest" else f"jev-{version}" + ".0" * (version.count(".") == 1)
     return URL, "OPENROUTER_API_KEY", model
 
 
