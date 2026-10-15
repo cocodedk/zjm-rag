@@ -54,10 +54,6 @@ def _is_str_list(v):
     return isinstance(v, list) and all(isinstance(x, str) for x in v)
 
 
-def _is_nonempty_str_list(v):
-    return isinstance(v, list) and all(isinstance(x, str) and x for x in v)
-
-
 def _validate(raw, used_path):
     if not isinstance(raw, dict):
         raise ZjmError(f"config file {used_path} must be a JSON object")
@@ -74,7 +70,7 @@ def _validate(raw, used_path):
         check_embedding_baked(raw["embedding"])
     if "llm" in raw and not (isinstance(raw["llm"], str) and raw["llm"]):
         raise ZjmError(f'llm is an OpenRouter model id now, e.g. "deepseek/deepseek-v4-flash", in {used_path}')
-    _check_type(raw, "languages", _is_nonempty_str_list, "a list of non-empty strings", used_path)
+    _check_type(raw, "languages", lambda v: _is_str_list(v) and all(v), "a list of non-empty strings", used_path)
     if "translate_model" in raw and not (isinstance(raw["translate_model"], str) and raw["translate_model"]):
         _type_error("translate_model", used_path, "a non-empty string")
     egress = raw.get("egress", {})
@@ -129,7 +125,7 @@ def load(path=None, *, cwd=None, environ=None):
         "allow": [resolve(p) for p in raw.get("allow", [])],
         "deny": [resolve(p) for p in raw.get("deny", [])],
         "exclude": list(raw.get("exclude", [])),
-        "egress": {key: bool(egress_raw.get(key, False)) for key in ("rank", "answer", "translate")},
+        "egress": {key: egress_raw.get(key, False) for key in ("rank", "answer", "translate")},
         "embedding": raw.get("embedding", DEFAULT_EMBEDDING),
         "llm": raw.get("llm", DEFAULT_LLM),
         "languages": list(raw.get("languages", DEFAULT_LANGUAGES)),

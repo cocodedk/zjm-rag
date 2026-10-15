@@ -36,9 +36,8 @@ def check_source_allowed(source, config):
         for i, part in enumerate(parts):
             if part and (i < len(parts) - 1 or os.path.isdir(candidate)) and _floor_excluded(part, True, config["exclude"]):
                 raise ZjmError(f"{source} is excluded by {config['path']}")
-    for entry in config["allow"]:
-        if is_inside(r, os.path.realpath(entry)):
-            return r
+    if any(is_inside(r, os.path.realpath(entry)) for entry in config["allow"]):
+        return r
     raise ZjmError(f'{source} is outside the allowed paths in {config["path"]}; add it to "allow"')
 
 
