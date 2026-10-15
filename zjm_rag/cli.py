@@ -79,12 +79,10 @@ def _parser():
 def _args_to_body(cmd, args):
     if cmd == "locker-create":
         body = {"name": args.name}
-        if args.multilingual:
-            body["multilingual"] = True
-        if args.embedding:
-            body["embedding"] = args.embedding
-        if args.plain:
-            body["plain"] = True
+        for name in ("multilingual", "embedding", "plain"):
+            value = getattr(args, name)
+            if value:
+                body[name] = value
         return body
     if cmd in ("locker-list", "doctor", "help"):
         return {}

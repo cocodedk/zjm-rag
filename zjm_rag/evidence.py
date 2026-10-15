@@ -116,13 +116,12 @@ def build_ask_context(accepted, per_locker, top_k, ask_chars=None):
             break
         rec = per_locker[hit["locker"]][hit["path"]]
         label = f"{hit['locker']}/{hit['path']}"
-        contributed = False
+        previous_parts = len(parts)
         whole = rec.get("whole")
         whole_block = f"=== {label} ===\n{whole}" if whole is not None else None
         if whole_block is not None and len(whole_block) <= budget:
             parts.append(whole_block)
             budget -= len(whole_block)
-            contributed = True
         else:
             for p in rec["passages"]:
                 if budget <= 0:
@@ -135,7 +134,6 @@ def build_ask_context(accepted, per_locker, top_k, ask_chars=None):
                 # it is dropped rather than left in the prompt as a dangling, content-free header.
                 if len(block) > len(header):
                     parts.append(block)
-                    contributed = True
-        if contributed:
+        if len(parts) > previous_parts:
             files.append(label)
     return "\n\n".join(parts), files

@@ -59,20 +59,19 @@ def _walk(src, dest, config, files, count_excluded, root=None):
         if _denied(p, config["deny"], config["home"]) or entry.is_symlink():
             count_excluded[0] += 1
             continue
-        if entry.is_dir(follow_symlinks=False):
-            if _floor_excluded(entry.name, True, config["exclude"]):
-                count_excluded[0] += 1
-                continue
+        is_dir = entry.is_dir(follow_symlinks=False)
+        if not is_dir and not entry.is_file(follow_symlinks=False):
+            count_excluded[0] += 1
+            continue
+        if _floor_excluded(entry.name, is_dir, config["exclude"]):
+            count_excluded[0] += 1
+            continue
+        if is_dir:
             os.makedirs(os.path.join(dest, entry.name), exist_ok=True)
             _walk(entry.path, os.path.join(dest, entry.name), config, files, count_excluded, root)
-        elif entry.is_file(follow_symlinks=False):
-            if _floor_excluded(entry.name, False, config["exclude"]):
-                count_excluded[0] += 1
-                continue
+        else:
             rel = os.path.relpath(entry.path, root)
             files.append((rel, entry.path, os.path.join(dest, entry.name)))
-        else:
-            count_excluded[0] += 1
 
 
 def _has_git_ancestor(path):
