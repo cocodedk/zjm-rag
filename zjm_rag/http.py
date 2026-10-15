@@ -98,24 +98,8 @@ def make_server(host="127.0.0.1", port=8765, *, config=None, runner=None, jev=No
             self._send(200, result)
 
         def do_GET(self):
-            self._route("GET")
+            self._route(self.command)
 
-        def do_POST(self):
-            self._route("POST")
-
-        def do_PUT(self):
-            self._route("PUT")
-
-        def do_PATCH(self):
-            self._route("PATCH")
-
-        def do_DELETE(self):
-            self._route("DELETE")
-
-        def do_HEAD(self):
-            self._route("HEAD")
-
-        def do_OPTIONS(self):
-            self._route("OPTIONS")
+        do_POST = do_PUT = do_PATCH = do_DELETE = do_HEAD = do_OPTIONS = do_GET
 
     return ThreadingHTTPServer((host, port), Handler)
