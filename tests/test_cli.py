@@ -104,5 +104,22 @@ class CliTest(unittest.TestCase):
         self.assertEqual((code, out.splitlines()[0]), (1, "missing zg"))
 
 
+    def test_doctor_needs_a_ranking_key_for_rank_and_openrouter_for_answer(self):
+        from zjm_rag import core
+        def ok(egress, keys):
+            cfg = {"egress": egress, "path": "p", "home": "h"}
+            with mock.patch.object(core.config_module, "resolve", return_value=cfg), \
+                    mock.patch.object(core.lockers, "home_dirs", return_value=("h", "l")), \
+                    mock.patch.object(core, "_locker_count", return_value=0), \
+                    mock.patch("shutil.which", return_value="/usr/bin/x"), \
+                    mock.patch.dict(os.environ, keys, clear=True):
+                return core.doctor()["ok"]
+        rank = {"rank": True, "answer": False, "translate": False}
+        answer = {"rank": False, "answer": True, "translate": False}
+        self.assertTrue(ok(rank, {"TYPESAFE_API_KEY": "t"}))
+        self.assertFalse(ok(rank, {}))
+        self.assertFalse(ok(answer, {"TYPESAFE_API_KEY": "t"}))
+        self.assertTrue(ok(answer, {"OPENROUTER_API_KEY": "o"}))
+
 if __name__ == "__main__":
     unittest.main()

@@ -64,7 +64,7 @@ def typesafe_key():
     conf = Path.home() / ".config/environment.d/60-typesafe.conf"
     if os.environ.get("TYPESAFE_API_KEY") or not conf.is_file():
         return os.environ.get("TYPESAFE_API_KEY", "")
-    return next((line.split("=", 1)[1].strip() for line in conf.read_text().splitlines()
+    return next((line.split("=", 1)[1].strip().strip("\"'") for line in conf.read_text().splitlines()
                  if line.startswith("TYPESAFE_API_KEY=")), "")
 
 

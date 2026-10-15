@@ -23,5 +23,6 @@ def doctor(*, config=None, runner=None, jev=None):
               "openrouter_key": bool(os.environ.get("OPENROUTER_API_KEY")),
               "typesafe_key": bool(os.environ.get("TYPESAFE_API_KEY"))}
     ok = (checks["zg"] and checks["age"]
-         and (checks["openrouter_key"] or not (egress["rank"] or egress["answer"] or egress["translate"])))
+          and (checks["openrouter_key"] or not (egress["answer"] or egress["translate"]))
+          and (checks["openrouter_key"] or checks["typesafe_key"] or not egress["rank"]))
     return {"ok": ok, "checks": checks, "config": cfg["path"], "home": cfg["home"], "egress": egress, "lockers": n}
