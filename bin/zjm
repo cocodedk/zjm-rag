@@ -69,8 +69,7 @@ def main(args, directory):
     config = Path(config).expanduser().resolve()
     if not config.is_file():
         raise ValueError(f"host config not found: {config}; run install.sh to create the default config")
-    raw = json.loads(config.read_text())
-    egress = raw.get("egress", {})
+    egress = json.loads(config.read_text()).get("egress", {})
     online = any(egress.get(key) is True for key in ("rank", "answer", "translate"))
     args = replace_option(args, "--config", "/etc/zjm/config.json")
     command = ["docker", "run", "--rm", "-i", "--user", "10001:10001", "--read-only",
