@@ -92,9 +92,7 @@ def _validate(raw, used_path):
 def _resolve_path(value, *, base_dir, home_env):
     if value == "~" or value.startswith("~/"):
         value = home_env + value[1:]
-    if not os.path.isabs(value):
-        value = os.path.join(base_dir, value)
-    return os.path.abspath(value)
+    return os.path.abspath(os.path.join(base_dir, value))
 
 
 def resolve(config):

@@ -2,6 +2,7 @@
 import fnmatch
 import os
 import shutil
+from pathlib import Path
 
 from .errors import ZjmError
 
@@ -71,14 +72,8 @@ def _walk(src, dest, config, files, count_excluded, root=None):
 
 
 def _has_git_ancestor(path):
-    cur = path
-    while True:
-        if os.path.isdir(os.path.join(cur, ".git")):
-            return True
-        parent = os.path.dirname(cur)
-        if parent == cur:
-            return False
-        cur = parent
+    path = Path(path)
+    return any(os.path.isdir(p / ".git") for p in (path, *path.parents))
 
 
 def _gitignored(src, rel_paths, runner):

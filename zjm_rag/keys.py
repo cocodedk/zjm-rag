@@ -12,7 +12,7 @@ def check_key(key):
     if not isinstance(key, str):
         raise ZjmError("invalid key")
     k = key.removesuffix("\n")
-    if "\n" in k or not KEY_RE.match(k):
+    if not KEY_RE.fullmatch(k):
         raise ZjmError("invalid key")
     return k
 
