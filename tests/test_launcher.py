@@ -155,9 +155,12 @@ if __name__ == "__main__":
 
 class TypesafeKeyTest(unittest.TestCase):
     def test_env_wins_else_the_central_conf_file(self):
+        import importlib.util
         from importlib.machinery import SourceFileLoader
         from unittest import mock
-        zjm = SourceFileLoader("zjm_launcher", str(SCRIPT)).load_module()
+        loader = SourceFileLoader("zjm_launcher", str(SCRIPT))
+        zjm = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+        loader.exec_module(zjm)
         with tempfile.TemporaryDirectory() as home, mock.patch.dict("os.environ", {"HOME": home}, clear=True):
             self.assertEqual(zjm.typesafe_key(), "")
             conf = Path(home, ".config/environment.d/60-typesafe.conf")

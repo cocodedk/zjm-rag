@@ -257,7 +257,7 @@ claude mcp add zjm -- zjm mcp          # add --config PATH after `zjm mcp` for a
 Ranking tries these models in order, moving on only when a request fails:
 
 1. `perplexity/pplx-decider-v1.1-27b` (default)
-2. `~typesafe/jev-latest`, sent as `jev-1.14.0`
+2. `jev-1.14.0` (TypeSafe)
 3. `openai/gpt-6-luna-decisions`
 4. `microsoft/microsoft-decision-1`
 
