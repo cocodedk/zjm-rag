@@ -110,7 +110,7 @@ jobs:
           # zjm runs only in its container (spec 07): outside it, the installed command must refuse
           # with its one message and a nonzero exit, which also proves the guard is in the wheel.
           if out=$(/tmp/v/bin/zjm --help 2>&1); then echo "::error::zjm ran outside its container"; exit 1; fi
-          grep -qx "zjm: runs only in its container; use the zjm launcher" <<< "$out"
+          test "$out" = "zjm: runs only in its container; use the zjm launcher"
           (cd dist && zip -q ../zjm-rag.zip "zjm_rag-$VERSION-py3-none-any.whl" "zjm_rag-$VERSION.tar.gz")
           mv zjm-rag.zip dist/
 
