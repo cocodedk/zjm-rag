@@ -7,11 +7,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g @zvec/zvec-grep@0.2.2 \
     && Z=/usr/lib/node_modules/@zvec/zvec-grep/node_modules \
-    && rm -rf $Z/@node-llama-cpp/linux-x64-cuda $Z/@node-llama-cpp/linux-x64-cuda-ext \
-              $Z/@node-llama-cpp/linux-x64-vulkan $Z/@node-llama-cpp/linux-arm64 \
-              $Z/@node-llama-cpp/linux-armv7l \
-              $Z/onnxruntime-node/bin/napi-v3/linux/x64/libonnxruntime_providers_cuda.so \
-              $Z/onnxruntime-node/bin/napi-v3/linux/x64/libonnxruntime_providers_tensorrt.so \
+    && rm -rf $Z/@node-llama-cpp $Z/node-llama-cpp $Z/onnxruntime-node $Z/onnxruntime-web \
     && apt-get purge -y curl gnupg \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
