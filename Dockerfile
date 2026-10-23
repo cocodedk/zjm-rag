@@ -8,6 +8,7 @@ RUN apt-get update \
     && npm install -g @zvec/zvec-grep@0.2.2 \
     && Z=/usr/lib/node_modules/@zvec/zvec-grep/node_modules \
     && rm -rf $Z/@node-llama-cpp $Z/node-llama-cpp $Z/onnxruntime-node $Z/onnxruntime-web \
+    && rm -rf /root/.npm \
     && apt-get purge -y curl gnupg \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
