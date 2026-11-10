@@ -107,7 +107,10 @@ def file_put(locker, name, text, key=None, *, config=None, runner=zg.run, jev=No
     _check_put_name(name, cfg)
     with sealed.open_locker(cfg, locker, key, write=True, runner=runner) as ldir:
         manifest = lockers.read_manifest(ldir)
-        dest = ldir / "corpus" / name
+        corpus = ldir / "corpus"
+        dest = corpus / name
+        if dest.is_dir() or any(p.exists() and not p.is_dir() for p in list(dest.parents)[:name.count("/")]):
+            raise ZjmError(f"{name!r} clashes with a file or folder already in locker {locker}")
         existed = name in manifest["files"]
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(data)
@@ -136,6 +139,10 @@ def file_remove(locker, names, key=None, *, config=None, runner=zg.run, jev=None
             if path.exists():
                 path.unlink()
             del manifest["files"][k]
+            for parent in path.parents:
+                if parent == corpus or not parent.is_dir() or any(parent.iterdir()):
+                    break
+                parent.rmdir()
         lockers.run_index(ldir, manifest, runner)
     return {"removed": list(matches)}
 
