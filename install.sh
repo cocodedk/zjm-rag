@@ -26,15 +26,19 @@ have docker || die "docker is needed to build and run zjm's container"
 have python3 || die "python3 is needed by the zjm launcher"
 
 echo "2/4 building the zjm-rag image"
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-context="$REPO"
-[ -f "$script_dir/Dockerfile" ] && context="$script_dir"
+# Under `curl ... | sh`, $0 is "sh": use a local checkout only when this script file sits in one.
+script_dir=
+if [ -f "$0" ]; then
+  checkout=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+  [ -f "$checkout/Dockerfile" ] && [ -d "$checkout/zjm_rag" ] && script_dir="$checkout"
+fi
+context="${script_dir:-$REPO}"
 run docker build -t zjm-rag:latest "$context" || die "docker build failed"
 
 echo "3/4 installing the launcher"
 bin_dir="$HOME/.local/bin"
 run mkdir -p "$bin_dir" || die "cannot create $bin_dir"
-if [ -f "$script_dir/bin/zjm" ]; then
+if [ -n "$script_dir" ] && [ -f "$script_dir/bin/zjm" ]; then
   run cp "$script_dir/bin/zjm" "$bin_dir/zjm" || die "cannot copy the zjm launcher"
 else
   have curl || die "curl is needed to fetch the zjm launcher"
@@ -66,7 +70,7 @@ fi
 echo "4/4 installing the Claude Code skill"
 skill_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/zjm-rag"
 run rm -rf "$skill_dir" || die "cannot replace $skill_dir"
-if [ -d "$script_dir/skills/zjm-rag" ]; then
+if [ -n "$script_dir" ] && [ -d "$script_dir/skills/zjm-rag" ]; then
   run mkdir -p "$(dirname "$skill_dir")" || die "cannot create the skills folder"
   run cp -R "$script_dir/skills/zjm-rag" "$skill_dir" || die "cannot copy the skill"
 else

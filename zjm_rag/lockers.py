@@ -14,11 +14,12 @@ from . import zg
 from .errors import ZjmError
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+SEALED_SUFFIX = ".age"
 MULTILINGUAL_MODEL = config_module.MULTILINGUAL_EMBEDDING
 
 
 def check_name(name):
-    if not isinstance(name, str) or not NAME_RE.match(name):
+    if not isinstance(name, str) or not NAME_RE.match(name) or name.endswith(SEALED_SUFFIX):
         raise ZjmError(f"bad locker name: {name!r}")
 
 
@@ -38,7 +39,7 @@ def home_dirs(cfg):
 def lock(cfg, *, exclusive):
     home, lockers_dir = home_dirs(cfg)
     _check_dir_safe(home)
-    home.mkdir(mode=0o700, exist_ok=True)
+    home.mkdir(mode=0o700, parents=True, exist_ok=True)
     _check_dir_safe(lockers_dir)
     lockers_dir.mkdir(mode=0o700, exist_ok=True)
     fd = os.open(home / ".lock", os.O_CREAT | os.O_RDWR, 0o600)
@@ -88,7 +89,7 @@ def locker_dir(cfg, name):
 
 def _locations(cfg, name):
     _, lockers_dir = home_dirs(cfg)
-    return lockers_dir / f"{name}.age", locker_dir(cfg, name)
+    return lockers_dir / f"{name}{SEALED_SUFFIX}", locker_dir(cfg, name)
 
 
 def locker_create(name, key=None, multilingual=False, embedding=None, plain=False, *, config=None, runner=zg.run,

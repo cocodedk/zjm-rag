@@ -49,13 +49,13 @@ def _floor_excluded(name, is_dir, extra):
         for pat in extra if pat.endswith("/") == is_dir)
 
 
-def _walk(src, dest, config, files, count_excluded, root=None):
+def _walk(src, dest, config, files, count_excluded, real_home, root=None):
     root = root or src
     with os.scandir(src) as it:
         entries = sorted(it, key=lambda e: e.name)
     for entry in entries:
         p = os.path.abspath(entry.path)
-        if _denied(p, config["deny"], config["home"]) or entry.is_symlink():
+        if _denied(p, config["deny"], config["home"]) or is_inside(p, real_home) or entry.is_symlink():
             count_excluded[0] += 1
             continue
         is_dir = entry.is_dir(follow_symlinks=False)
@@ -64,7 +64,7 @@ def _walk(src, dest, config, files, count_excluded, root=None):
             continue
         if is_dir:
             os.makedirs(os.path.join(dest, entry.name), exist_ok=True)
-            _walk(entry.path, os.path.join(dest, entry.name), config, files, count_excluded, root)
+            _walk(entry.path, os.path.join(dest, entry.name), config, files, count_excluded, real_home, root)
         else:
             rel = os.path.relpath(entry.path, root)
             files.append((rel, entry.path, os.path.join(dest, entry.name)))
@@ -90,7 +90,7 @@ def _gitignored(src, rel_paths, runner):
 def copy_tree(src_real, dest, config, runner):
     """Copy `src_real` into `dest`; returns (files_copied, excluded_entries)."""
     files, count_excluded = [], [0]
-    _walk(src_real, dest, config, files, count_excluded)
+    _walk(src_real, dest, config, files, count_excluded, os.path.realpath(config["home"]))
     ignored = _gitignored(src_real, [rel for rel, _, _ in files], runner)
     copied = 0
     for rel, srcp, destp in files:
