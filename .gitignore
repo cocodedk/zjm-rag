@@ -9,3 +9,6 @@ scratchpad/
 .ruff_cache/
 .mypy_cache/
 .DS_Store
+
+# Project notes live in a private repo; memory is a symlink to them
+memory
