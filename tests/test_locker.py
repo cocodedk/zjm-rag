@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from fakes import TEST_KEY, FakeRunner, make_config
+from fakes import OLD_INDEX_ERR, TEST_KEY, FakeRunner, make_config
 from zjm_rag import ZjmError, find, locker_create, locker_drop, locker_list
 from zjm_rag import files as files_mod
 from zjm_rag import lockers as lockers_mod
@@ -56,7 +56,7 @@ class LockerTest(unittest.TestCase):
         zg_calls = [c for c in runner.calls if c[0][0] == "zg"]
         self.assertEqual(len(zg_calls), 1)
         argv, cwd, env, _ = zg_calls[0]
-        self.assertEqual(argv, ["zg", "index", ".", "--embedding", "local/potion-code-16m-v2", "--mode",
+        self.assertEqual(argv, ["zg", "--index", ".", "--embedding", "local/potion-code-16m-v2", "--mode",
                                 "direct", "--hidden"])
         self.assertEqual(cwd, str(lockers_mod.locker_dir(cfg, "lib") / "corpus"))
         self.assertEqual(env["ZVEC_GREP_HOME"], str(lockers_mod.locker_dir(cfg, "lib") / "zghome"))
@@ -95,7 +95,7 @@ class LockerTest(unittest.TestCase):
         before = age_path.read_bytes()
 
         def failing(argv, *, cwd, env, input):
-            if argv[0] == "zg" and argv[1] == "index":
+            if "--index" in argv:
                 return 1, "", "boom"
             return FakeRunner()(argv, cwd=cwd, env=env, input=input)
 
@@ -106,8 +106,8 @@ class LockerTest(unittest.TestCase):
         self.assertEqual(age_path.read_bytes(), before)
 
         def query_runner(argv, *, cwd, env, input):
-            if argv[0] == "zg" and argv[1] == "query":
-                return 0, "hits: 1\n\n#1 matchedBy=fts docs/b.md:1-1\nsource:\n1\tb\n", ""
+            if argv[0] == "zg" and "--index" not in argv:
+                return 0, "#1 docs/b.md:1\n1\tb\n", ""
             return FakeRunner()(argv, cwd=cwd, env=env, input=input)
 
         found = find("q", ["lib"], keys={"lib": TEST_KEY}, config=cfg, runner=query_runner,
@@ -150,6 +150,32 @@ class LockerTest(unittest.TestCase):
         self.assertIn("local/potion-multilingual-128m", argv)
         with self.assertRaises(ZjmError):
             locker_create("other", embedding="qwen/x", plain=True, config=cfg)
+
+    def test_incompatible_index_is_rebuilt_on_write(self):
+        cfg = make_config(self)
+        locker_create("lib", plain=True, config=cfg)
+        ldir = lockers_mod.locker_dir(cfg, "lib")
+        index_calls = []
+
+        def older_zg(rebuild_works):
+            def runner(argv, *, cwd, env, input):
+                if "--index" not in argv:
+                    return FakeRunner()(argv, cwd=cwd, env=env, input=input)
+                index_calls.append(argv)
+                if "--rebuild" in argv and rebuild_works:
+                    return 0, "", ""
+                return 1, "", f"{OLD_INDEX_ERR}\n{cwd}"
+            return runner
+
+        files_mod.file_put("lib", "a.md", "a", config=cfg, runner=older_zg(True))
+        self.assertEqual(["--rebuild" in argv for argv in index_calls], [False, True])
+        self.assertTrue(lockers_mod.read_manifest(ldir)["indexed"])
+
+        del index_calls[:]
+        with self.assertRaisesRegex(ZjmError, "zg index failed"):
+            files_mod.file_put("lib", "b.md", "b", config=cfg, runner=older_zg(False))
+        self.assertEqual(["--rebuild" in argv for argv in index_calls], [False, True])
+        self.assertFalse(lockers_mod.read_manifest(ldir)["indexed"])
 
     def test_foreign_or_symlinked_locker_refused(self):
         cfg = make_config(self)

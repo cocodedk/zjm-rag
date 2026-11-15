@@ -6,8 +6,8 @@ import tempfile
 from pathlib import Path
 
 PATHS = ["proj/b.md", "proj/a.py", "proj/c.txt"]  # zg order
-ZG_OUT = "hits: 3\n" + "".join(f"\n#{i} matchedBy=fts+vector {p}:1-2\nsource:\n1\tbody of {p}\n"
-                               for i, p in enumerate(PATHS, 1))
+ZG_OUT = "\n".join(f"#{i} {p}:1-2\n1\tbody of {p}\n" for i, p in enumerate(PATHS, 1))
+OLD_INDEX_ERR = "Error: This index is incompatible with the current version of zg."  # then the corpus path
 TEST_KEY = "AGE-SECRET-KEY-1" + "Q" * 58
 OTHER_KEY = "AGE-SECRET-KEY-1" + "Z" * 58
 AGE_MARKER = b"FAKE-AGEv1\n"
@@ -47,6 +47,23 @@ def make_locker(test, cfg, name="lib", *, embedding="m"):
         os.utime(f, (mtime, mtime))
         files[p] = {"source": f"/src/{p}", "size": f.stat().st_size, "sha256": "x", "added": mtime}
     lockers.write_manifest(ldir, {"name": name, "embedding": embedding, "indexed": True, "files": files})
+    return ldir
+
+
+def make_multi_locker(cfg, name, files):
+    """A plain locker under cfg["home"]/lockers/<name>, indexed, with the given {relpath: text}."""
+    from zjm_rag import lockers
+
+    ldir = lockers.locker_dir(cfg, name)
+    (ldir / "corpus").mkdir(parents=True)
+    (ldir / "zghome").mkdir(parents=True)
+    manifest_files = {}
+    for rel, text in files.items():
+        p = ldir / "corpus" / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+        manifest_files[rel] = {"source": f"/src/{rel}", "size": p.stat().st_size, "sha256": "x", "added": 0}
+    lockers.write_manifest(ldir, {"name": name, "embedding": "m", "indexed": True, "files": manifest_files})
     return ldir
 
 

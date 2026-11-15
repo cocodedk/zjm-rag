@@ -10,9 +10,11 @@ from . import zg
 from .errors import ZjmError
 
 
-def _run_zg_query(argv, corpus, ldir, runner):
+def _run_zg_query(argv, corpus, ldir, runner, name):
     code, out, err = runner(argv, cwd=str(corpus), env=lockers_mod.zg_env(ldir), input=None)
     if code != 0:
+        if zg.incompatible(err):
+            raise ZjmError(f"locker {name} was indexed by an older zg; re-run a file operation")
         raise ZjmError(f"zg query failed: {err.strip()}")
     return zg.parse(out)
 
@@ -39,11 +41,11 @@ def gather(cfg, names, keys, query, file_types, limit, translations, runner, *, 
                 if not manifest["indexed"]:
                     raise ZjmError(f"locker {name} is not indexed; re-run a file operation")
                 corpus = ldir / "corpus"
-                hits = _run_zg_query(zg.query_argv(query, file_types), corpus, ldir, runner)
+                hits = _run_zg_query(zg.query_argv(query, file_types), corpus, ldir, runner, name)
                 translated_hits = None
                 if translations:
                     argv = zg.query_argv_translations(translations, file_types)
-                    translated_hits = _run_zg_query(argv, corpus, ldir, runner)
+                    translated_hits = _run_zg_query(argv, corpus, ldir, runner, name)
                 record = evidence.read_candidates(hits, manifest["files"], corpus, limit, want_text=want_text,
                                                   translated_hits=translated_hits)
                 for path, rec in record.items():

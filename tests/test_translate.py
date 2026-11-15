@@ -4,27 +4,12 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from fakes import PATHS, FakeRunner, fake_jev, make_config, make_locker
+from fakes import PATHS, FakeRunner, fake_jev, make_config, make_locker, make_multi_locker
 from zjm_rag import ZjmError, doctor, find
 from zjm_rag import config as config_module
 from zjm_rag import lockers as lockers_mod
 from zjm_rag import translate as translate_module
 from zjm_rag import zg
-
-
-def _make_multi_locker(cfg, name, files):
-    """A plain locker under cfg["home"]/lockers/<name>, indexed, with the given {relpath: text}."""
-    ldir = lockers_mod.locker_dir(cfg, name)
-    (ldir / "corpus").mkdir(parents=True)
-    (ldir / "zghome").mkdir(parents=True)
-    manifest_files = {}
-    for rel, text in files.items():
-        p = ldir / "corpus" / rel
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(text)
-        manifest_files[rel] = {"source": f"/src/{rel}", "size": p.stat().st_size, "sha256": "x", "added": 0}
-    lockers_mod.write_manifest(ldir, {"name": name, "embedding": "m", "indexed": True, "files": manifest_files})
-    return ldir
 
 
 class TranslateTest(unittest.TestCase):
@@ -109,17 +94,15 @@ class TranslateTest(unittest.TestCase):
         self.assertIsNone(r2["translate_error"])
 
     def test_translations_only_add_candidates(self):
-        original_out = ("hits: 2\n"
-                        "\n#1 matchedBy=fts+vector proj/b.md:1-1\nsource:\n1\tb line1\n"
-                        "\n#2 matchedBy=fts+vector proj/a.py:1-1\nsource:\n1\ta line1\n")
-        translated_out = ("hits: 3\n"
-                          "\n#1 matchedBy=fts+vector proj/c.txt:1-1\nsource:\n1\tc line1\n"
-                          "\n#2 matchedBy=fts+vector proj/b.md:3-3\nsource:\n3\tb line3\n"
-                          "\n#3 matchedBy=fts+vector proj/d.md:1-1\nsource:\n1\td line1\n")
+        original_out = ("#1 proj/b.md:1\n1\tb line1\n"
+                        "\n#2 proj/a.py:1\n1\ta line1\n")
+        translated_out = ("#1 proj/c.txt:1\n1\tc line1\n"
+                          "\n#2 proj/b.md:3\n3\tb line3\n"
+                          "\n#3 proj/d.md:1\n1\td line1\n")
         cfg = make_config(self, egress={"rank": False, "answer": False, "translate": True})
-        _make_multi_locker(cfg, "lib", {"proj/b.md": "b line1\nb line2\nb line3\nb line4\n",
-                                        "proj/a.py": "a line1\n", "proj/c.txt": "c line1\n",
-                                        "proj/d.md": "d line1\n"})
+        make_multi_locker(cfg, "lib", {"proj/b.md": "b line1\nb line2\nb line3\nb line4\n",
+                                       "proj/a.py": "a line1\n", "proj/c.txt": "c line1\n",
+                                       "proj/d.md": "d line1\n"})
         calls = []
 
         def runner(argv, *, cwd, env, input=None):
@@ -143,24 +126,21 @@ class TranslateTest(unittest.TestCase):
         self.assertEqual({(p["start"], p["end"]) for p in b_hit["passages"]}, {(1, 1), (3, 3)})
 
         self.assertEqual(calls[0][-2:], ["--", "q"])
-        hybrid_flags = [a for a in calls[1] if a.startswith("--hybrid=")]
-        self.assertEqual(len(hybrid_flags), 2)
-        self.assertIn("--fuse", calls[1])
+        self.assertEqual(calls[1], ["zg", "--hybrid=kaffeemaschine frage", "--hybrid=kaffe maskine spoergsmaal",
+                                    "--fuse", "--preview", "none", "--limit", str(zg.ZG_HITS), "--mode", "direct"])
 
     def test_merge_query_candidates_first(self):
         cfg = make_config(self, egress={"rank": False, "answer": False, "translate": True})
-        _make_multi_locker(cfg, "lib1", {"q1a.md": "qa1\n", "q1b.md": "qa2\n", "t1a.md": "ta1\n",
-                                         "t1b.md": "ta2\n"})
-        _make_multi_locker(cfg, "lib2", {"q2a.md": "qb1\n", "t2a.md": "tb1\n"})
+        make_multi_locker(cfg, "lib1", {"q1a.md": "qa1\n", "q1b.md": "qa2\n", "t1a.md": "ta1\n",
+                                        "t1b.md": "ta2\n"})
+        make_multi_locker(cfg, "lib2", {"q2a.md": "qb1\n", "t2a.md": "tb1\n"})
         lib1_corpus = str(lockers_mod.locker_dir(cfg, "lib1") / "corpus")
         lib2_corpus = str(lockers_mod.locker_dir(cfg, "lib2") / "corpus")
         outs = {
-            (lib1_corpus, False): "hits: 2\n\n#1 matchedBy=fts q1a.md:1-1\nsource:\n1\tqa1\n"
-                                 "\n#2 matchedBy=fts q1b.md:1-1\nsource:\n1\tqa2\n",
-            (lib1_corpus, True): "hits: 2\n\n#1 matchedBy=fts t1a.md:1-1\nsource:\n1\tta1\n"
-                                "\n#2 matchedBy=fts t1b.md:1-1\nsource:\n1\tta2\n",
-            (lib2_corpus, False): "hits: 1\n\n#1 matchedBy=fts q2a.md:1-1\nsource:\n1\tqb1\n",
-            (lib2_corpus, True): "hits: 1\n\n#1 matchedBy=fts t2a.md:1-1\nsource:\n1\ttb1\n",
+            (lib1_corpus, False): "#1 q1a.md:1\n1\tqa1\n\n#2 q1b.md:1\n1\tqa2\n",
+            (lib1_corpus, True): "#1 t1a.md:1\n1\tta1\n\n#2 t1b.md:1\n1\tta2\n",
+            (lib2_corpus, False): "#1 q2a.md:1\n1\tqb1\n",
+            (lib2_corpus, True): "#1 t2a.md:1\n1\ttb1\n",
         }
 
         def runner(argv, *, cwd, env, input=None):

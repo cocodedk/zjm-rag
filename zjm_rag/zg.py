@@ -3,7 +3,8 @@ import re
 import subprocess
 
 ZG_HITS = 40
-HIT_RE = re.compile(r"^#(\d+) matchedBy=\S+ (.+?):(\d+)(?:-(\d+))?$")
+HIT_RE = re.compile(r"^#(\d+) (.+?):(\d+)(?:-(\d+))?$")
+INCOMPATIBLE = "incompatible with the current version of zg"
 
 
 def run(argv, *, cwd, env, input=None):
@@ -18,14 +19,14 @@ def run(argv, *, cwd, env, input=None):
 
 
 def index_argv(embedding, rebuild=False):
-    argv = ["zg", "index", ".", "--embedding", embedding, "--mode", "direct", "--hidden"]
+    argv = ["zg", "--index", ".", "--embedding", embedding, "--mode", "direct", "--hidden"]
     return argv + ["--rebuild"] if rebuild else argv
 
 
 def query_argv(query, file_types=None):
     """Options first, `-t` per type, then `--` and the query last, so a question such as
     `--help` is searched, not obeyed (spec 10)."""
-    argv = ["zg", "query", "--preview", "none", "--limit", str(ZG_HITS), "--mode", "direct"]
+    argv = ["zg", "--preview", "none", "--limit", str(ZG_HITS), "--mode", "direct"]
     for t in file_types or []:
         argv += ["-t", t]
     return argv + ["--", query]
@@ -34,7 +35,7 @@ def query_argv(query, file_types=None):
 def query_argv_translations(translations, file_types=None):
     """One `--hybrid=<t>` argv element per translation, so it can never be read as an option;
     `--fuse` only when there is more than one (spec 10)."""
-    argv = ["zg", "query"] + [f"--hybrid={t}" for t in translations]
+    argv = ["zg"] + [f"--hybrid={t}" for t in translations]
     if len(translations) > 1:
         argv.append("--fuse")
     argv += ["--preview", "none", "--limit", str(ZG_HITS), "--mode", "direct"]
@@ -43,9 +44,14 @@ def query_argv_translations(translations, file_types=None):
     return argv
 
 
+def incompatible(stderr):
+    """True when zg refused an index that an older zg built; `--index --rebuild` repairs it."""
+    return INCOMPATIBLE in stderr
+
+
 def parse(out):
     """zg query output -> every hit, in zg order, as {"path", "start", "end", "rank"}. Only header
-    lines matter; everything else (heading/scope/source lines) is ignored."""
+    lines matter; everything else (heading/scope/symbol lines) is ignored."""
     hits = []
     for line in out.split("\n"):
         m = HIT_RE.match(line)
