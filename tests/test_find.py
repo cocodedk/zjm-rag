@@ -6,7 +6,7 @@ import unittest
 import urllib.error
 from unittest import mock
 
-from fakes import PATHS, FakeRunner, fake_jev, make_config, make_locker
+from fakes import OLD_INDEX_ERR, PATHS, FakeRunner, fake_jev, make_config, make_locker
 
 from zjm_rag import ZjmError, find, jev
 from zjm_rag import lockers as lockers_mod
@@ -25,7 +25,7 @@ class FindTest(unittest.TestCase):
             return fake_jev([0.9, 0.2, 0.5])(payload)
 
         r = find("q", ["lib"], file_types=["py", "md"], runner=runner, jev=jev, config=self.cfg)
-        self.assertEqual(runner.calls[0][0], ["zg", "query", "--preview", "none", "--limit", "40",
+        self.assertEqual(runner.calls[0][0], ["zg", "--preview", "none", "--limit", "40",
                                               "--mode", "direct", "-t", "py", "-t", "md", "--", "q"])
         self.assertEqual(list(payloads[0]["questions"]), ["f1", "f2", "f3"])
         self.assertEqual(payloads[0]["state"]["evidence"][0]["path"], "lib/proj/b.md")
@@ -38,6 +38,22 @@ class FindTest(unittest.TestCase):
         self.assertEqual(r["accepted"][0]["source_path"], "/src/proj/b.md")
         self.assertEqual(r["accepted"][0]["score"], 0.9)
         self.assertEqual((r["sort"], r["min_score"]), ("score", 0.5))
+
+    def test_find_on_incompatible_index_names_the_locker(self):
+        calls = []
+
+        def older_zg(argv, *, cwd, env, input):
+            calls.append((argv, cwd))
+            return 1, "", f"{OLD_INDEX_ERR}\n{cwd}"
+
+        with self.assertRaises(ZjmError) as caught:
+            find("q", ["lib"], runner=older_zg, jev=fake_jev([]), config=self.cfg)
+        message = str(caught.exception)
+        self.assertEqual(message, "locker lib was indexed by an older zg; re-run a file operation")
+        self.assertNotIn(self.cfg["home"], message)
+        self.assertNotIn(calls[0][1], message)
+        self.assertEqual(len(calls), 1)
+        self.assertNotIn("--rebuild", calls[0][0])
 
     def test_sort_keys(self):
         jev = fake_jev([0.7, 0.9, 0.8])

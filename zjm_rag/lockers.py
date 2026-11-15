@@ -73,8 +73,10 @@ def run_index(ldir, manifest, runner):
     """Reindex a locker's corpus; keeps files copied even when zg fails (indexed stays False)."""
     manifest["indexed"] = False
     write_manifest(ldir, manifest)
-    code, _, err = runner(zg.index_argv(manifest["embedding"]), cwd=str(ldir / "corpus"),
-                          env=zg_env(ldir), input=None)
+    corpus, env = str(ldir / "corpus"), zg_env(ldir)
+    code, _, err = runner(zg.index_argv(manifest["embedding"]), cwd=corpus, env=env, input=None)
+    if code != 0 and zg.incompatible(err):  # built by an older zg: rebuild once
+        code, _, err = runner(zg.index_argv(manifest["embedding"], rebuild=True), cwd=corpus, env=env, input=None)
     if code != 0:
         raise ZjmError(f"zg index failed: {err.strip()}")
     manifest["indexed"] = True
