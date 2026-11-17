@@ -44,16 +44,18 @@ The same two model2vec models, at the revisions zg 0.3.0 pins:
 | `local/potion-code-16m-v2` | `minishlab/potion-code-16M-v2` @ `e9d2a44ca6a05ac6685f3b23709ea57eb7352d5b` | `75cf7a6c2171b230ad19b1e7d8e0b1aee86da5a02af8e7cacedd9921d227623c` | `107bbdcbad4bff1d299b7a4c3a2fb17c52890688b7dd0e4c9deab79d3c4f3d45` |
 
 Each lives in `/opt/zjm/models/<model>/` (`<model>` is the name without `local/`) with
-`model.safetensors`, `tokenizer.json` and `vocab/`, the vocabulary prebuilt for memory-mapping:
+`model.safetensors` and `tokenizer.json`. The multilingual model's tokenizer is a 500,353-entry
+Unigram, too slow to load per call, so its folder also has `vocab/`, prebuilt for memory-mapping:
 an FST of token to id, a score array, and a tokenizer skeleton that keeps only the normalizer and
-pre-tokenizer.
+pre-tokenizer. The code model's tokenizer is a 63,457-entry WordPiece and is loaded as it is.
 
 A text's vector is zg 0.3.0's: tokenize, keep the first 1,024 tokens, drop the unknown token, take
 the mean of their rows in f64, normalize, store as f32.
 
 ### Commands
 
-- `zjm-engine vocab TOKENIZER_JSON OUT_DIR`: writes `vocab/`. Run at image build only.
+- `zjm-engine vocab TOKENIZER_JSON OUT_DIR`: writes `vocab/` for a Unigram tokenizer. Run at image
+  build only, for the multilingual model.
 - `zjm-engine index --model DIR CORPUS INDEX`: splits every file under `CORPUS` into chunks, embeds
   each chunk, and writes `INDEX`. It always builds the index from scratch. It skips a file that is empty or
   whitespace only, has a NUL byte in its first 8 KiB, or is over 16 MiB; text that is not valid
@@ -72,7 +74,7 @@ format version or for another model.
 
 ### Chunks
 
-zg 0.3.0's rule: a markdown file splits at its headings (outside code fences), one chunk per
+The engine's rule, with zg 0.3.0's sizes: a markdown file splits at its headings (outside code fences), one chunk per
 section. A section, or any other file, longer than 3,600 characters splits into pieces of at most
 3,600 characters with 540 overlapping, cut at a line end when one falls in the last 30% of the
 piece. Each chunk records its path and first and last line. Whitespace-only text makes no chunk.
@@ -158,6 +160,15 @@ rewritten for the engine, not added. `test_incompatible_index_is_rebuilt_on_writ
 every write builds the index from scratch. New:
 `test_find_makes_one_engine_call_with_translations`, `test_write_removes_zg_leftovers`,
 `test_bad_engine_output_raises`.
+
+## Slices
+
+Two pull requests, in order:
+
+1. The crate: `engine/`, its 16 Rust tests and the `engine` CI job. Python is untouched and stays
+   at 131 tests.
+2. The switch: the Python changes, the image, the docs and the recall eval, ending at 133 Python
+   tests and the acceptance below.
 
 ## Acceptance
 
