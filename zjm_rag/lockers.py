@@ -15,11 +15,13 @@ from .errors import ZjmError
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 SEALED_SUFFIX = ".age"
+RESERVED_SUFFIXES = (SEALED_SUFFIX, ".key", ".verify", ".tmp")  # session keys, verification copies, seal files
 MULTILINGUAL_MODEL = config_module.MULTILINGUAL_EMBEDDING
 
 
-def check_name(name):
-    if not isinstance(name, str) or not NAME_RE.match(name) or name.endswith(SEALED_SUFFIX):
+def check_name(name, *, legacy=False):
+    """`legacy` lets a name made before spec 15 reserved its suffixes through, so it can be dropped."""
+    if not isinstance(name, str) or not NAME_RE.match(name) or (not legacy and name.endswith(RESERVED_SUFFIXES)):
         raise ZjmError(f"bad locker name: {name!r}")
 
 
@@ -66,7 +68,7 @@ def write_manifest(ldir, manifest):
 
 
 def zg_env(ldir):
-    return {**os.environ, "ZVEC_GREP_HOME": str(ldir / "zghome")}
+    return zg.child_env(ZVEC_GREP_HOME=str(ldir / "zghome"))
 
 
 def run_index(ldir, manifest, runner):
@@ -75,8 +77,10 @@ def run_index(ldir, manifest, runner):
     write_manifest(ldir, manifest)
     corpus, env = str(ldir / "corpus"), zg_env(ldir)
     code, _, err = runner(zg.index_argv(manifest["embedding"]), cwd=corpus, env=env, input=None)
+    zg.raise_if_timed_out(code, "zg index")
     if code != 0 and zg.incompatible(err):  # built by an older zg: rebuild once
         code, _, err = runner(zg.index_argv(manifest["embedding"], rebuild=True), cwd=corpus, env=env, input=None)
+        zg.raise_if_timed_out(code, "zg index rebuild")
     if code != 0:
         raise ZjmError(f"zg index failed: {err.strip()}")
     manifest["indexed"] = True
@@ -130,7 +134,7 @@ def locker_list(*, config=None, runner=None, jev=None):
 
 
 def locker_drop(name, key=None, *, config=None, runner=zg.run, jev=None):
-    check_name(name)
+    check_name(name, legacy=True)
     cfg = config_module.resolve(config)
     age_path, plain_dir = _locations(cfg, name)
     with lock(cfg, exclusive=True):

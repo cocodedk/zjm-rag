@@ -1,5 +1,6 @@
 """A locker with three files, a resolved config, and a fake runner that plays zg, git, age and the LLM."""
 import hashlib
+import io
 import json
 import os
 import tempfile
@@ -80,12 +81,12 @@ class FakeRunner:
     def __init__(self, ignored=()):
         self.calls, self.ignored = [], set(ignored)
 
-    def __call__(self, argv, *, cwd, env, input):
+    def __call__(self, argv, *, cwd, env, input, consume=None):
         self.calls.append((argv, cwd, env, input))
         if argv[0] == "age-keygen":
             return self._age_keygen(argv)
         if argv[0] == "age":
-            return self._age(argv, input)
+            return self._age(argv, input, consume)
         if argv[0] == "zg":
             return 0, ZG_OUT, ""
         if argv[0] == "git":
@@ -100,7 +101,7 @@ class FakeRunner:
         key = Path(key_file).read_text()
         return 0, (_fake_recipient(key) + "\n").encode(), b""
 
-    def _age(self, argv, input):
+    def _age(self, argv, input, consume=None):
         if "-o" in argv:
             recipient = argv[argv.index("-r") + 1]
             out_path = argv[argv.index("-o") + 1]
@@ -116,7 +117,8 @@ class FakeRunner:
         stored_recipient, _, plaintext = data[len(AGE_MARKER):].partition(b"\n")
         if stored_recipient.decode() != recipient:
             return 1, b"", b"no identity matched a recipient"
-        return 0, plaintext, b""
+        consume(io.BytesIO(plaintext))
+        return 0, None, b""
 
 
 CRITERIA = {"true": "The file holds the answer.", "false": "The file does not hold the answer."}

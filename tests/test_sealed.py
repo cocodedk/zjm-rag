@@ -63,10 +63,10 @@ class SealedTest(unittest.TestCase):
 
         base = FakeRunner()
 
-        def failing(argv, *, cwd, env, input):
+        def failing(argv, *, cwd, env, input, consume=None):
             if argv[0] == "zg":
                 return 1, "", "boom"
-            return base(argv, cwd=cwd, env=env, input=input)
+            return base(argv, cwd=cwd, env=env, input=input, consume=consume)
 
         with self.assertRaises(ZjmError):
             file_put("lib", "a.md", "hello", key=TEST_KEY, config=self.cfg, runner=failing)
@@ -137,10 +137,10 @@ class SealedTest(unittest.TestCase):
 
         make_locker(self, self.cfg, "lib2")
 
-        def failing_seal(argv, *, cwd, env, input):
+        def failing_seal(argv, *, cwd, env, input, consume=None):
             if argv[0] == "age" and "-o" in argv:
                 return 1, b"", b"boom"
-            return FakeRunner()(argv, cwd=cwd, env=env, input=input)
+            return FakeRunner()(argv, cwd=cwd, env=env, input=input, consume=consume)
 
         with self.assertRaises(ZjmError):
             locker_encrypt("lib2", TEST_KEY, config=self.cfg, runner=failing_seal)

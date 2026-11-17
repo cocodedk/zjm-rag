@@ -12,6 +12,7 @@ from .errors import ZjmError
 
 def _run_zg_query(argv, corpus, ldir, runner, name):
     code, out, err = runner(argv, cwd=str(corpus), env=lockers_mod.zg_env(ldir), input=None)
+    zg.raise_if_timed_out(code, "zg query")
     if code != 0:
         if zg.incompatible(err):
             raise ZjmError(f"locker {name} was indexed by an older zg; re-run a file operation")

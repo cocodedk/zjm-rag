@@ -11,13 +11,32 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from . import keys as keys_mod
+from . import zg
 from .errors import ZjmError
 
 TMP_ROOT = Path("/tmp/zjm")
+MOUNTS_PATH = Path("/proc/self/mounts")
+TMP_MOUNT_POINT = "/tmp"
+TMPFS = "tmpfs"
+NOT_TMPFS = f"refusing to decrypt: {TMP_MOUNT_POINT} is not a {TMPFS}; run zjm with --tmpfs {TMP_MOUNT_POINT}"
+
+
+def _require_tmpfs():
+    """In the container, plaintext may only touch a memory-backed /tmp (spec 15)."""
+    if os.environ.get("ZJM_IN_CONTAINER") != "1":
+        return
+    try:
+        lines = MOUNTS_PATH.read_text().splitlines()
+    except OSError:
+        lines = []
+    fstypes = [f[2] for f in (ln.split() for ln in lines) if len(f) > 2 and f[1] == TMP_MOUNT_POINT]
+    if not fstypes or fstypes[-1] != TMPFS:
+        raise ZjmError(NOT_TMPFS)
 
 
 def _ensure_tmp_root():
     """TMP_ROOT must be our own, private directory, never a symlink another user could plant."""
+    _require_tmpfs()
     try:
         st = os.lstat(TMP_ROOT)
     except FileNotFoundError:
@@ -69,24 +88,31 @@ def cleanup(session_dir, key_file, age_path=None):
         age_path.with_name(age_path.name + ".tmp").unlink(missing_ok=True)
 
 
-def _safe_members(tf):
-    members = tf.getmembers()
-    for m in members:
-        if not (m.isfile() or m.isdir()):
-            raise ZjmError("locker archive contains an unsupported member")
-        parts = Path(m.name).parts
-        if m.name.startswith("/") or ".." in parts:
-            raise ZjmError("locker archive contains an unsafe path")
-    return members
+def _check_member(m):
+    if not (m.isfile() or m.isdir()):
+        raise ZjmError("locker archive contains an unsupported member")
+    if m.name.startswith("/") or ".." in Path(m.name).parts:
+        raise ZjmError("locker archive contains an unsafe path")
 
 
 def decrypt_into(age_path, key_file, session_dir, runner, name):
-    code, out, _err = runner(["age", "-d", "-i", str(key_file), str(age_path)], cwd=str(session_dir),
-                             env=dict(os.environ), input=b"")
+    """Unpack `age -d` into `session_dir` as it streams, checking each member as it arrives."""
+    damaged = f"wrong key or damaged locker {name}"
+
+    def consume(stream):
+        try:
+            with tarfile.open(fileobj=stream, mode="r|") as tf:
+                for member in tf:
+                    _check_member(member)
+                    tf.extract(member, session_dir)
+        except tarfile.TarError:
+            raise ZjmError(damaged) from None
+
+    code, _out, _err = runner(["age", "-d", "-i", str(key_file), str(age_path)], cwd=str(session_dir),
+                              env=zg.child_env(), input=None, consume=consume)
+    zg.raise_if_timed_out(code, f"decrypting locker {name}")
     if code != 0:
-        raise ZjmError(f"wrong key or damaged locker {name}")
-    with tarfile.open(fileobj=io.BytesIO(out)) as tf:
-        tf.extractall(session_dir, members=_safe_members(tf))
+        raise ZjmError(damaged)
 
 
 def tar_bytes(session_dir):
@@ -102,7 +128,8 @@ def encrypt_to(session_dir, tmp_path, key_file, runner, name):
     recipient = keys_mod.get_recipient(key_file, runner)
     data = tar_bytes(session_dir)
     code, _out, _err = runner(["age", "-r", recipient, "-o", str(tmp_path)], cwd=str(session_dir),
-                              env=dict(os.environ), input=data)
+                              env=zg.child_env(), input=data)
+    zg.raise_if_timed_out(code, f"sealing locker {name}")
     if code != 0 or not tmp_path.exists():
         tmp_path.unlink(missing_ok=True)
         raise ZjmError(f"failed to seal locker {name}")
