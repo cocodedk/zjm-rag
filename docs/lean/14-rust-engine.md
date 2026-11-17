@@ -55,9 +55,11 @@ the mean of their rows in f64, normalize, store as f32.
 
 - `zjm-engine vocab TOKENIZER_JSON OUT_DIR`: writes `vocab/`. Run at image build only.
 - `zjm-engine index --model DIR CORPUS INDEX`: splits every file under `CORPUS` into chunks, embeds
-  each chunk, and writes `INDEX`. It always builds the index from scratch. A file that is empty or
-  whitespace only, is not UTF-8, or is over zg's limit for its kind (code 1 MiB, data 16 MiB, other
-  text 256 MiB, the kinds of zg's type table) stays in the locker but is not indexed; a corpus
+  each chunk, and writes `INDEX`. It always builds the index from scratch. A binary file (a NUL byte
+  in its first 8 KiB, or one of the binary extensions zg 0.3.0 skips), an empty or whitespace-only
+  file, or one over zg's limit for its kind (code types 1 MiB; csv, html, json, toml, xml and yaml
+  16 MiB; any other text 256 MiB) stays in the locker but is not indexed. Text that is not valid
+  UTF-8 is read with replacement characters, not skipped; a corpus
   with no chunk still writes a valid, empty index. Which files enter a locker is
   still decided by the copy rules of spec 05; the engine adds no path rules.
 - `zjm-engine query --model DIR --limit N [--type T]... INDEX -- QUESTION [TRANSLATION]...`:
@@ -90,9 +92,9 @@ language the model reads. The two rankings fuse by reciprocal rank (k = 60). The
 the question's fused ranking; the `translation` group fuses the translations' rankings the same way. Each group keeps its best `N` chunks; a file may
 appear more than once. `--type` takes zg 0.3.0's whole type table (`zg --help file-types`), copied
 into the engine: extensions (`markdown` is `.md`, `.mdx`; `python` is `.py`) and file names
-(`dockerfile` is `Dockerfile`, `makefile` is `Makefile`). A value is a type name or one of its
-extensions without the dot (`python` or `py`, `markdown` or `md`), as zg 0.3.0 accepts. Anything
-else is refused with an error that names it.
+(`dockerfile` is `Dockerfile`, `makefile` is `Makefile`). A value matches as in zg 0.3.0: a type name in any
+case (`python`, `Python`), an extension with or without its dot (`py`, `.py`), or a file name from
+the table (`Dockerfile`). Anything else is refused with an error that names it.
 
 Only markdown splits at headings. zg cuts structured code (python, rust, go, c, cpp, java,
 javascript, typescript, jsx, tsx, vue, svelte) at symbols; the engine cuts it as text. That is a
@@ -109,12 +111,12 @@ hold documents. The eval's code rows are the check that code search still finds 
    no longer makes `zghome`.
 3. `gather` makes one engine call per locker carrying the question and its translations (#41); a
    hit's `via` is its group.
-4. A locker with files whose manifest says `indexed` false still gets spec 06's "not indexed" error first. One
-   that says `indexed` true but has no `engine.idx`, or whose index the engine refuses with exit 3:
+4. The order stays as `gather` has it today: a locker with no files gives zero hits without
+   running the engine; one with files and `indexed` false gets spec 06's "not indexed" error. One
+   with files that says `indexed` true but has no `engine.idx`, or whose index the engine refuses with exit 3:
    `find` and `ask` raise
    `ZjmError("locker NAME has an index from an older version; re-run a file operation")` and stay
-   read-only. The next `file_add`, `file_put` or `file_remove` builds the new index. A locker with
-   no files still gives zero hits without running the engine (spec 06).
+   read-only. The next `file_add`, `file_put` or `file_remove` builds the new index.
 5. `zjm doctor` checks `zjm-engine` on `PATH` instead of zg: `checks["engine"]` replaces
    `checks["zg"]`, and `ok` requires it where it required zg. The image installs the binary as
    `/usr/local/bin/zjm-engine`.
@@ -131,7 +133,7 @@ hold documents. The eval's code rows are the check that code search still finds 
   `needs`, so the required check covers it.
 - Every file outside `docs/lean/` and `evals/corpus/` that names zg as zjm-rag's search tool names
   `zjm-engine` instead: docs, website, skill, issue template, help text and the op descriptions in
-  `zjm_rag/ops.py`. `rg -w zg` over those files finds only `zg_rank` and `sort="zg"` afterwards. The result field `zg_rank` and `sort="zg"` keep their names, since
+  `zjm_rag/ops.py`. `rg zg` over those files finds only `zg_rank` and `sort="zg"` afterwards. The result field `zg_rank` and `sort="zg"` keep their names, since
   callers use them; they now carry the engine's rank.
 - `evals/recall.py` imports `engine` instead of `zg`, its `TOOLS` holds `zjm-engine` instead of
   `zg`, and its rank column reads the engine's rank.
