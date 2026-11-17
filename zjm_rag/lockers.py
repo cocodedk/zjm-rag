@@ -21,10 +21,7 @@ MULTILINGUAL_MODEL = config_module.MULTILINGUAL_EMBEDDING
 
 def check_name(name, *, legacy=False):
     """`legacy` lets a name made before spec 15 reserved its suffixes through, so it can be dropped."""
-    reserved = name.endswith(RESERVED_SUFFIXES) if isinstance(name, str) else True
-    if legacy:
-        reserved = isinstance(name, str) and name.endswith(SEALED_SUFFIX)
-    if not isinstance(name, str) or not NAME_RE.match(name) or reserved:
+    if not isinstance(name, str) or not NAME_RE.match(name) or (not legacy and name.endswith(RESERVED_SUFFIXES)):
         raise ZjmError(f"bad locker name: {name!r}")
 
 
@@ -83,6 +80,7 @@ def run_index(ldir, manifest, runner):
     zg.raise_if_timed_out(code, "zg index")
     if code != 0 and zg.incompatible(err):  # built by an older zg: rebuild once
         code, _, err = runner(zg.index_argv(manifest["embedding"], rebuild=True), cwd=corpus, env=env, input=None)
+        zg.raise_if_timed_out(code, "zg index rebuild")
     if code != 0:
         raise ZjmError(f"zg index failed: {err.strip()}")
     manifest["indexed"] = True

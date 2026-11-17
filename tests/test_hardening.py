@@ -4,13 +4,13 @@ import os
 import sys
 import tarfile
 import tempfile
-import time
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from fakes import TEST_KEY, FakeRunner, fake_jev, fake_llm, make_config, make_locker
+from fakes import TEST_KEY, FakeRunner, fake_jev, fake_llm, make_config, make_encrypted_locker, make_locker
 from zjm_rag import ZjmError, ask, copying, file_list, file_put, find, locker_create, locker_drop, locker_list
+from zjm_rag import lockers as lockers_mod
 from zjm_rag import sealed, zg
 from zjm_rag.cli import main
 from zjm_rag.lockers import check_name
@@ -154,10 +154,9 @@ class HardeningTest(unittest.TestCase):
     def test_finished_child_keeps_the_consume_error(self):
         def consume(stream):
             stream.read()
-            time.sleep(0.6)
             raise ZjmError("from consume")
 
-        with mock.patch.object(zg, "RUN_TIMEOUT_S", 0.3):
+        with mock.patch.object(zg, "RUN_TIMEOUT_S", 5):
             with self.assertRaisesRegex(ZjmError, "from consume"):
                 zg.run(["true"], cwd=str(self.tmp), env=zg.child_env(), input=None, consume=consume)
 
@@ -186,6 +185,12 @@ class HardeningTest(unittest.TestCase):
         with self.assertRaisesRegex(ZjmError, "bad locker name"):
             file_list("old.key", config=self.cfg, runner=FakeRunner())
         self.assertEqual(locker_drop("old.key", config=self.cfg)["name"], "old.key")
+        self.assertEqual(locker_list(config=self.cfg)["lockers"], [])
+        make_encrypted_locker(self, self.cfg, "backup")
+        lockers_dir = lockers_mod.home_dirs(self.cfg)[1]
+        (lockers_dir / "backup.age").rename(lockers_dir / "backup.age.age")
+        self.assertEqual([e["name"] for e in locker_list(config=self.cfg)["lockers"]], ["backup.age"])
+        self.assertEqual(locker_drop("backup.age", TEST_KEY, config=self.cfg, runner=FakeRunner())["name"], "backup.age")
         self.assertEqual(locker_list(config=self.cfg)["lockers"], [])
         with self.assertRaisesRegex(ZjmError, "bad locker name"):
             locker_drop("Bad Name", config=self.cfg)

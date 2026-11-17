@@ -25,7 +25,7 @@ amended where they say otherwise.
    error is today's. Reads keep one copy of the plaintext (the session folder) instead of two.
 4. **Every child process has a deadline.** The default runner kills a process that runs longer
    than `RUN_TIMEOUT_S = 600` seconds (a 2,000-file `file_add` took 13.4 s) and returns exit 124
-   with `timed out after 600 s` on stderr. Callers turn that into a `ZjmError` of its own ("decrypting locker NAME timed out"), never a wrong-key or failed-tool message. The timer only counts if the child is still running when it fires, so a finished child or a `consume` error is never turned into a timeout. `input` and `consume` cannot be combined (`ValueError`).
+   with `timed out after 600 s` on stderr. Callers turn that into a `ZjmError` of its own ("decrypting locker NAME timed out"), never a wrong-key or failed-tool message. The timer only counts if the child is still running when it fires, so a finished child is never turned into a timeout, and a `consume` error raised after the child has exited is never turned into one (a deadline that kills a child still running is the cause, and is reported as the timeout). `input` and `consume` cannot be combined (`ValueError`).
 5. **Children get only what they need.** `age`, `age-keygen`, `git` and `zg` run with an
    environment built from an allowlist (`PATH`, `HOME`, `LANG`, `LC_ALL`,
    `ZVEC_GREP_MODEL_CACHE`, each only when set) plus what the call adds (`ZVEC_GREP_HOME` for zg).
@@ -36,7 +36,7 @@ amended where they say otherwise.
    `.key`, `.verify` or `.tmp`, the suffixes `/tmp/zjm` and the lockers folder use for keys,
    verification copies and seal files. `locker_create` and every operation that opens a locker
    check the name, so such a locker can no longer be created or opened. A locker made under such a
-   name before this change stays visible in `locker_list` and can be removed with `locker_drop`;
+   name, or one ending in `.age`, before this change stays visible in `locker_list` and can be removed with `locker_drop`;
    nothing else accepts it.
 
 ## Tests
