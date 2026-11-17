@@ -2,8 +2,9 @@
 
 zjm-rag stops calling zg and searches with its own engine, `zjm-engine`, a Rust binary built from
 `engine/`. The aim is speed and memory (#39, #40, #49); search quality must not drop, and the
-recall eval below is the gate for that. Where specs 06, 07, 09, 10 and 13 describe zg (its argv,
-`ZG_HITS`, the two zg calls of a translated search, the image), this one wins.
+recall eval below is the gate for that. Where any earlier spec describes zg (its argv,
+`ZG_HITS`, the two zg calls of a translated search, `zghome` and `.zvec-grep` in a locker, the
+doctor's `zg` check, the image), this one wins.
 
 ## Why: measured on b18370b (zg 0.3.0)
 
@@ -55,7 +56,8 @@ the mean of their rows in f64, normalize, store as f32.
 - `zjm-engine vocab TOKENIZER_JSON OUT_DIR`: writes `vocab/`. Run at image build only.
 - `zjm-engine index --model DIR CORPUS INDEX`: splits every file under `CORPUS` into chunks, embeds
   each chunk, and writes `INDEX`. It always builds the index from scratch. A file that is empty, is
-  not UTF-8 or is over 16 MiB stays in the locker but is not indexed. Which files enter a locker is
+  not UTF-8 or is over 256 MiB (zg's text limit) stays in the locker but is not indexed; a corpus
+  with no chunk still writes a valid, empty index. Which files enter a locker is
   still decided by the copy rules of spec 05; the engine adds no path rules.
 - `zjm-engine query --model DIR --limit N [--type T]... INDEX -- QUESTION [TRANSLATION]...`:
   prints one JSON object, `{"query": [hit...], "translation": [hit...]}` (`translation` is empty
@@ -85,10 +87,15 @@ Every chunk is scored twice for each query text: cosine with its vector, and BM2
 over the model's own token ids, so the keyword leg needs no second tokenizer and covers every
 language the model reads. The two rankings fuse by reciprocal rank (k = 60). The `query` group is
 the question's fused ranking; the `translation` group fuses the translations' rankings the same way. Each group keeps its best `N` chunks; a file may
-appear more than once. `--type` takes zg 0.3.0's type names and extensions (`zg --help file-types`,
-copied into the engine as a table, e.g. `markdown` is `.md`, `.mdx` and `python` is `.py`); an
-unknown name is refused with an error that names it. Only markdown splits at headings; code is
-chunked as text, as zg already does for its "other code" types.
+appear more than once. `--type` takes zg 0.3.0's whole type table (`zg --help file-types`), copied
+into the engine: extensions (`markdown` is `.md`, `.mdx`; `python` is `.py`) and file names
+(`dockerfile` is `Dockerfile`, `makefile` is `Makefile`). An unknown name is refused with an error
+that names it.
+
+Only markdown splits at headings. zg cuts structured code (python, rust, go, c, cpp, java,
+javascript, typescript, jsx, tsx, vue, svelte) at symbols; the engine cuts it as text. That is a
+deliberate trade: symbol parsing would add a parser per language, and the lockers this is built for
+hold documents. The eval's code rows are the check that code search still finds its file.
 
 ## Python changes
 
@@ -96,14 +103,19 @@ chunked as text, as zg already does for its "other code" types.
    raises `ZjmError("engine returned bad output")` on anything else, and the model folder for a
    manifest's `embedding`.
 2. `lockers.run_index` runs `zjm-engine index`; on failure `indexed` stays false, as today. It
-   removes `zghome` and `corpus/.zvec-grep` when present. `zg_env` goes.
+   removes `zghome` and `corpus/.zvec-grep` when present. `zg_env` goes, and `locker_create`
+   no longer makes `zghome`.
 3. `gather` makes one engine call per locker carrying the question and its translations (#41); a
    hit's `via` is its group.
-4. A locker that has files but no `engine.idx`, or one the engine refuses with exit 3: `find` and `ask` raise
+4. A locker whose manifest says `indexed` false still gets spec 06's "not indexed" error first. One
+   that says `indexed` true but has no `engine.idx`, or whose index the engine refuses with exit 3:
+   `find` and `ask` raise
    `ZjmError("locker NAME has an index from an older version; re-run a file operation")` and stay
    read-only. The next `file_add`, `file_put` or `file_remove` builds the new index. A locker with
    no files still gives zero hits without running the engine (spec 06).
-5. `zjm doctor` checks `zjm-engine` instead of zg (`checks["engine"]` replaces `checks["zg"]`).
+5. `zjm doctor` checks `zjm-engine` on `PATH` instead of zg: `checks["engine"]` replaces
+   `checks["zg"]`, and `ok` requires it where it required zg. The image installs the binary as
+   `/usr/local/bin/zjm-engine`.
    `config.check_embedding_baked` keeps spec 07's `ZJM_IN_CONTAINER=1` guard and its model list.
 
 ## Image and repo
@@ -115,10 +127,9 @@ chunked as text, as zg already does for its "other code" types.
   `/opt/zjm/models`, readable by uid 10001.
 - CI: a new `engine` job runs `cargo test --locked` in `engine/` and is added to `verify`'s
   `needs`, so the required check covers it.
-- Every file outside `docs/lean/` and `evals/corpus/` that names zg as zjm-rag's search tool
-  (today `CLAUDE.md`, `CONTRIBUTING.md`, `README.md`, `SECURITY.md`, `profile-python.md`,
-  `pyproject.toml`, `website/`, `skills/zjm-rag/SKILL.md` and the help text in `zjm_rag/guide.py`)
-  names `zjm-engine` instead. The result field `zg_rank` and `sort="zg"` keep their names, since
+- Every file outside `docs/lean/` and `evals/corpus/` that names zg as zjm-rag's search tool names
+  `zjm-engine` instead: docs, website, skill, issue template, help text and the op descriptions in
+  `zjm_rag/ops.py`. `rg -w zg` over those files finds only `zg_rank` and `sort="zg"` afterwards. The result field `zg_rank` and `sort="zg"` keep their names, since
   callers use them; they now carry the engine's rank.
 - `evals/recall.py` imports `engine` instead of `zg`, its `TOOLS` holds `zjm-engine` instead of
   `zg`, and its rank column reads the engine's rank.
@@ -128,14 +139,15 @@ chunked as text, as zg already does for its "other code" types.
 All offline. Cargo tests build a tiny synthetic model (a few-row table and a small Unigram
 `tokenizer.json`) in a temporary folder; the real model is never needed.
 
-Rust, exactly **15** tests:
+Rust, exactly **16** tests:
 `markdown_splits_at_headings`, `long_section_splits_with_overlap_at_a_line_end`,
-`other_files_use_the_same_splitter`, `whitespace_makes_no_chunk`,
+`other_files_use_the_same_splitter`, `unindexable_files_skipped_and_empty_index_valid`,
 `pooling_matches_a_hand_computed_mean`, `unknown_tokens_dropped_and_1024_cap`,
 `prebuilt_vocab_matches_the_stock_tokenizer`, `index_round_trip`,
 `other_version_or_model_exits_3`, `exact_token_wins_through_the_keyword_leg`,
 `paraphrase_wins_through_the_vector_leg`, `fusion_order_matches_a_worked_example`,
-`translations_form_their_own_group`, `limit_caps_each_group`, `unknown_type_is_refused`.
+`translations_form_their_own_group`, `limit_caps_each_group`, `type_matches_extension_and_file_name`,
+`unknown_type_is_refused`.
 
 Python: exactly **133** tests (131 today). Tests of zg argv, output, `zghome` or the zg cache are
 rewritten for the engine, not added. `test_incompatible_index_is_rebuilt_on_write` is deleted:
