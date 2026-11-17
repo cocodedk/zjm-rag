@@ -92,7 +92,10 @@ counts for the keyword leg. The reader does not trust the file: it checks the he
 count, the vector size, each path length and each token-pair count against the bytes actually
 left before it allocates or slices, and the sizes must add up to the file exactly (trailing bytes
 included). Anything else is exit 1 with `damaged index`, never a panic or an allocation larger
-than the file; exit 3 stays for another version or model.
+than the file. An empty file, a header with no newline, or a header that is not JSON or has no
+version is damaged too (exit 1), so a truncated write never reads as "another version"; exit 3
+stays for a header that parses and names another version or model, or a vector size that differs
+from the model's.
 
 ### Ranking
 

@@ -63,6 +63,10 @@ fn damaged_index_is_refused_exactly() {
         ("trailing bytes", [good.clone(), vec![0]].concat()),
         ("chunk count short of the body", with_header(&header.replace(r#""chunks":2"#, r#""chunks":1"#))),
         ("no chunk count", with_header(&header.replace(r#""chunks":2,"#, ""))),
+        ("empty file", Vec::new()),
+        ("header without newline", header.clone().into_bytes()),
+        ("header that is not JSON", b"zzz\n".to_vec()),
+        ("header with no version", with_header(&header.replace(r#","version":1"#, ""))),
     ];
     let args = ["query", "--model", &m, "--limit", "5", &i];
     for (name, bytes) in cases {

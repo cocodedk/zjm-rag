@@ -66,10 +66,12 @@ impl<'a> Cursor<'a> {
 /// when its sizes do not add up to the bytes in the file.
 pub fn read(path: &Path, model: &str) -> Res<Index> {
     let bytes = fs::read(path).map_err(|e| Fail::io(path, e))?;
-    let nl = bytes.iter().position(|&b| b == b'\n').ok_or_else(|| Fail::format("index has no header"))?;
-    let header: serde_json::Value = serde_json::from_slice(&bytes[..nl]).map_err(|_| Fail::format("index has an unknown header"))?;
-    if header["version"].as_u64() != Some(FORMAT_VERSION) {
-        return Err(Fail::format("index has another format version"));
+    let nl = bytes.iter().position(|&b| b == b'\n').ok_or_else(damaged)?;
+    let header: serde_json::Value = serde_json::from_slice(&bytes[..nl]).map_err(|_| damaged())?;
+    match header["version"].as_u64() {
+        Some(FORMAT_VERSION) => {}
+        Some(_) => return Err(Fail::format("index has another format version")),
+        None => return Err(damaged()),
     }
     if header["model"].as_str() != Some(model) {
         return Err(Fail::format("index was built for another model"));
@@ -82,7 +84,7 @@ pub fn read(path: &Path, model: &str) -> Res<Index> {
         return Err(damaged());
     }
     let mut cur = Cursor { bytes: &bytes, at: nl + 1 };
-    let mut chunks = Vec::with_capacity(count);
+    let mut chunks = Vec::new();
     for _ in 0..count {
         let len = cur.u32()? as usize;
         let path = String::from_utf8_lossy(cur.take(len)?).into_owned();
