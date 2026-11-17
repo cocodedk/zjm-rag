@@ -55,11 +55,11 @@ the mean of their rows in f64, normalize, store as f32.
 
 - `zjm-engine vocab TOKENIZER_JSON OUT_DIR`: writes `vocab/`. Run at image build only.
 - `zjm-engine index --model DIR CORPUS INDEX`: splits every file under `CORPUS` into chunks, embeds
-  each chunk, and writes `INDEX`. It always builds the index from scratch. A binary file (a NUL byte
-  in its first 8 KiB, or one of the binary extensions zg 0.3.0 skips), an empty or whitespace-only
-  file, or one over zg's limit for its kind (code types 1 MiB; csv, html, json, toml, xml and yaml
-  16 MiB; any other text 256 MiB) stays in the locker but is not indexed. Text that is not valid
-  UTF-8 is read with replacement characters, not skipped; a corpus
+  each chunk, and writes `INDEX`. It always builds the index from scratch. It skips a file that is empty or
+  whitespace only, has a NUL byte in its first 8 KiB, or is over 16 MiB; text that is not valid
+  UTF-8 is read with replacement characters. These rules differ from zg 0.3.0's per-extension
+  rules on purpose: spec 05's copy rules already decide what enters a locker, and one plain rule
+  is easier to test than zg's table; a corpus
   with no chunk still writes a valid, empty index. Which files enter a locker is
   still decided by the copy rules of spec 05; the engine adds no path rules.
 - `zjm-engine query --model DIR --limit N [--type T]... INDEX -- QUESTION [TRANSLATION]...`:
@@ -150,7 +150,7 @@ Rust, exactly **16** tests:
 `prebuilt_vocab_matches_the_stock_tokenizer`, `index_round_trip`,
 `other_version_or_model_exits_3`, `exact_token_wins_through_the_keyword_leg`,
 `paraphrase_wins_through_the_vector_leg`, `fusion_order_matches_a_worked_example`,
-`translations_form_their_own_group`, `limit_caps_each_group`, `type_matches_extension_and_file_name`,
+`translations_form_their_own_group`, `limit_caps_each_group`, `type_matches_name_in_any_case_extension_and_file_name`,
 `unknown_type_is_refused`.
 
 Python: exactly **133** tests (131 today). Tests of zg argv, output, `zghome` or the zg cache are
