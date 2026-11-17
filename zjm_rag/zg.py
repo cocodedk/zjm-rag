@@ -4,6 +4,8 @@ import re
 import subprocess
 import threading
 
+from .errors import ZjmError
+
 ZG_HITS = 40
 RUN_TIMEOUT_S = 600
 TIMEOUT_EXIT = 124
@@ -18,6 +20,12 @@ def child_env(**extra):
     """The only environment a child process gets: the allowlisted variables that are set, plus `extra`."""
     env = {k: os.environ[k] for k in CHILD_ENV_VARS if k in os.environ}
     return {**env, **extra}
+
+
+def raise_if_timed_out(code, what):
+    """A timed-out child (exit 124) is its own error, never read as a wrong key or a failed tool."""
+    if code == TIMEOUT_EXIT:
+        raise ZjmError(f"{what} timed out")
 
 
 def _timed_out():
@@ -35,8 +43,9 @@ def _run_streaming(argv, cwd, env, consume):
     expired = threading.Event()
 
     def expire():
-        expired.set()
-        p.kill()
+        if p.poll() is None:  # a child that already exited was not slow
+            expired.set()
+            p.kill()
 
     timer = threading.Timer(RUN_TIMEOUT_S, expire)
     errors = []
@@ -68,6 +77,8 @@ def run(argv, *, cwd, env, input=None, consume=None):
     text or None selects text mode (zg, git). `consume` gets stdout as a binary stream while the
     process runs, and stdout is then None."""
     if consume is not None:
+        if input is not None:
+            raise ValueError("input and consume cannot be combined")
         return _run_streaming(argv, cwd, env, consume)
     binary = isinstance(input, bytes)
     try:

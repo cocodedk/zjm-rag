@@ -4,12 +4,13 @@ import os
 import sys
 import tarfile
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
 
 from fakes import TEST_KEY, FakeRunner, fake_jev, fake_llm, make_config, make_locker
-from zjm_rag import ZjmError, ask, copying, file_list, file_put, find, locker_create
+from zjm_rag import ZjmError, ask, copying, file_list, file_put, find, locker_create, locker_drop, locker_list
 from zjm_rag import sealed, zg
 from zjm_rag.cli import main
 from zjm_rag.lockers import check_name
@@ -70,7 +71,7 @@ class HardeningTest(unittest.TestCase):
             self.assertEqual((code, b"timed out after" in err), (124, True))
             code, _out, err = zg.run(argv, cwd=str(self.tmp), env=zg.child_env(), input=None)
             self.assertEqual((code, "timed out after" in err), (124, True))
-            code, out, err = zg.run(argv, cwd=str(self.tmp), env=zg.child_env(), input=b"", consume=lambda s: s.read())
+            code, out, err = zg.run(argv, cwd=str(self.tmp), env=zg.child_env(), input=None, consume=lambda s: s.read())
             self.assertEqual((code, out, b"timed out after" in err), (124, None, True))
 
     def test_children_get_only_allowlisted_env(self):
@@ -148,6 +149,50 @@ class HardeningTest(unittest.TestCase):
         self.assertTrue((session / "good.txt").exists())
         self.assertFalse((session / "after.txt").exists())
         self.assertFalse((self.tmp_root / "evil").exists())
+
+
+    def test_finished_child_keeps_the_consume_error(self):
+        def consume(stream):
+            stream.read()
+            time.sleep(0.6)
+            raise ZjmError("from consume")
+
+        with mock.patch.object(zg, "RUN_TIMEOUT_S", 0.3):
+            with self.assertRaisesRegex(ZjmError, "from consume"):
+                zg.run(["true"], cwd=str(self.tmp), env=zg.child_env(), input=None, consume=consume)
+
+    def test_timeouts_have_their_own_message(self):
+        locker_create("lib", TEST_KEY, config=self.cfg, runner=FakeRunner())
+        base = FakeRunner()
+        timed_out = {}
+
+        def runner(argv, *, cwd, env, input, consume=None):
+            if argv[0] == timed_out.get("tool"):
+                return zg.TIMEOUT_EXIT, None if consume else "", b"timed out after 600 s"
+            return base(argv, cwd=cwd, env=env, input=input, consume=consume)
+
+        for tool, message in (("age", "decrypting locker lib timed out"), ("age-keygen", "timed out"),
+                              ("zg", "timed out")):
+            timed_out["tool"] = tool
+            with self.subTest(tool=tool), self.assertRaisesRegex(ZjmError, message) as caught:
+                file_put("lib", "a.md", "hi", key=TEST_KEY, config=self.cfg, runner=runner)
+            self.assertNotIn("wrong key", str(caught.exception))
+
+    def test_legacy_reserved_names_can_be_listed_and_dropped(self):
+        make_locker(self, self.cfg, "old.key")
+        self.assertEqual([e["name"] for e in locker_list(config=self.cfg)["lockers"]], ["old.key"])
+        with self.assertRaisesRegex(ZjmError, "bad locker name"):
+            locker_create("new.tmp", plain=True, config=self.cfg)
+        with self.assertRaisesRegex(ZjmError, "bad locker name"):
+            file_list("old.key", config=self.cfg, runner=FakeRunner())
+        self.assertEqual(locker_drop("old.key", config=self.cfg)["name"], "old.key")
+        self.assertEqual(locker_list(config=self.cfg)["lockers"], [])
+        with self.assertRaisesRegex(ZjmError, "bad locker name"):
+            locker_drop("Bad Name", config=self.cfg)
+
+    def test_input_with_consume_is_refused(self):
+        with self.assertRaises(ValueError):
+            zg.run(["true"], cwd=str(self.tmp), env={}, input=b"x", consume=lambda s: None)
 
 
 if __name__ == "__main__":

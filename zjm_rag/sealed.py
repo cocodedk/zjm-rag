@@ -109,7 +109,8 @@ def decrypt_into(age_path, key_file, session_dir, runner, name):
             raise ZjmError(damaged) from None
 
     code, _out, _err = runner(["age", "-d", "-i", str(key_file), str(age_path)], cwd=str(session_dir),
-                              env=zg.child_env(), input=b"", consume=consume)
+                              env=zg.child_env(), input=None, consume=consume)
+    zg.raise_if_timed_out(code, f"decrypting locker {name}")
     if code != 0:
         raise ZjmError(damaged)
 
@@ -128,6 +129,7 @@ def encrypt_to(session_dir, tmp_path, key_file, runner, name):
     data = tar_bytes(session_dir)
     code, _out, _err = runner(["age", "-r", recipient, "-o", str(tmp_path)], cwd=str(session_dir),
                               env=zg.child_env(), input=data)
+    zg.raise_if_timed_out(code, f"sealing locker {name}")
     if code != 0 or not tmp_path.exists():
         tmp_path.unlink(missing_ok=True)
         raise ZjmError(f"failed to seal locker {name}")

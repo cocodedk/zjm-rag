@@ -25,7 +25,7 @@ amended where they say otherwise.
    error is today's. Reads keep one copy of the plaintext (the session folder) instead of two.
 4. **Every child process has a deadline.** The default runner kills a process that runs longer
    than `RUN_TIMEOUT_S = 600` seconds (a 2,000-file `file_add` took 13.4 s) and returns exit 124
-   with `timed out after 600 s` on stderr. Callers turn that into their usual `ZjmError`.
+   with `timed out after 600 s` on stderr. Callers turn that into a `ZjmError` of its own ("decrypting locker NAME timed out"), never a wrong-key or failed-tool message. The timer only counts if the child is still running when it fires, so a finished child or a `consume` error is never turned into a timeout. `input` and `consume` cannot be combined (`ValueError`).
 5. **Children get only what they need.** `age`, `age-keygen`, `git` and `zg` run with an
    environment built from an allowlist (`PATH`, `HOME`, `LANG`, `LC_ALL`,
    `ZVEC_GREP_MODEL_CACHE`, each only when set) plus what the call adds (`ZVEC_GREP_HOME` for zg).
@@ -34,25 +34,29 @@ amended where they say otherwise.
    `MAX_LIMIT = 100`; the HTTP and MCP schemas state the same maximum from that constant.
 7. **Locker names cannot collide with session files.** `check_name` also refuses names ending in
    `.key`, `.verify` or `.tmp`, the suffixes `/tmp/zjm` and the lockers folder use for keys,
-   verification copies and seal files. Every operation checks the name, so such a locker can no
-   longer be opened.
+   verification copies and seal files. `locker_create` and every operation that opens a locker
+   check the name, so such a locker can no longer be created or opened. A locker made under such a
+   name before this change stays visible in `locker_list` and can be removed with `locker_drop`;
+   nothing else accepts it.
 
 ## Tests
 
 All offline; the timeout test runs `sys.executable` with a sleep and a timeout patched to under a
-second. Python, exactly **140** tests (131 today). Tests whose fake `age -d` returned bytes are
+second. Python, exactly **144** tests (131 today). Tests whose fake `age -d` returned bytes are
 rewritten to feed `consume`, not added. New:
 `test_names_with_session_suffixes_are_refused`, `test_limit_and_top_k_over_the_cap_are_refused`,
 `test_runner_kills_a_process_past_its_timeout`, `test_children_get_only_allowlisted_env`,
 `test_decrypt_refuses_when_tmp_is_not_tmpfs`, `test_decrypt_runs_when_tmp_is_tmpfs`,
 `test_core_dumps_are_off_in_the_container`, `test_decrypt_streams_into_the_session`,
-`test_unsafe_member_mid_stream_stops_the_decrypt`.
+`test_unsafe_member_mid_stream_stops_the_decrypt`, `test_finished_child_keeps_the_consume_error`,
+`test_timeouts_have_their_own_message`, `test_legacy_reserved_names_can_be_listed_and_dropped`,
+`test_input_with_consume_is_refused`.
 
-Spec 14's slice 2 ends at **142** Python tests instead of 133.
+Spec 14's slice 2 ends at **146** Python tests instead of 133.
 
 ## Acceptance
 
-1. The suite at exactly 140, CI's `verify` green.
+1. The suite at exactly 144, CI's `verify` green.
 2. By hand, once, with an image built from this branch and a throwaway volume (never `zjm-data`):
    an encrypted locker is created, filled with `file_put`, and found, through `bin/zjm`'s own
    flags; the same `find` with `/tmp` not a tmpfs is refused with the message above and leaves no

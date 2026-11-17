@@ -83,9 +83,9 @@ def main():
 
         prompts = []
 
-        def runner(argv, *, cwd, env, input=None):
+        def runner(argv, *, cwd, env, input=None, consume=None):
             if argv[0] in TOOLS:
-                return zg.run(argv, cwd=cwd, env=env, input=input)
+                return zg.run(argv, cwd=cwd, env=env, input=input, consume=consume)
             prompts.append(input or "")
             return 0, "", ""
 

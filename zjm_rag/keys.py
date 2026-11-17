@@ -21,6 +21,7 @@ def get_recipient(key_file, runner):
     """`age-keygen -y <key_file>` through `runner` (bytes), or raise ZjmError("invalid key")."""
     code, out, _err = runner(["age-keygen", "-y", str(key_file)], cwd=str(key_file.parent),
                              env=zg.child_env(), input=b"")
+    zg.raise_if_timed_out(code, "reading the key")
     text = out.decode("utf-8", "replace") if isinstance(out, bytes) else out
     lines = [ln for ln in text.split("\n") if ln != ""]
     if code != 0 or len(lines) != 1:

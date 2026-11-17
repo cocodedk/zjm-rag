@@ -19,8 +19,12 @@ RESERVED_SUFFIXES = (SEALED_SUFFIX, ".key", ".verify", ".tmp")  # session keys, 
 MULTILINGUAL_MODEL = config_module.MULTILINGUAL_EMBEDDING
 
 
-def check_name(name):
-    if not isinstance(name, str) or not NAME_RE.match(name) or name.endswith(RESERVED_SUFFIXES):
+def check_name(name, *, legacy=False):
+    """`legacy` lets a name made before spec 15 reserved its suffixes through, so it can be dropped."""
+    reserved = name.endswith(RESERVED_SUFFIXES) if isinstance(name, str) else True
+    if legacy:
+        reserved = isinstance(name, str) and name.endswith(SEALED_SUFFIX)
+    if not isinstance(name, str) or not NAME_RE.match(name) or reserved:
         raise ZjmError(f"bad locker name: {name!r}")
 
 
@@ -76,6 +80,7 @@ def run_index(ldir, manifest, runner):
     write_manifest(ldir, manifest)
     corpus, env = str(ldir / "corpus"), zg_env(ldir)
     code, _, err = runner(zg.index_argv(manifest["embedding"]), cwd=corpus, env=env, input=None)
+    zg.raise_if_timed_out(code, "zg index")
     if code != 0 and zg.incompatible(err):  # built by an older zg: rebuild once
         code, _, err = runner(zg.index_argv(manifest["embedding"], rebuild=True), cwd=corpus, env=env, input=None)
     if code != 0:
@@ -131,7 +136,7 @@ def locker_list(*, config=None, runner=None, jev=None):
 
 
 def locker_drop(name, key=None, *, config=None, runner=zg.run, jev=None):
-    check_name(name)
+    check_name(name, legacy=True)
     cfg = config_module.resolve(config)
     age_path, plain_dir = _locations(cfg, name)
     with lock(cfg, exclusive=True):
