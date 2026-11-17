@@ -55,8 +55,9 @@ the mean of their rows in f64, normalize, store as f32.
 
 - `zjm-engine vocab TOKENIZER_JSON OUT_DIR`: writes `vocab/`. Run at image build only.
 - `zjm-engine index --model DIR CORPUS INDEX`: splits every file under `CORPUS` into chunks, embeds
-  each chunk, and writes `INDEX`. It always builds the index from scratch. A file that is empty, is
-  not UTF-8 or is over 256 MiB (zg's text limit) stays in the locker but is not indexed; a corpus
+  each chunk, and writes `INDEX`. It always builds the index from scratch. A file that is empty or
+  whitespace only, is not UTF-8, or is over zg's limit for its kind (code 1 MiB, data 16 MiB, other
+  text 256 MiB, the kinds of zg's type table) stays in the locker but is not indexed; a corpus
   with no chunk still writes a valid, empty index. Which files enter a locker is
   still decided by the copy rules of spec 05; the engine adds no path rules.
 - `zjm-engine query --model DIR --limit N [--type T]... INDEX -- QUESTION [TRANSLATION]...`:
@@ -89,8 +90,9 @@ language the model reads. The two rankings fuse by reciprocal rank (k = 60). The
 the question's fused ranking; the `translation` group fuses the translations' rankings the same way. Each group keeps its best `N` chunks; a file may
 appear more than once. `--type` takes zg 0.3.0's whole type table (`zg --help file-types`), copied
 into the engine: extensions (`markdown` is `.md`, `.mdx`; `python` is `.py`) and file names
-(`dockerfile` is `Dockerfile`, `makefile` is `Makefile`). An unknown name is refused with an error
-that names it.
+(`dockerfile` is `Dockerfile`, `makefile` is `Makefile`). A value is a type name or one of its
+extensions without the dot (`python` or `py`, `markdown` or `md`), as zg 0.3.0 accepts. Anything
+else is refused with an error that names it.
 
 Only markdown splits at headings. zg cuts structured code (python, rust, go, c, cpp, java,
 javascript, typescript, jsx, tsx, vue, svelte) at symbols; the engine cuts it as text. That is a
@@ -103,11 +105,11 @@ hold documents. The eval's code rows are the check that code search still finds 
    raises `ZjmError("engine returned bad output")` on anything else, and the model folder for a
    manifest's `embedding`.
 2. `lockers.run_index` runs `zjm-engine index`; on failure `indexed` stays false, as today. It
-   removes `zghome` and `corpus/.zvec-grep` when present. `zg_env` goes, and `locker_create`
+   removes `zghome` and `corpus/.zvec-grep` before it calls the engine, so they are never indexed. `zg_env` goes, and `locker_create`
    no longer makes `zghome`.
 3. `gather` makes one engine call per locker carrying the question and its translations (#41); a
    hit's `via` is its group.
-4. A locker whose manifest says `indexed` false still gets spec 06's "not indexed" error first. One
+4. A locker with files whose manifest says `indexed` false still gets spec 06's "not indexed" error first. One
    that says `indexed` true but has no `engine.idx`, or whose index the engine refuses with exit 3:
    `find` and `ask` raise
    `ZjmError("locker NAME has an index from an older version; re-run a file operation")` and stay
@@ -141,7 +143,7 @@ All offline. Cargo tests build a tiny synthetic model (a few-row table and a sma
 
 Rust, exactly **16** tests:
 `markdown_splits_at_headings`, `long_section_splits_with_overlap_at_a_line_end`,
-`other_files_use_the_same_splitter`, `unindexable_files_skipped_and_empty_index_valid`,
+`other_files_use_the_same_splitter`, `skipped_files_make_no_chunk_and_empty_index_is_valid`,
 `pooling_matches_a_hand_computed_mean`, `unknown_tokens_dropped_and_1024_cap`,
 `prebuilt_vocab_matches_the_stock_tokenizer`, `index_round_trip`,
 `other_version_or_model_exits_3`, `exact_token_wins_through_the_keyword_leg`,
