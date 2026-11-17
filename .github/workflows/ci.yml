@@ -61,13 +61,23 @@ jobs:
       - run: pip install ruff==0.16.2
       - run: ruff check --select E9,F63,F7,F82 .
 
+  # The Rust search engine (spec 14). The toolchain is pinned by engine/rust-toolchain.toml.
+  engine:
+    name: engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: cargo test
+        working-directory: engine
+        run: cargo test --locked
+
   # The one check branch protection requires (scripts/setup-repo.sh). A matrix reports
   # as "test (3.10)" / "test (3.13)", so protection names this fan-in instead.
   # `if: always()` is load-bearing: without it a failed dependency SKIPS this job, the
   # required check is never reported, and the PR sits pending instead of failing.
   verify:
     name: verify
-    needs: [test, lint]
+    needs: [test, lint, engine]
     if: always()
     runs-on: ubuntu-latest
     steps:

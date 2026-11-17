@@ -65,12 +65,15 @@ vector, as in zg 0.3.0, so its cosine with any question is 0.
   is easier to test than zg's table; a corpus
   with no chunk still writes a valid, empty index. Which files enter a locker is
   still decided by the copy rules of spec 05; the engine adds no path rules.
-- `zjm-engine query --model DIR --limit N [--type T]... INDEX -- QUESTION [TRANSLATION]...`:
-  prints one JSON object, `{"query": [hit...], "translation": [hit...]}` (`translation` is empty
+- `zjm-engine query --model DIR --limit N [--type T]... INDEX`: reads one JSON object from stdin,
+  `{"question": "...", "translations": ["...", ...]}` (`translations` may be empty or absent), so
+  no question text is ever on the command line, where `/proc/<pid>/cmdline` is readable by other
+  users of the host. Text after `INDEX`, a stdin that is not that object, or an empty question
+  is refused with exit 1. It prints one JSON object, `{"query": [hit...], "translation": [hit...]}` (`translation` is empty
   when no translation is given), each hit
   `{"path", "start", "end", "rank"}` with 1-based lines and ranks. It never prints file text.
 
-Exit 0 on success; 1 with one line on stderr on any error; 3 when `INDEX` was written by another
+Exit 0 on success; 1 with one line on stderr on any error (a damaged index included); 3 when `INDEX` was written by another
 format version or for another model.
 
 ### Chunks
@@ -85,7 +88,14 @@ piece. Each chunk records its path and first and last line. Whitespace-only text
 One file, `engine.idx` in the locker's folder, beside `locker.json`, so it is sealed with the
 locker and encrypted at rest. Its first line is a JSON header with the format version, the model
 name and the chunk count; then the chunk table, each chunk's vector, and each chunk's token-id
-counts for the keyword leg.
+counts for the keyword leg. The reader does not trust the file: it checks the header's chunk
+count, the vector size, each path length and each token-pair count against the bytes actually
+left before it allocates or slices, and the sizes must add up to the file exactly (trailing bytes
+included). Anything else is exit 1 with `damaged index`, never a panic or an allocation larger
+than the file. An empty file, a header with no newline, or a header that is not JSON or has no
+version is damaged too (exit 1), so a truncated write never reads as "another version"; exit 3
+stays for a header that parses and names another version or model, or a vector size that differs
+from the model's.
 
 ### Ranking
 
@@ -112,8 +122,8 @@ hold documents. The eval's code rows are the check that code search still finds 
 2. `lockers.run_index` runs `zjm-engine index`; on failure `indexed` stays false, as today. It
    removes `zghome` and `corpus/.zvec-grep` before it calls the engine, so they are never indexed. `zg_env` goes, and `locker_create`
    no longer makes `zghome`.
-3. `gather` makes one engine call per locker carrying the question and its translations (#41); a
-   hit's `via` is its group.
+3. `gather` makes one engine call per locker carrying the question and its translations (#41) as the
+   JSON object on the engine's stdin, never in its argv; a hit's `via` is its group.
 4. The order stays as `gather` has it today: a locker with no files gives zero hits without
    running the engine; one with files and `indexed` false gets spec 06's "not indexed" error. One
    with files that says `indexed` true but has no `engine.idx`, or whose index the engine refuses with exit 3:
@@ -146,7 +156,7 @@ hold documents. The eval's code rows are the check that code search still finds 
 All offline. Cargo tests build a tiny synthetic model (a few-row table and a small Unigram
 `tokenizer.json`) in a temporary folder; the real model is never needed.
 
-Rust, exactly **16** tests:
+Rust, exactly **19** tests:
 `markdown_splits_at_headings`, `long_section_splits_with_overlap_at_a_line_end`,
 `other_files_use_the_same_splitter`, `skipped_files_make_no_chunk_and_empty_index_is_valid`,
 `pooling_matches_a_hand_computed_mean`, `unknown_tokens_dropped_and_1024_cap`,
@@ -154,7 +164,8 @@ Rust, exactly **16** tests:
 `other_version_or_model_exits_3`, `exact_token_wins_through_the_keyword_leg`,
 `paraphrase_wins_through_the_vector_leg`, `fusion_order_matches_a_worked_example`,
 `translations_form_their_own_group`, `limit_caps_each_group`, `type_matches_name_in_any_case_extension_and_file_name`,
-`unknown_type_is_refused`.
+`unknown_type_is_refused`, `question_comes_from_stdin_not_the_command_line`, `bad_stdin_is_refused`,
+`damaged_index_is_refused_exactly`.
 
 Python: exactly **133** tests (131 today). Tests of zg argv, output, `zghome` or the zg cache are
 rewritten for the engine, not added. `test_incompatible_index_is_rebuilt_on_write` is deleted:
@@ -166,7 +177,7 @@ every write builds the index from scratch. New:
 
 Two pull requests, in order:
 
-1. The crate: `engine/`, its 16 Rust tests and the `engine` CI job. Python is untouched and stays
+1. The crate: `engine/`, its 19 Rust tests and the `engine` CI job. Python is untouched and stays
    at 131 tests.
 2. The switch: the Python changes, the image, the docs and the recall eval, ending at 133 Python
    tests and the acceptance below.
