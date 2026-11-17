@@ -2,7 +2,8 @@
 
 zjm-rag stops calling zg and searches with its own engine, `zjm-engine`, a Rust binary built from
 `engine/`. The aim is speed and memory (#39, #40, #49); search quality must not drop, and the
-recall eval below is the gate for that. Where specs 06, 07 and 13 describe zg, this one wins.
+recall eval below is the gate for that. Where specs 06, 07, 09, 10 and 13 describe zg (its argv,
+`ZG_HITS`, the two zg calls of a translated search, the image), this one wins.
 
 ## Why: measured on b18370b (zg 0.3.0)
 
@@ -52,10 +53,13 @@ the mean of their rows in f64, normalize, store as f32.
 ### Commands
 
 - `zjm-engine vocab TOKENIZER_JSON OUT_DIR`: writes `vocab/`. Run at image build only.
-- `zjm-engine index --model DIR CORPUS INDEX`: reads every regular file under `CORPUS`, splits it
-  into chunks, embeds each chunk, and writes `INDEX`. It always builds the index from scratch.
+- `zjm-engine index --model DIR CORPUS INDEX`: splits every file under `CORPUS` into chunks, embeds
+  each chunk, and writes `INDEX`. It always builds the index from scratch. A file that is empty, is
+  not UTF-8 or is over 16 MiB stays in the locker but is not indexed. Which files enter a locker is
+  still decided by the copy rules of spec 05; the engine adds no path rules.
 - `zjm-engine query --model DIR --limit N [--type T]... INDEX -- QUESTION [TRANSLATION]...`:
-  prints one JSON object, `{"query": [hit...], "translation": [hit...]}`, each hit
+  prints one JSON object, `{"query": [hit...], "translation": [hit...]}` (`translation` is empty
+  when no translation is given), each hit
   `{"path", "start", "end", "rank"}` with 1-based lines and ranks. It never prints file text.
 
 Exit 0 on success; 1 with one line on stderr on any error; 3 when `INDEX` was written by another
@@ -80,10 +84,11 @@ counts for the keyword leg.
 Every chunk is scored twice for each query text: cosine with its vector, and BM25 (k1 1.2, b 0.75)
 over the model's own token ids, so the keyword leg needs no second tokenizer and covers every
 language the model reads. The two rankings fuse by reciprocal rank (k = 60). The `query` group is
-the question's fused ranking; the `translation` group, present only when translations are given,
-fuses the translations' rankings the same way. Each group keeps its best `N` chunks; a file may
-appear more than once. `--type` keeps `markdown` (`.md`, `.markdown`) or `text` (`.txt`); any other type
-name is refused with an error that names it.
+the question's fused ranking; the `translation` group fuses the translations' rankings the same way. Each group keeps its best `N` chunks; a file may
+appear more than once. `--type` takes zg 0.3.0's type names and extensions (`zg --help file-types`,
+copied into the engine as a table, e.g. `markdown` is `.md`, `.mdx` and `python` is `.py`); an
+unknown name is refused with an error that names it. Only markdown splits at headings; code is
+chunked as text, as zg already does for its "other code" types.
 
 ## Python changes
 
@@ -94,11 +99,12 @@ name is refused with an error that names it.
    removes `zghome` and `corpus/.zvec-grep` when present. `zg_env` goes.
 3. `gather` makes one engine call per locker carrying the question and its translations (#41); a
    hit's `via` is its group.
-4. A locker with no `engine.idx`, or one the engine refuses with exit 3: `find` and `ask` raise
+4. A locker that has files but no `engine.idx`, or one the engine refuses with exit 3: `find` and `ask` raise
    `ZjmError("locker NAME has an index from an older version; re-run a file operation")` and stay
-   read-only. The next `file_add`, `file_put` or `file_remove` builds the new index.
-5. `zjm doctor` and `config.check_embedding_baked` check `zjm-engine` and the model folder
-   instead of zg and its cache.
+   read-only. The next `file_add`, `file_put` or `file_remove` builds the new index. A locker with
+   no files still gives zero hits without running the engine (spec 06).
+5. `zjm doctor` checks `zjm-engine` instead of zg (`checks["engine"]` replaces `checks["zg"]`).
+   `config.check_embedding_baked` keeps spec 07's `ZJM_IN_CONTAINER=1` guard and its model list.
 
 ## Image and repo
 
@@ -109,8 +115,13 @@ name is refused with an error that names it.
   `/opt/zjm/models`, readable by uid 10001.
 - CI: a new `engine` job runs `cargo test --locked` in `engine/` and is added to `verify`'s
   `needs`, so the required check covers it.
-- `CLAUDE.md`, `CONTRIBUTING.md` and the README name `zjm-engine` where they name zg.
-- `evals/recall.py` runs through the engine (it calls the library, so only its tool list changes).
+- Every file outside `docs/lean/` and `evals/corpus/` that names zg as zjm-rag's search tool
+  (today `CLAUDE.md`, `CONTRIBUTING.md`, `README.md`, `SECURITY.md`, `profile-python.md`,
+  `pyproject.toml`, `website/`, `skills/zjm-rag/SKILL.md` and the help text in `zjm_rag/guide.py`)
+  names `zjm-engine` instead. The result field `zg_rank` and `sort="zg"` keep their names, since
+  callers use them; they now carry the engine's rank.
+- `evals/recall.py` imports `engine` instead of `zg`, its `TOOLS` holds `zjm-engine` instead of
+  `zg`, and its rank column reads the engine's rank.
 
 ## Tests
 
@@ -147,7 +158,8 @@ every write builds the index from scratch. New:
 
 3. By hand, once, through the `zjm` launcher (uid 10001, read-only root, no network, 2 GB), on a
    2,010-file multilingual locker, rank and translate off: report a `find`'s time and
-   `zjm-engine`'s peak private memory (`/proc/<pid>/smaps_rollup`); the find takes under 1 s
+   `zjm-engine`'s private memory (`Private_Clean` + `Private_Dirty` in `/proc/<pid>/smaps_rollup`,
+   sampled every 5 ms while it runs, the highest sample); the find takes under 1 s
    (zg: 5.9 s) and the engine's private memory stays under 100 MiB (zg: 1.45 GB). After the call
    no `zjm-engine` process and no `/tmp/zjm/<name>` folder remain.
 4. A locker made by the b18370b image: `find` gives the older-version error, a `file_add` then
