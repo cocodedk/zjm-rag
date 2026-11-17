@@ -1,0 +1,22 @@
+[package]
+name = "zjm-engine"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "zjm_engine"
+path = "src/lib.rs"
+
+[[bin]]
+name = "zjm-engine"
+path = "src/main.rs"
+
+[dependencies]
+tokenizers = { version = "0.21", default-features = false, features = ["onig"] }
+memmap2 = "0.9"
+fst = "0.4"
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
