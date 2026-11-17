@@ -4,6 +4,7 @@ import os
 import sys
 import tarfile
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -154,9 +155,10 @@ class HardeningTest(unittest.TestCase):
     def test_finished_child_keeps_the_consume_error(self):
         def consume(stream):
             stream.read()
+            time.sleep(2)  # past the 1 s deadline: the timer fires after the child has exited
             raise ZjmError("from consume")
 
-        with mock.patch.object(zg, "RUN_TIMEOUT_S", 5):
+        with mock.patch.object(zg, "RUN_TIMEOUT_S", 1):
             with self.assertRaisesRegex(ZjmError, "from consume"):
                 zg.run(["true"], cwd=str(self.tmp), env=zg.child_env(), input=None, consume=consume)
 
@@ -194,6 +196,18 @@ class HardeningTest(unittest.TestCase):
         self.assertEqual(locker_list(config=self.cfg)["lockers"], [])
         with self.assertRaisesRegex(ZjmError, "bad locker name"):
             locker_drop("Bad Name", config=self.cfg)
+
+    def test_timeout_on_the_rebuild_retry_is_reported(self):
+        ldir = make_locker(self, self.cfg, "lib")
+        calls = []
+
+        def runner(argv, *, cwd, env, input, consume=None):
+            calls.append(argv)
+            return (1, "", "incompatible with the current version of zg") if len(calls) == 1 else (zg.TIMEOUT_EXIT, "", "")
+
+        with self.assertRaisesRegex(ZjmError, "zg index rebuild timed out"):
+            lockers_mod.run_index(ldir, lockers_mod.read_manifest(ldir), runner)
+        self.assertIn("--rebuild", calls[1])
 
     def test_input_with_consume_is_refused(self):
         with self.assertRaises(ValueError):

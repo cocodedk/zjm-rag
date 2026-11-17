@@ -42,7 +42,7 @@ amended where they say otherwise.
 ## Tests
 
 All offline; the timeout test runs `sys.executable` with a sleep and a timeout patched to under a
-second. Python, exactly **144** tests (131 today). Tests whose fake `age -d` returned bytes are
+second. Python, exactly **145** tests (131 today). Tests whose fake `age -d` returned bytes are
 rewritten to feed `consume`, not added. New:
 `test_names_with_session_suffixes_are_refused`, `test_limit_and_top_k_over_the_cap_are_refused`,
 `test_runner_kills_a_process_past_its_timeout`, `test_children_get_only_allowlisted_env`,
@@ -50,13 +50,13 @@ rewritten to feed `consume`, not added. New:
 `test_core_dumps_are_off_in_the_container`, `test_decrypt_streams_into_the_session`,
 `test_unsafe_member_mid_stream_stops_the_decrypt`, `test_finished_child_keeps_the_consume_error`,
 `test_timeouts_have_their_own_message`, `test_legacy_reserved_names_can_be_listed_and_dropped`,
-`test_input_with_consume_is_refused`.
+`test_input_with_consume_is_refused`, `test_timeout_on_the_rebuild_retry_is_reported`.
 
-Spec 14's slice 2 ends at **146** Python tests instead of 133.
+Spec 14's slice 2 ends at **147** Python tests instead of 133.
 
 ## Acceptance
 
-1. The suite at exactly 144, CI's `verify` green.
+1. The suite at exactly 145, CI's `verify` green.
 2. By hand, once, with an image built from this branch and a throwaway volume (never `zjm-data`):
    an encrypted locker is created, filled with `file_put`, and found, through `bin/zjm`'s own
    flags; the same `find` with `/tmp` not a tmpfs is refused with the message above and leaves no
