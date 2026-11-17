@@ -50,7 +50,8 @@ an FST of token to id, a score array, and a tokenizer skeleton that keeps only t
 pre-tokenizer. The code model's tokenizer is a 63,457-entry WordPiece and is loaded as it is.
 
 A text's vector is zg 0.3.0's: tokenize, keep the first 1,024 tokens, drop the unknown token, take
-the mean of their rows in f64, normalize, store as f32.
+the mean of their rows in f64, normalize, store as f32. A text with no known token gets the zero
+vector, as in zg 0.3.0, so its cosine with any question is 0.
 
 ### Commands
 
