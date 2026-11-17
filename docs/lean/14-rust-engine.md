@@ -129,13 +129,13 @@ hold documents. The eval's code rows are the check that code search still finds 
 - `Dockerfile`: the zg stage and the two seed steps go, and so do `ZVEC_GREP_MODEL_CACHE` and the
   zg libraries. A build stage on a pinned `rust` image runs `cargo build --release --locked`,
   fetches the four model files at the pinned revisions, checks each sha256 (a mismatch fails the
-  build), and runs `zjm-engine vocab` for both models. The runtime image takes the binary and
+  build), and runs `zjm-engine vocab` for the multilingual model. The runtime image takes the binary and
   `/opt/zjm/models`, readable by uid 10001.
 - CI: a new `engine` job runs `cargo test --locked` in `engine/` and is added to `verify`'s
   `needs`, so the required check covers it.
 - Every file outside `docs/lean/` and `evals/corpus/` that names zg as zjm-rag's search tool names
-  `zjm-engine` instead: docs, website, skill, issue template, help text and the op descriptions in
-  `zjm_rag/ops.py`. `rg zg` over those files finds only `zg_rank` and `sort="zg"` afterwards. The result field `zg_rank` and `sort="zg"` keep their names, since
+  `zjm-engine` instead: docs, website, skill, issue template, `pyproject.toml`, CI comments,
+  docstrings, help text and the op descriptions in `zjm_rag/ops.py`. `rg zg` over those files finds only `zg_rank` and `sort="zg"` afterwards. The result field `zg_rank` and `sort="zg"` keep their names, since
   callers use them; they now carry the engine's rank.
 - `evals/recall.py` imports `engine` instead of `zg`, its `TOOLS` holds `zjm-engine` instead of
   `zg`, and its rank column reads the engine's rank.
