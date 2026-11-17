@@ -63,7 +63,7 @@ impl<'a> Cursor<'a> {
 }
 
 /// Reads an index; exit 3 when it has another format version or is for another model, exit 1
-/// when its sizes do not add up to the bytes in the file.
+/// when its header is missing or unreadable or its sizes do not add up to the bytes in the file.
 pub fn read(path: &Path, model: &str) -> Res<Index> {
     let bytes = fs::read(path).map_err(|e| Fail::io(path, e))?;
     let nl = bytes.iter().position(|&b| b == b'\n').ok_or_else(damaged)?;
