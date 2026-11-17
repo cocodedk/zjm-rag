@@ -4,6 +4,7 @@ import os
 import shutil
 from pathlib import Path
 
+from . import zg
 from .errors import ZjmError
 
 FLOOR_DIRS = {".git", "node_modules", ".venv", "__pycache__", ".zvec-grep", ".zjm", ".ssh", ".gnupg", ".aws",
@@ -79,7 +80,7 @@ def _gitignored(src, rel_paths, runner):
     if not rel_paths:
         return set()
     data = "".join(p + "\0" for p in rel_paths)
-    code, out, err = runner(["git", "-C", src, "check-ignore", "-z", "--stdin"], cwd=src, env=os.environ, input=data)
+    code, out, err = runner(["git", "-C", src, "check-ignore", "-z", "--stdin"], cwd=src, env=zg.child_env(), input=data)
     if code in (0, 1):
         return {p for p in out.split("\0") if p}
     if _has_git_ancestor(src):

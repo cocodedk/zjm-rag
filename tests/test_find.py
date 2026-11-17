@@ -42,7 +42,7 @@ class FindTest(unittest.TestCase):
     def test_find_on_incompatible_index_names_the_locker(self):
         calls = []
 
-        def older_zg(argv, *, cwd, env, input):
+        def older_zg(argv, *, cwd, env, input, consume=None):
             calls.append((argv, cwd))
             return 1, "", f"{OLD_INDEX_ERR}\n{cwd}"
 

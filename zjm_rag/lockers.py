@@ -15,11 +15,12 @@ from .errors import ZjmError
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 SEALED_SUFFIX = ".age"
+RESERVED_SUFFIXES = (SEALED_SUFFIX, ".key", ".verify", ".tmp")  # session keys, verification copies, seal files
 MULTILINGUAL_MODEL = config_module.MULTILINGUAL_EMBEDDING
 
 
 def check_name(name):
-    if not isinstance(name, str) or not NAME_RE.match(name) or name.endswith(SEALED_SUFFIX):
+    if not isinstance(name, str) or not NAME_RE.match(name) or name.endswith(RESERVED_SUFFIXES):
         raise ZjmError(f"bad locker name: {name!r}")
 
 
@@ -66,7 +67,7 @@ def write_manifest(ldir, manifest):
 
 
 def zg_env(ldir):
-    return {**os.environ, "ZVEC_GREP_HOME": str(ldir / "zghome")}
+    return zg.child_env(ZVEC_GREP_HOME=str(ldir / "zghome"))
 
 
 def run_index(ldir, manifest, runner):

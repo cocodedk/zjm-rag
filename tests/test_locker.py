@@ -94,10 +94,10 @@ class LockerTest(unittest.TestCase):
         age_path = lockers_mod.home_dirs(cfg)[1] / "lib.age"
         before = age_path.read_bytes()
 
-        def failing(argv, *, cwd, env, input):
+        def failing(argv, *, cwd, env, input, consume=None):
             if "--index" in argv:
                 return 1, "", "boom"
-            return FakeRunner()(argv, cwd=cwd, env=env, input=input)
+            return FakeRunner()(argv, cwd=cwd, env=env, input=input, consume=consume)
 
         with self.assertRaises(ZjmError):
             files_mod.file_add("lib", [str(src)], key=TEST_KEY, config=cfg, runner=failing)
@@ -105,10 +105,10 @@ class LockerTest(unittest.TestCase):
         # settled detail 8/9: a failed write never touches the sealed locker; find still works.
         self.assertEqual(age_path.read_bytes(), before)
 
-        def query_runner(argv, *, cwd, env, input):
+        def query_runner(argv, *, cwd, env, input, consume=None):
             if argv[0] == "zg" and "--index" not in argv:
                 return 0, "#1 docs/b.md:1\n1\tb\n", ""
-            return FakeRunner()(argv, cwd=cwd, env=env, input=input)
+            return FakeRunner()(argv, cwd=cwd, env=env, input=input, consume=consume)
 
         found = find("q", ["lib"], keys={"lib": TEST_KEY}, config=cfg, runner=query_runner,
                      jev=lambda p: {"answers": {k: {"noul": 0.9} for k in p["questions"]}})
@@ -158,9 +158,9 @@ class LockerTest(unittest.TestCase):
         index_calls = []
 
         def older_zg(rebuild_works):
-            def runner(argv, *, cwd, env, input):
+            def runner(argv, *, cwd, env, input, consume=None):
                 if "--index" not in argv:
-                    return FakeRunner()(argv, cwd=cwd, env=env, input=input)
+                    return FakeRunner()(argv, cwd=cwd, env=env, input=input, consume=consume)
                 index_calls.append(argv)
                 if "--rebuild" in argv and rebuild_works:
                     return 0, "", ""

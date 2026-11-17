@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import resource
 import sys
 
 from . import cli_keys, search
@@ -115,6 +116,7 @@ def main(argv=None, *, runner=None, jev=None, llm=None):
     if os.environ.get("ZJM_IN_CONTAINER") != "1":
         print("zjm: runs only in its container; use the zjm launcher", file=sys.stderr)
         return 1
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))  # a crash must not write a decrypted locker to disk
     try:
         args = _parser().parse_args(argv)
     except SystemExit as e:
