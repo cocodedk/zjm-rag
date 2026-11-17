@@ -15,9 +15,8 @@ fn setup(tmp: &Tmp, words: &[&str], rows: &[&[f32]], files: &[(&str, &str)]) -> 
 }
 
 fn query(model: &str, index: &str, limit: &str, texts: &[&str]) -> Value {
-    let mut args = vec!["query", "--model", model, "--limit", limit, index, "--"];
-    args.extend(texts);
-    let (code, out, err) = run(&args);
+    let args = ["query", "--model", model, "--limit", limit, index];
+    let (code, out, err) = run_in(&args, &request(texts[0], &texts[1..]));
     assert_eq!(code, 0, "{err}");
     serde_json::from_str(&out).unwrap()
 }

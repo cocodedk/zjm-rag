@@ -17,6 +17,13 @@ pub const EXIT_ERROR: i32 = 1;
 pub const EXIT_FORMAT: i32 = 3;
 pub const FORMAT_VERSION: u64 = 1;
 
+pub const QUESTION_KEY: &str = "question";
+pub const TRANSLATIONS_KEY: &str = "translations";
+/// Bytes of a chunk record with an empty path, no vector and no token pairs: three u32 and a count.
+pub const CHUNK_FIXED_BYTES: usize = 16;
+pub const TOKEN_PAIR_BYTES: usize = 8;
+pub const F32_BYTES: usize = 4;
+
 pub const MODEL_FILE: &str = "model.safetensors";
 pub const TOKENIZER_FILE: &str = "tokenizer.json";
 pub const TENSOR_NAME: &str = "embeddings";

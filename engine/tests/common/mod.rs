@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 //! Tiny synthetic models, temp folders and a runner for the binary.
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::io::Write;
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -72,12 +73,31 @@ pub fn corpus(dir: &Path, files: &[(&str, &str)]) {
     }
 }
 
-/// Runs the binary: (exit code, stdout, stderr).
+/// Runs the binary with nothing on stdin: (exit code, stdout, stderr).
 pub fn run(args: &[&str]) -> (i32, String, String) {
-    let out = Command::new(env!("CARGO_BIN_EXE_zjm-engine")).args(args).output().unwrap();
+    run_in(args, "")
+}
+
+/// Runs the binary with `stdin` as its standard input.
+pub fn run_in(args: &[&str], stdin: &str) -> (i32, String, String) {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_zjm-engine"))
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(stdin.as_bytes()).unwrap();
+    let out = child.wait_with_output().unwrap();
     (out.status.code().unwrap(), String::from_utf8_lossy(&out.stdout).into(), String::from_utf8_lossy(&out.stderr).into())
 }
 
-pub fn s(p: &Path) -> &str {
-    p.to_str().unwrap()
+/// A query request body for stdin.
+pub fn request(question: &str, translations: &[&str]) -> String {
+    serde_json::json!({"question": question, "translations": translations}).to_string()
+}
+
+/// The path as a string that lives as long as the test process (leaked on purpose).
+pub fn s(p: &Path) -> &'static str {
+    Box::leak(p.to_str().unwrap().to_string().into_boxed_str())
 }

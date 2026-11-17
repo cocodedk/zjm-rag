@@ -26,8 +26,8 @@ fn type_matches_name_in_any_case_extension_and_file_name() {
     let paths = |t: &[&str]| {
         let mut args = vec!["query", "--model", s(&model_dir), "--limit", "9"];
         t.iter().for_each(|v| args.extend(["--type", v]));
-        args.extend([s(&index), "--", "alpha"]);
-        let out: serde_json::Value = serde_json::from_str(&run(&args).1).unwrap();
+        args.push(s(&index));
+        let out: serde_json::Value = serde_json::from_str(&run_in(&args, &request("alpha", &[])).1).unwrap();
         out["query"].as_array().unwrap().iter().map(|h| h["path"].as_str().unwrap().to_string()).collect::<Vec<_>>()
     };
     assert_eq!(paths(&["Python"]), vec!["a.py"]);
@@ -43,7 +43,8 @@ fn unknown_type_is_refused() {
     model(&tmp.path("m"), &["alpha"], &[&[0.0, 0.0], &[1.0, 0.0]], false);
     corpus(&tmp.path("c"), &[("a.py", "alpha")]);
     run(&["index", "--model", s(&tmp.path("m")), s(&tmp.path("c")), s(&tmp.path("i"))]);
-    let (code, out, err) = run(&["query", "--model", s(&tmp.path("m")), "--limit", "3", "--type", "klingon", s(&tmp.path("i")), "--", "alpha"]);
+    let args = ["query", "--model", s(&tmp.path("m")), "--limit", "3", "--type", "klingon", s(&tmp.path("i"))];
+    let (code, out, err) = run_in(&args, &request("alpha", &[]));
     assert_eq!((code, out.as_str()), (1, ""));
     assert!(err.contains("klingon"), "{err}");
 }

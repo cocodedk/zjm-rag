@@ -1,11 +1,11 @@
 //! Argument parsing and the three subcommands.
 use crate::error::{Fail, Res};
-use crate::{indexer, index, model::Model, search, types, vocabbuild};
+use crate::{index, indexer, model::Model, request, search, types, vocabbuild};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
 const USAGE: &str = "usage: zjm-engine vocab TOKENIZER_JSON OUT_DIR | index --model DIR CORPUS INDEX | \
-query --model DIR --limit N [--type T]... INDEX -- QUESTION [TRANSLATION]...";
+query --model DIR --limit N [--type T]... INDEX (the question and translations are JSON on stdin)";
 
 #[derive(Default)]
 struct Args {
@@ -13,7 +13,6 @@ struct Args {
     limit: Option<usize>,
     types: Vec<String>,
     positional: Vec<String>,
-    texts: Vec<String>,
 }
 
 fn parse(args: &[String]) -> Res<Args> {
@@ -25,10 +24,6 @@ fn parse(args: &[String]) -> Res<Args> {
             "--model" => a.model = Some(value("--model")?.into()),
             "--limit" => a.limit = Some(value("--limit")?.parse().map_err(|_| Fail::new("--limit must be a number"))?),
             "--type" => a.types.push(value("--type")?),
-            "--" => {
-                a.texts = it.cloned().collect();
-                break;
-            }
             other if other.starts_with("--") => return Err(Fail::new(format!("unknown option {other}"))),
             other => a.positional.push(other.to_string()),
         }
@@ -61,13 +56,11 @@ pub fn run(args: &[String]) -> Res<String> {
         "query" => {
             pos(1)?;
             let (model_dir, limit) = (a.model.as_deref().ok_or_else(usage)?, a.limit.ok_or_else(usage)?);
-            if a.texts.is_empty() {
-                return Err(usage());
-            }
+            let texts = request::read_texts(std::io::stdin())?;
             let filters = a.types.iter().map(|t| types::parse(t)).collect::<Res<Vec<_>>>()?;
             let model = Model::open(model_dir)?;
             let idx = index::read(Path::new(&a.positional[0]), &model.name)?;
-            let (query, translation) = search::search(&model, &idx, &filters, &a.texts, limit)?;
+            let (query, translation) = search::search(&model, &idx, &filters, &texts, limit)?;
             Ok(json!({"query": hits(&query), "translation": hits(&translation)}).to_string())
         }
         _ => Err(usage()),

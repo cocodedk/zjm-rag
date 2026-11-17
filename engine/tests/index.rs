@@ -19,7 +19,8 @@ fn skipped_files_make_no_chunk_and_empty_index_is_valid() {
     corpus(&only_skipped, &[("empty.txt", ""), ("blank.txt", "\n")]);
     let (code, out, _) = run(&["index", "--model", s(&tmp.path("m")), s(&only_skipped), s(&tmp.path("i2"))]);
     assert_eq!((code, out.trim()), (0, r#"{"chunks":0}"#));
-    let (code, out, _) = run(&["query", "--model", s(&tmp.path("m")), "--limit", "5", s(&tmp.path("i2")), "--", "alpha", "beta"]);
+    let args = ["query", "--model", s(&tmp.path("m")), "--limit", "5", s(&tmp.path("i2"))];
+    let (code, out, _) = run_in(&args, &request("alpha", &["beta"]));
     assert_eq!((code, out.trim()), (0, r#"{"query":[],"translation":[]}"#));
 }
 
@@ -53,13 +54,14 @@ fn other_version_or_model_exits_3() {
     corpus(&tmp.path("c"), &[("a.txt", "alpha")]);
     let idx = tmp.path("i");
     run(&["index", "--model", s(&tmp.path("m")), s(&tmp.path("c")), s(&idx)]);
-    let ask = |model: &str, index: &str| run(&["query", "--model", model, "--limit", "3", index, "--", "alpha"]).0;
+    let ask = |model: &str, index: &str| run_in(&["query", "--model", model, "--limit", "3", index], &request("alpha", &[])).0;
     assert_eq!(ask(s(&tmp.path("m")), s(&idx)), 0);
     assert_eq!(ask(s(&tmp.path("other")), s(&idx)), 3);
     let text = std::fs::read(&idx).unwrap();
     let changed = String::from_utf8_lossy(&text).replacen(r#""version":1"#, r#""version":2"#, 1);
     std::fs::write(tmp.path("v2"), changed.as_bytes()).unwrap();
-    let (code, _, err) = run(&["query", "--model", s(&tmp.path("m")), "--limit", "3", s(&tmp.path("v2")), "--", "alpha"]);
+    let args = ["query", "--model", s(&tmp.path("m")), "--limit", "3", s(&tmp.path("v2"))];
+    let (code, _, err) = run_in(&args, &request("alpha", &[]));
     assert_eq!((code, err.lines().count()), (3, 1));
     // A missing index is an ordinary error, exit 1.
     assert_eq!(ask(s(&tmp.path("m")), s(&tmp.path("nope"))), 1);

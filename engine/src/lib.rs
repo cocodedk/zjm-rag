@@ -10,6 +10,7 @@ pub mod indexer;
 pub mod model;
 pub mod pool;
 pub mod rank;
+pub mod request;
 pub mod search;
 pub mod table;
 pub mod tok;
