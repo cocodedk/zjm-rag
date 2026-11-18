@@ -70,6 +70,7 @@ def _parser():
     p = sub.add_parser("serve")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--allow-host", action="append", default=[])
     p.add_argument("--config", default=None)
 
     p = sub.add_parser("mcp")
@@ -142,7 +143,7 @@ def _execute(args, *, runner, jev, llm):
         from .http import make_server
         cfg = config_module.resolve(args.config)
         try:
-            server = make_server(args.host, args.port, config=cfg, runner=runner, jev=jev, llm=llm)
+            server = make_server(args.host, args.port, allow_hosts=tuple(args.allow_host), config=cfg, runner=runner, jev=jev, llm=llm)
         except ValueError as e:
             print(f"zjm: {e}", file=sys.stderr)
             return 2

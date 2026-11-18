@@ -22,7 +22,7 @@ def _host_of(value):
     return value.rsplit(":", 1)[0] if value.count(":") <= 1 else value.split("]")[0].lstrip("[")
 
 
-def make_server(host="127.0.0.1", port=8765, *, config=None, runner=None, jev=None, llm=None):
+def make_server(host="127.0.0.1", port=8765, *, allow_hosts=(), config=None, runner=None, jev=None, llm=None):
     """A ThreadingHTTPServer bound to host:port (loopback only, or 0.0.0.0 in the container)."""
     allowed = ("127.0.0.1", "localhost", "::1")
     if os.environ.get("ZJM_IN_CONTAINER") == "1":
@@ -31,6 +31,7 @@ def make_server(host="127.0.0.1", port=8765, *, config=None, runner=None, jev=No
         raise ValueError(f"host must be 127.0.0.1, localhost or ::1, not {host!r}")
     cfg = config_module.resolve(config)
     fakes = {"runner": runner, "jev": jev, "llm": llm}
+    accepted = ALLOWED_HOSTS | set(allow_hosts)
     routes = {f"/{name}": func for name, (func, _, _) in OPS.items()}
 
     class Handler(BaseHTTPRequestHandler):
@@ -51,7 +52,7 @@ def make_server(host="127.0.0.1", port=8765, *, config=None, runner=None, jev=No
 
         def _guarded(self, method):
             host_hdr = _host_of(self.headers.get("Host"))
-            if host_hdr is not None and host_hdr not in ALLOWED_HOSTS:
+            if host_hdr is not None and host_hdr not in accepted:
                 self._send(403, {"error": "host not allowed"})
                 return True
             origin = self.headers.get("Origin")

@@ -414,7 +414,8 @@ app, never in zjm: **zjm never stores a key**, and a lost key means a lost locke
   errors, results or the messages sent to the model.
 - `zjm serve` binds to `127.0.0.1`, `localhost` or `::1` only, and checks `Host`/`Origin` on every
   request (in the container, `0.0.0.0` is also accepted, since the launcher publishes only to
-  the host's loopback interface).
+  the host's loopback interface). `--allow-host NAME` (repeatable) adds names the `Host` check
+  accepts, for a caller on a private network; such a server's port must not be published.
 - The app, not zjm, decides who may use which locker and which lockers a question may search.
 - **The container is the only supported way to run zjm.** It runs read-only, as a non-root user,
   with no Linux capabilities, no swap, no core dumps, `--network none` unless `egress` is on, and
