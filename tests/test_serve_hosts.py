@@ -6,13 +6,14 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parent))
+from fakes import make_config
 from test_safety import _req, _run_cli
 
 from zjm_rag.http import make_server
 
 
 def _serve(case, **kw):
-    server = make_server(port=0, **kw)
+    server = make_server(port=0, config=make_config(case), **kw)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     case.addCleanup(server.server_close)
     case.addCleanup(server.shutdown)

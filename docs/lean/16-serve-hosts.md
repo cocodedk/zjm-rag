@@ -4,8 +4,11 @@ A caller in another container on the same private Docker network reaches `zjm se
 name, for example `http://zjm:8765`, and so sends `Host: zjm:8765`. The Host check (spec 05) answers
 403 to every name but loopback (#43). This spec lets the operator list the names to accept.
 
-It adds no authentication. The server stays reachable only from where its port is reachable, so a
-server opened this way belongs on a private network with no published port.
+It adds no authentication. The Host check stops a browser being steered at the server (DNS
+rebinding); any caller that reaches the port can send any Host, and a request without one is not
+checked, as today. So a server opened this way belongs on a private network with no published port.
+It is run on that network directly (for example as a compose service), not through the launcher,
+which publishes only to the host's loopback.
 
 ## Change
 
@@ -17,8 +20,10 @@ server opened this way belongs on a private network with no published port.
 - The Origin check is unchanged and stays loopback only. A server-to-server caller sends no Origin.
 - With nothing listed, the server behaves exactly as today.
 - The launcher (`bin/zjm`) passes `--allow-host` through untouched and still publishes to loopback only.
-- README, Safety section: the `zjm serve` bullet says that `--allow-host NAME` adds names the Host check
-  accepts, for a caller on a private network, and that such a server's port must not be published.
+- README: the `zjm serve` Safety bullet says that `--allow-host NAME` adds names the Host check accepts,
+  that such a server's port must not be published, and that the Host check is not authentication; the
+  launcher's `serve` paragraph says how to run the image for a caller on a private network, that NAME
+  is a bare host name matched exactly, and that the option has no use through the launcher.
 
 ## Tests
 
