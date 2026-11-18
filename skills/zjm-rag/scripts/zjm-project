@@ -102,7 +102,7 @@ def reindex(s: dict, root: Path, state: Path) -> None:
         mirror.floor_check(d)
         dirs.append(d)
         if mirror.linked(root, f):
-            links[d] = root / f
+            links[len(dirs) - 1] = root / f  # by entry: two entries may link one folder
         mounts.append(Path(f).name if mirror.linked(root, f) else d.name)  # a linked folder mounts under the link's name
     for f in s.get("files", []):
         p = mirror.inside(root, f)
@@ -115,7 +115,7 @@ def reindex(s: dict, root: Path, state: Path) -> None:
         die("a folder named _files is refused: that mount holds the files list")
     if len(set(names)) < len(names):
         die("two folders share a name: they would replace each other; index one of them separately")
-    lines = [f"M\t{d}" if d in missing else f"L\t{links[d]}\t{d}" if d in links else str(d) for d in dirs] + [f"F\t{p}" for p in files]
+    lines = [f"M\t{d}" if d in missing else f"L\t{links[i]}\t{d}" if i in links else str(d) for i, d in enumerate(dirs)] + [f"F\t{p}" for p in files]
     want = "\n".join(lines)
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
@@ -158,6 +158,7 @@ def stale(state: Path) -> list[str]:
         if kind.startswith("L\t"):  # a linked folder: stale when the link is gone or points elsewhere, else walked as its target
             if os.path.realpath(kind[2:]) != d:
                 out.append(kind[2:])
+                continue
             kind = ""
         if kind == "M":  # missing at index time: stale only once it exists
             if os.path.isdir(d):

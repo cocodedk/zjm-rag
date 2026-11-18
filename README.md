@@ -109,7 +109,8 @@ The commands below use `~/.claude/skills/zjm-rag/scripts/zjm-project`. If you se
      see the names in use.
    - `folders`: the folders to index, relative to the top folder. Each must be a real folder inside the
      project, not a symlink (one exception: a top-level entry such as `memory` that links into
-     `~/vaults/<project>` is indexed from its target, under the link's name), and two folders cannot share a name. A folder that does not exist yet is
+     `~/vaults/<project>` is indexed from its target, under the link's name; the vault folder must have the same name as the project's
+     checkout folder, so a worktree or clone under another folder name is refused, naming the expected folder), and two folders cannot share a name. A folder that does not exist yet is
      indexed as empty, with a warning.
    - `files`: single files to index, such as `README.md` or `CLAUDE.md`, relative to the top folder. Use
      it for files that sit in the top folder, so you do not index the code around them.

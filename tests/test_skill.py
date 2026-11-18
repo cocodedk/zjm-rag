@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import unittest
 
-from skillbase import CLEAN, SkillBase
+from skillbase import CLEAN, SKILL, SkillBase
 
 
 class SkillTest(SkillBase):
@@ -94,6 +94,37 @@ class SkillTest(SkillBase):
         (self.project / "memory").unlink()
         (self.project / "memory").symlink_to(self.notes("project/sub"))
         self.assertIn("STALE", self.run_script("find", "q", settings=mem).stderr)
+
+    def test_a_checkout_folder_named_unlike_the_vault_folder_is_refused(self):
+        other = self.tmp / "clone"
+        other.mkdir()
+        (other / "zjm-project.json").write_text("{}")
+        (other / "memory").symlink_to(self.notes())  # vaults/project, but this checkout is named clone
+        env = {**CLEAN, "PATH": f"{self.tmp / 'bin'}{os.pathsep}{os.defpath}", "HOME": str(self.tmp)}
+        (other / "zjm-project.json").write_text(json.dumps({"locker": "mine", "folders": ["memory"]}))
+        r = subprocess.run([shutil.which("python3"), str(SKILL / "zjm-project"), "reindex"], cwd=other, env=env,
+                           capture_output=True, text=True, check=False, timeout=30)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("is a symlink", r.stderr)
+        self.assertIn("vaults/clone", r.stderr)
+
+    def test_two_links_to_one_folder_each_count_and_a_repoint_warns_once(self):
+        notes = self.notes()
+        (notes / "note.md").write_text("one")
+        self.notes("project/sub")  # made before the reindex, so it is no change in the notes
+        two = {"locker": "mine", "folders": ["memory", "notes"]}
+        (self.project / "notes").symlink_to(notes)
+        self.assertEqual(self.reindex_linked(notes, folders=two["folders"]).returncode, 0)
+        (self.project / "notes").unlink()
+        r = self.run_script("find", "q", settings=two)
+        self.assertEqual(r.stderr.count("STALE"), 1)
+        self.assertIn("project/notes", r.stderr)
+        (self.project / "notes").symlink_to(notes)
+        (self.project / "memory").unlink()
+        (self.project / "memory").symlink_to(notes / "sub")
+        r = self.run_script("find", "q", settings=two)
+        self.assertEqual(r.stderr.count("STALE"), 1)
+        self.assertIn("project/memory", r.stderr)
 
     def test_a_link_to_the_notes_root_itself_is_refused(self):
         r = self.reindex_linked(self.notes().parent)
