@@ -448,10 +448,13 @@ real `zjm-engine` (offline; no network), captures the answer prompt instead of c
 not part of the unit suite. It runs inside the image, where the engine and its models are:
 
 ```sh
-run="docker run --rm --read-only --tmpfs /tmp --entrypoint python3 -w /src"
-$run --network none zjm-rag evals/recall.py              # ranking off (no network)
-$run -e OPENROUTER_API_KEY zjm-rag evals/recall.py --jev  # also ranks with the real Jev (network, costs)
-$run --network none zjm-rag evals/recall.py --limit 20 --min-score 0.7 --multilingual --verbose
+# ranking off (no network)
+docker run --rm --read-only --tmpfs /tmp --network none --entrypoint python3 -w /src zjm-rag evals/recall.py
+# also ranks with the real decision models, Jev included (network, costs)
+docker run --rm --read-only --tmpfs /tmp -e OPENROUTER_API_KEY -e TYPESAFE_API_KEY \
+  --entrypoint python3 -w /src zjm-rag evals/recall.py --jev
+docker run --rm --read-only --tmpfs /tmp --network none --entrypoint python3 -w /src \
+  zjm-rag evals/recall.py --limit 20 --min-score 0.7 --multilingual --verbose
 ```
 
 Per question it reports whether the expected file was a candidate (`cand`), whether the answer
