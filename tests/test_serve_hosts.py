@@ -25,6 +25,8 @@ class ServeHostsTest(unittest.TestCase):
         base = _serve(self, allow_hosts=("zjm",))
         self.assertEqual(_req(base, "/health", headers={"Host": "zjm:8765"}), 200)
         self.assertEqual(_req(base, "/health", headers={"Host": "other:8765"}), 403)
+        self.assertEqual(_req(base, "/health", headers={"Host": "ZJM:8765"}), 403)
+        self.assertEqual(_req(base, "/health", headers={"Host": "zjm-extra:8765"}), 403)
         self.assertEqual(_req(base, "/health", headers={"Origin": "http://zjm"}), 403)
 
     def test_nothing_listed_is_unchanged(self):
