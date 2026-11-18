@@ -1,7 +1,7 @@
 # zjm-rag
 
 Find the file that holds the answer. zjm-rag searches your folders with
-[zg](https://www.npmjs.com/package/@zvec/zvec-grep) (zvec-grep), has Jev judge which of the
+its own search engine, zjm-engine, has Jev judge which of the
 candidate files actually contain the answer, and lets an LLM answer from those files only, citing
 their paths.
 
@@ -20,10 +20,10 @@ A locker can be **encrypted with its own key**, supplied by the app on every cal
 [Locker keys](#locker-keys)): at rest it is one `age`-encrypted file, and zjm holds neither the
 key nor the plaintext outside the single request that needs them.
 
-1. **zg finds.** A hybrid search over a locker's zg index returns candidate files, in zg's rank
-   order. For the first `limit` candidate files of each locker (plus up to `limit` more from a translated question), zjm keeps every zg hit as a full chunk (the line ranges of its matches, with
+1. **zjm-engine finds.** A hybrid search over a locker's zjm-engine index returns candidate files, in zjm-engine's rank
+   order. For the first `limit` candidate files of each locker (plus up to `limit` more from a translated question), zjm keeps every zjm-engine hit as a full chunk (the line ranges of its matches, with
    overlapping or adjacent ranges merged, not a truncated preview), so the text that answers a
-   question is never lost between zg and the answer model.
+   question is never lost between zjm-engine and the answer model.
 2. **Jev ranks.** One request to Jev (TypeSafe's decisions API) asks, per file, whether it
    contains the information needed to answer the question, judging from those full chunks. Each
    file gets a probability; files at or above a threshold (default `0.5`) are accepted, the rest
@@ -70,7 +70,7 @@ Then check the install:
 
     zjm doctor
 
-`zjm doctor` checks zg, age, the API key, the config, the data folder, outside calls and the lockers.
+`zjm doctor` checks zjm-engine, age, the API key, the config, the data folder, outside calls and the lockers.
 It exits with status 1 when a check fails. A missing `OPENROUTER_API_KEY` matters only once you turn
 sending on (`send` in a project, or `egress` in your config).
 
@@ -118,7 +118,7 @@ The commands below use `~/.claude/skills/zjm-rag/scripts/zjm-project`. If you se
      the skill's project setup; direct use follows the config's `egress` instead.
    - `llm`: the OpenRouter model that writes answers. It is used only when `send` is `true`.
    - `multilingual`: `true` for documents that are not in English.
-3. Add `.zvec-grep/` to `.gitignore`, on its own line. Expected: zg's working folder stays out of git.
+3. Add `.zvec-grep/` to `.gitignore`, on its own line. Expected: a folder an earlier search tool left in the project stays out of git.
 4. Commit `zjm-project.json` and `.gitignore`. Expected: git lists both as committed.
 5. Build the index:
 
@@ -136,8 +136,8 @@ The commands below use `~/.claude/skills/zjm-rag/scripts/zjm-project`. If you se
        ~/.claude/skills/zjm-rag/scripts/zjm-project find "who approves a change before it runs?"
 
    Expected: a list of file paths, each with a score. The line `rejected: N below 0.5` counts the files
-   the judge turned down. With `send` set to `false`, the scores show as `-` and the list is zg's
-   candidates in zg's order, with no ranking. Open every file you plan to rely on: a score measures
+   the judge turned down. With `send` set to `false`, the scores show as `-` and the list is zjm-engine's
+   candidates in zjm-engine's order, with no ranking. Open every file you plan to rely on: a score measures
    relevance, not truth. No hit does not prove that the text is missing, so try other wordings.
 7. Optional: get answers with citations. Set `"send": true` in `zjm-project.json`, then run this in
    your terminal, with your own key in place of the placeholder:
@@ -219,7 +219,7 @@ zjm file-remove LOCKER NAME... [--key-file KEY]
 zjm file-list LOCKER [--key-file KEY]
 zjm find "which linter checks CSS files" -l LOCKER [-l LOCKER]... [--key-file KEYS.json] [--limit N] [--type py]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank] [--no-translate]
 zjm ask "which linter checks CSS files" -l LOCKER --lang da [--key-file KEYS.json] [--top-k 3] [--no-translate]
-zjm doctor                                   # zg, age, OPENROUTER_API_KEY, TYPESAFE_API_KEY, config, home, egress, lockers
+zjm doctor                                   # zjm-engine, age, OPENROUTER_API_KEY, TYPESAFE_API_KEY, config, home, egress, lockers
 zjm help                                     # the workflow guide and this instance's settings; changes nothing
 ```
 
@@ -388,7 +388,7 @@ app, never in zjm: **zjm never stores a key**, and a lost key means a lost locke
 - A plain locker exists only when created with `plain=True` (`--plain`); it is a directory under
   `<home>/lockers/<name>/`, exactly as before.
 - With a key (given to `locker_create`, or later to `locker_encrypt`), a locker is exactly one file,
-  `<home>/lockers/<name>.age`: the whole locker (its files, zg index and manifest), tarred and
+  `<home>/lockers/<name>.age`: the whole locker (its files, zjm-engine index and manifest), tarred and
   encrypted. No other per-locker file exists on disk.
 - Every request that touches an encrypted locker decrypts it into a private `/tmp` directory for
   that request only, re-encrypts after a write, and deletes both the plaintext and the key file
@@ -438,19 +438,23 @@ python3 -m unittest discover -s tests -q    # the test suite
 ```
 
 The package is stdlib-only, so there is nothing else to install. Tests use fakes and never call
-zg, Jev or the answer model. See [CONTRIBUTING.md](CONTRIBUTING.md).
+zjm-engine, Jev or the answer model. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Recall eval
 
-`evals/recall.py` measures whether zjm keeps the text that answers a question, from zg's hits
+`evals/recall.py` measures whether zjm keeps the text that answers a question, from zjm-engine's hits
 through to the answer model's prompt, over `evals/corpus` plus a generated runbook. It runs the
-real `zg` (offline; no network), captures the answer prompt instead of calling the model, and is
-not part of the unit suite:
+real `zjm-engine` (offline; no network), captures the answer prompt instead of calling the model, and is
+not part of the unit suite. It runs inside the image, where the engine and its models are:
 
 ```sh
-python3 evals/recall.py                                # ranking off (no network)
-python3 evals/recall.py --jev                           # also ranks with the real Jev (network, costs)
-python3 evals/recall.py --limit 20 --min-score 0.7 --multilingual --verbose
+# ranking off (no network)
+docker run --rm --read-only --tmpfs /tmp --network none --entrypoint python3 -w /src zjm-rag evals/recall.py
+# also ranks with the decision models (network, costs)
+docker run --rm --read-only --tmpfs /tmp -e OPENROUTER_API_KEY -e TYPESAFE_API_KEY \
+  --entrypoint python3 -w /src zjm-rag evals/recall.py --jev
+docker run --rm --read-only --tmpfs /tmp --network none --entrypoint python3 -w /src \
+  zjm-rag evals/recall.py --limit 20 --multilingual --verbose
 ```
 
 Per question it reports whether the expected file was a candidate (`cand`), whether the answer
@@ -461,10 +465,10 @@ is `yes`, `evid` and `ctx` must be `yes` too.
 ## Architecture
 
 ```
-zjm_rag/            library: lockers, files, search, gather (per-locker zg queries), evidence
+zjm_rag/            library: lockers, files, search, gather (per-locker zjm-engine queries), evidence
                     (full chunks), translate (question translation), llm (OpenRouter),
                     sealed (age), ops table
-tests/              unittest suite and the zg output fixture
+tests/              unittest suite
 evals/              the recall eval: corpus, golden questions and recall.py
 docs/lean/          specs for the library, CLI, HTTP API, MCP server and installer
 profile-python.md   gate profile the lean loop builds against
@@ -473,7 +477,7 @@ website/            the project site (rag.cocode.dk)
 
 | Part | Technology |
 |---|---|
-| Search | zg (zvec-grep), local hybrid index per locker |
+| Search | zjm-engine, local hybrid index per locker |
 | Ranking | Jev via TypeSafe; fallback decision models via the OpenRouter Decisions API |
 | Answer | an OpenRouter model (`deepseek/deepseek-v4-flash` by default) |
 | Code | Python 3.10+, standard library only |

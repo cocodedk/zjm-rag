@@ -1,6 +1,6 @@
 """find and ask across named lockers, plain or encrypted (specs 06, 08, 09 and 10)."""
 from . import config as config_module
-from . import evidence, zg
+from . import engine, evidence
 from . import gather as gather_module
 from . import jev as jev_client
 from . import llm as llm_client
@@ -89,7 +89,7 @@ def _check_cap(**sizes):
 
 
 def find(query, lockers, keys=None, *, limit=8, file_types=None, min_score=0.5, sort=None, rank=None, model=None,
-        translate=None, runner=zg.run, jev=jev_client.post, llm=llm_client.post, config=None):
+        translate=None, runner=engine.run, jev=jev_client.post, llm=llm_client.post, config=None):
     """Files across `lockers` that may hold the answer to `query`, split into accepted and rejected."""
     _check_cap(limit=limit)
     cfg = config_module.resolve(config)
@@ -105,7 +105,7 @@ def find(query, lockers, keys=None, *, limit=8, file_types=None, min_score=0.5, 
 
 
 def ask(query, lockers, keys=None, *, limit=8, file_types=None, min_score=0.5, sort=None, rank=None, model=None, top_k=None,
-       translate=None, answer_language=None, runner=zg.run, jev=jev_client.post, llm=llm_client.post, config=None):
+       translate=None, answer_language=None, runner=engine.run, jev=jev_client.post, llm=llm_client.post, config=None):
     """Answer `query` from the top accepted files, across lockers, with an LLM. `top_k=None`
     (the default, spec 10) means every accepted file, still bounded by `evidence.ASK_CHARS`."""
     _check_cap(limit=limit, top_k=top_k)

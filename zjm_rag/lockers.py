@@ -8,14 +8,15 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from . import config as config_module
+from . import engine
 from . import keys as keys_mod
 from . import sealed
-from . import zg
 from .errors import ZjmError
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 SEALED_SUFFIX = ".age"
 RESERVED_SUFFIXES = (SEALED_SUFFIX, ".key", ".verify", ".tmp")  # session keys, verification copies, seal files
+OLD_TOOL_LEFTOVERS = ("zghome", "corpus/.zvec-grep")  # what the search tool before zjm-engine left in a locker
 MULTILINGUAL_MODEL = config_module.MULTILINGUAL_EMBEDDING
 
 
@@ -67,22 +68,18 @@ def write_manifest(ldir, manifest):
     os.replace(tmp, manifest_path(ldir))
 
 
-def zg_env(ldir):
-    return zg.child_env(ZVEC_GREP_HOME=str(ldir / "zghome"))
-
-
 def run_index(ldir, manifest, runner):
-    """Reindex a locker's corpus; keeps files copied even when zg fails (indexed stays False)."""
+    """Rebuild a locker's index from scratch; keeps files copied even when the engine fails (indexed
+    stays False). Leftovers of the old search tool are removed first, so they are never indexed."""
     manifest["indexed"] = False
     write_manifest(ldir, manifest)
-    corpus, env = str(ldir / "corpus"), zg_env(ldir)
-    code, _, err = runner(zg.index_argv(manifest["embedding"]), cwd=corpus, env=env, input=None)
-    zg.raise_if_timed_out(code, "zg index")
-    if code != 0 and zg.incompatible(err):  # built by an older zg: rebuild once
-        code, _, err = runner(zg.index_argv(manifest["embedding"], rebuild=True), cwd=corpus, env=env, input=None)
-        zg.raise_if_timed_out(code, "zg index rebuild")
+    for leftover in OLD_TOOL_LEFTOVERS:
+        shutil.rmtree(ldir / leftover, ignore_errors=True)
+    argv = engine.index_argv(manifest["embedding"], ldir / "corpus", ldir / engine.INDEX_FILE)
+    code, _, err = runner(argv, cwd=str(ldir), env=engine.child_env(), input=None)
+    engine.raise_if_timed_out(code, "engine index")
     if code != 0:
-        raise ZjmError(f"zg index failed: {err.strip()}")
+        raise ZjmError(f"engine index failed: {err.strip()}")
     manifest["indexed"] = True
     write_manifest(ldir, manifest)
 
@@ -98,7 +95,7 @@ def _locations(cfg, name):
     return lockers_dir / f"{name}{SEALED_SUFFIX}", locker_dir(cfg, name)
 
 
-def locker_create(name, key=None, multilingual=False, embedding=None, plain=False, *, config=None, runner=zg.run,
+def locker_create(name, key=None, multilingual=False, embedding=None, plain=False, *, config=None, runner=engine.run,
                   jev=None):
     check_name(name)
     if key is None and not plain:
@@ -112,7 +109,6 @@ def locker_create(name, key=None, multilingual=False, embedding=None, plain=Fals
     config_module.check_embedding_baked(model)
     with sealed.open_locker(cfg, name, key, write=True, runner=runner, create=True) as ldir:
         (ldir / "corpus").mkdir(mode=0o700, exist_ok=True)
-        (ldir / "zghome").mkdir(mode=0o700, exist_ok=True)
         write_manifest(ldir, {"name": name, "embedding": model, "indexed": True, "files": {}})
     return {"name": name, "embedding": model}
 
@@ -133,7 +129,7 @@ def locker_list(*, config=None, runner=None, jev=None):
     return {"lockers": out}
 
 
-def locker_drop(name, key=None, *, config=None, runner=zg.run, jev=None):
+def locker_drop(name, key=None, *, config=None, runner=engine.run, jev=None):
     check_name(name, legacy=True)
     cfg = config_module.resolve(config)
     age_path, plain_dir = _locations(cfg, name)
@@ -163,7 +159,7 @@ def locker_drop(name, key=None, *, config=None, runner=zg.run, jev=None):
     return {"name": name, "files": count}
 
 
-def locker_encrypt(name, key, *, config=None, runner=zg.run, jev=None):
+def locker_encrypt(name, key, *, config=None, runner=engine.run, jev=None):
     """One-way: seal a plain locker's directory into `<name>.age`; there is no operation back."""
     check_name(name)
     cfg = config_module.resolve(config)

@@ -12,7 +12,7 @@ from unittest import mock
 from fakes import TEST_KEY, FakeRunner, fake_jev, fake_llm, make_config, make_encrypted_locker, make_locker
 from zjm_rag import ZjmError, ask, copying, file_list, file_put, find, locker_create, locker_drop, locker_list
 from zjm_rag import lockers as lockers_mod
-from zjm_rag import sealed, zg
+from zjm_rag import engine, sealed
 from zjm_rag.cli import main
 from zjm_rag.lockers import check_name
 
@@ -67,12 +67,12 @@ class HardeningTest(unittest.TestCase):
 
     def test_runner_kills_a_process_past_its_timeout(self):
         argv = [sys.executable, "-c", "import time; time.sleep(30)"]
-        with mock.patch.object(zg, "RUN_TIMEOUT_S", 0.3):
-            code, _out, err = zg.run(argv, cwd=str(self.tmp), env=zg.child_env(), input=b"")
+        with mock.patch.object(engine, "RUN_TIMEOUT_S", 0.3):
+            code, _out, err = engine.run(argv, cwd=str(self.tmp), env=engine.child_env(), input=b"")
             self.assertEqual((code, b"timed out after" in err), (124, True))
-            code, _out, err = zg.run(argv, cwd=str(self.tmp), env=zg.child_env(), input=None)
+            code, _out, err = engine.run(argv, cwd=str(self.tmp), env=engine.child_env(), input=None)
             self.assertEqual((code, "timed out after" in err), (124, True))
-            code, out, err = zg.run(argv, cwd=str(self.tmp), env=zg.child_env(), input=None, consume=lambda s: s.read())
+            code, out, err = engine.run(argv, cwd=str(self.tmp), env=engine.child_env(), input=None, consume=lambda s: s.read())
             self.assertEqual((code, out, b"timed out after" in err), (124, None, True))
 
     def test_children_get_only_allowlisted_env(self):
@@ -88,12 +88,10 @@ class HardeningTest(unittest.TestCase):
             (src / "f.txt").write_text("x")
             copying._gitignored(str(src), ["f.txt"], runner)
         seen = {c[0][0] for c in runner.calls}
-        self.assertEqual(seen, {"age", "age-keygen", "zg", "git"})
+        self.assertEqual(seen, {"age", "age-keygen", "zjm-engine", "git"})
         for argv, _cwd, env, _input in runner.calls:
-            self.assertLessEqual(set(env), {*zg.CHILD_ENV_VARS, "ZVEC_GREP_HOME"}, argv)
+            self.assertLessEqual(set(env), set(engine.CHILD_ENV_VARS), argv)
             self.assertNotIn(SECRET, "".join(env.values()))
-        zg_envs = [c[2] for c in runner.calls if c[0][0] == "zg"]
-        self.assertTrue(all("ZVEC_GREP_HOME" in e for e in zg_envs))
 
     def test_decrypt_refuses_when_tmp_is_not_tmpfs(self):
         locker_create("lib", TEST_KEY, config=self.cfg, runner=FakeRunner())
@@ -158,9 +156,9 @@ class HardeningTest(unittest.TestCase):
             time.sleep(2)  # past the 1 s deadline: the timer fires after the child has exited
             raise ZjmError("from consume")
 
-        with mock.patch.object(zg, "RUN_TIMEOUT_S", 1):
+        with mock.patch.object(engine, "RUN_TIMEOUT_S", 1):
             with self.assertRaisesRegex(ZjmError, "from consume"):
-                zg.run(["true"], cwd=str(self.tmp), env=zg.child_env(), input=None, consume=consume)
+                engine.run(["true"], cwd=str(self.tmp), env=engine.child_env(), input=None, consume=consume)
 
     def test_timeouts_have_their_own_message(self):
         locker_create("lib", TEST_KEY, config=self.cfg, runner=FakeRunner())
@@ -169,11 +167,11 @@ class HardeningTest(unittest.TestCase):
 
         def runner(argv, *, cwd, env, input, consume=None):
             if argv[0] == timed_out.get("tool"):
-                return zg.TIMEOUT_EXIT, None if consume else "", b"timed out after 600 s"
+                return engine.TIMEOUT_EXIT, None if consume else "", b"timed out after 600 s"
             return base(argv, cwd=cwd, env=env, input=input, consume=consume)
 
         for tool, message in (("age", "decrypting locker lib timed out"), ("age-keygen", "timed out"),
-                              ("zg", "timed out")):
+                              ("zjm-engine", "timed out")):
             timed_out["tool"] = tool
             with self.subTest(tool=tool), self.assertRaisesRegex(ZjmError, message) as caught:
                 file_put("lib", "a.md", "hi", key=TEST_KEY, config=self.cfg, runner=runner)
@@ -197,21 +195,19 @@ class HardeningTest(unittest.TestCase):
         with self.assertRaisesRegex(ZjmError, "bad locker name"):
             locker_drop("Bad Name", config=self.cfg)
 
-    def test_timeout_on_the_rebuild_retry_is_reported(self):
+    def test_timeout_on_the_index_run_is_reported(self):
         ldir = make_locker(self, self.cfg, "lib")
-        calls = []
 
         def runner(argv, *, cwd, env, input, consume=None):
-            calls.append(argv)
-            return (1, "", "incompatible with the current version of zg") if len(calls) == 1 else (zg.TIMEOUT_EXIT, "", "")
+            return engine.TIMEOUT_EXIT, "", ""
 
-        with self.assertRaisesRegex(ZjmError, "zg index rebuild timed out"):
+        with self.assertRaisesRegex(ZjmError, "engine index timed out"):
             lockers_mod.run_index(ldir, lockers_mod.read_manifest(ldir), runner)
-        self.assertIn("--rebuild", calls[1])
+        self.assertFalse(lockers_mod.read_manifest(ldir)["indexed"])
 
     def test_input_with_consume_is_refused(self):
         with self.assertRaises(ValueError):
-            zg.run(["true"], cwd=str(self.tmp), env={}, input=b"x", consume=lambda s: None)
+            engine.run(["true"], cwd=str(self.tmp), env={}, input=b"x", consume=lambda s: None)
 
 
 if __name__ == "__main__":

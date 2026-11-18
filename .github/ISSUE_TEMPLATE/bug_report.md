@@ -24,5 +24,5 @@ $
 **Environment**
 - OS:
 - `python3 --version`:
-- `zg --version`:
+- `zjm doctor` output:
 - zjm-rag commit or version:

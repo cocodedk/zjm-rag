@@ -1,4 +1,4 @@
-"""zjm_rag: named lockers; zg finds, Jev ranks, an LLM answers."""
+"""zjm_rag: named lockers; zjm-engine finds, Jev ranks, an LLM answers."""
 from .core import doctor
 from .errors import ZjmError
 from .files import file_add, file_list, file_put, file_remove

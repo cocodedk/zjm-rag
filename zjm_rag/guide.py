@@ -1,6 +1,6 @@
 """help: a zero-cost operation that explains zjm's workflow, keys and egress, and reports this
 instance's allowed paths, egress switches, languages, lockers and limits (spec 11). It changes
-nothing and creates nothing, not even the home directory: no zg, age, Jev or LLM call, and no lock
+nothing and creates nothing, not even the home directory: no zjm-engine, age, Jev or LLM call, and no lock
 is taken.
 """
 from . import config as config_module
@@ -85,7 +85,7 @@ def _lockers_view(cfg):
 
 def help(*, config=None, runner=None, jev=None):
     """The guide plus this instance's settings. Never raises (a bad lockers read gives `None`
-    instead), and never calls zg, age, Jev or an LLM. `runner`/`jev` are accepted, unused, only so
+    instead), and never calls zjm-engine, age, Jev or an LLM. `runner`/`jev` are accepted, unused, only so
     `help` takes the same keywords as every other op."""
     cfg = config_module.resolve(config)
     instance = {

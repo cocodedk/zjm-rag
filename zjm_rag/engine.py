@@ -1,19 +1,25 @@
-"""zg argv, the default process runner, and the parser for zg's query output."""
+"""zjm-engine argv, the default process runner, and the parser for the engine's query output."""
+import json
 import os
-import re
 import subprocess
 import threading
 
 from .errors import ZjmError
 
-ZG_HITS = 40
+HITS = 40
+BINARY = "zjm-engine"
+MODELS_DIR = "/opt/zjm/models"
+LOCAL_PREFIX = "local/"
+INDEX_FILE = "engine.idx"
+FORMAT_EXIT = 3
+BAD_OUTPUT = "engine returned bad output"
+GROUPS = ("query", "translation")
+HIT_KEYS = ("path", "start", "end", "rank")
 RUN_TIMEOUT_S = 600
 TIMEOUT_EXIT = 124
 NOT_FOUND_EXIT = 127
 DRAIN_CHUNK = 65536
-CHILD_ENV_VARS = ("PATH", "HOME", "LANG", "LC_ALL", "ZVEC_GREP_MODEL_CACHE")
-HIT_RE = re.compile(r"^#(\d+) (.+?):(\d+)(?:-(\d+))?$")
-INCOMPATIBLE = "incompatible with the current version of zg"
+CHILD_ENV_VARS = ("PATH", "HOME", "LANG", "LC_ALL")
 
 
 def child_env(**extra):
@@ -74,7 +80,7 @@ def _run_streaming(argv, cwd, env, consume):
 def run(argv, *, cwd, env, input=None, consume=None):
     """Default runner: (returncode, stdout, stderr); a missing binary is exit 127 and a process
     past RUN_TIMEOUT_S is killed and exits 124. `input` as bytes selects binary mode (used for age),
-    text or None selects text mode (zg, git). `consume` gets stdout as a binary stream while the
+    text or None selects text mode (zjm-engine, git). `consume` gets stdout as a binary stream while the
     process runs, and stdout is then None."""
     if consume is not None:
         if input is not None:
@@ -92,46 +98,45 @@ def run(argv, *, cwd, env, input=None, consume=None):
     return p.returncode, p.stdout, p.stderr
 
 
-def index_argv(embedding, rebuild=False):
-    argv = ["zg", "--index", ".", "--embedding", embedding, "--mode", "direct", "--hidden"]
-    return argv + ["--rebuild"] if rebuild else argv
+def model_dir(embedding):
+    """The baked folder of a manifest's `embedding`, e.g. local/potion-code-16m-v2."""
+    return f"{MODELS_DIR}/{embedding.removeprefix(LOCAL_PREFIX)}"
 
 
-def query_argv(query, file_types=None):
-    """Options first, `-t` per type, then `--` and the query last, so a question such as
-    `--help` is searched, not obeyed (spec 10)."""
-    argv = ["zg", "--preview", "none", "--limit", str(ZG_HITS), "--mode", "direct"]
+def index_argv(embedding, corpus, index):
+    return [BINARY, "index", "--model", model_dir(embedding), str(corpus), str(index)]
+
+
+def query_argv(embedding, index, file_types=None):
+    """The question never goes on argv (it is readable in /proc): see query_input."""
+    argv = [BINARY, "query", "--model", model_dir(embedding), "--limit", str(HITS)]
     for t in file_types or []:
-        argv += ["-t", t]
-    return argv + ["--", query]
+        argv += ["--type", t]
+    return argv + [str(index)]
 
 
-def query_argv_translations(translations, file_types=None):
-    """One `--hybrid=<t>` argv element per translation, so it can never be read as an option;
-    `--fuse` only when there is more than one (spec 10)."""
-    argv = ["zg"] + [f"--hybrid={t}" for t in translations]
-    if len(translations) > 1:
-        argv.append("--fuse")
-    argv += ["--preview", "none", "--limit", str(ZG_HITS), "--mode", "direct"]
-    for t in file_types or []:
-        argv += ["-t", t]
-    return argv
+def query_input(question, translations):
+    """The JSON object the engine reads on stdin."""
+    return json.dumps({"question": question, "translations": list(translations or [])})
 
 
-def incompatible(stderr):
-    """True when zg refused an index that an older zg built; `--index --rebuild` repairs it."""
-    return INCOMPATIBLE in stderr
+def _hits(items):
+    if not isinstance(items, list):
+        raise ZjmError(BAD_OUTPUT)
+    for h in items:
+        if (not isinstance(h, dict) or not all(isinstance(h.get(k), int) for k in HIT_KEYS[1:])
+                or not isinstance(h.get("path"), str)):
+            raise ZjmError(BAD_OUTPUT)
+    return [{k: h[k] for k in HIT_KEYS} for h in items]
 
 
 def parse(out):
-    """zg query output -> every hit, in zg order, as {"path", "start", "end", "rank"}. Only header
-    lines matter; everything else (heading/scope/symbol lines) is ignored."""
-    hits = []
-    for line in out.split("\n"):
-        m = HIT_RE.match(line)
-        if not m:
-            continue
-        rank, path, start, end = m.groups()
-        start = int(start)
-        hits.append({"path": path, "start": start, "end": int(end) if end else start, "rank": int(rank)})
-    return hits
+    """The engine's JSON -> {"query": [hit], "translation": [hit]}, hits as {"path", "start", "end",
+    "rank"}; anything else raises ZjmError."""
+    try:
+        data = json.loads(out)
+    except ValueError:
+        raise ZjmError(BAD_OUTPUT) from None
+    if not isinstance(data, dict):
+        raise ZjmError(BAD_OUTPUT)
+    return {g: _hits(data.get(g)) for g in GROUPS}

@@ -3,7 +3,7 @@
 ## What this is
 
 `zjm-rag` is a local tool: it indexes folders you choose into a local store, searches them with
-[zg](https://www.npmjs.com/package/@zvec/zvec-grep), asks Jev (TypeSafe's decisions API) which files hold
+zjm-engine, asks Jev (TypeSafe's decisions API) which files hold
 the answer, and can pass those files to an OpenRouter model for an answer. It is
 stdlib-only Python with no third-party runtime dependency.
 
@@ -28,7 +28,7 @@ stdlib-only Python with no third-party runtime dependency.
 
 ## Out of scope
 
-Vulnerabilities in zg, OpenRouter, Jev or the LLM client themselves belong with those projects.
+Vulnerabilities in zjm-engine, OpenRouter, Jev or the LLM client themselves belong with those projects.
 
 ## Reporting a vulnerability
 

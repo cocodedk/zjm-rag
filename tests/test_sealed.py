@@ -64,7 +64,7 @@ class SealedTest(unittest.TestCase):
         base = FakeRunner()
 
         def failing(argv, *, cwd, env, input, consume=None):
-            if argv[0] == "zg":
+            if argv[0] == "zjm-engine":
                 return 1, "", "boom"
             return base(argv, cwd=cwd, env=env, input=input, consume=consume)
 

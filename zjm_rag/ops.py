@@ -1,5 +1,5 @@
 """OPS: the single table the CLI, HTTP and MCP surfaces are generated from (spec 06)."""
-from . import core, files, guide, lockers, search, zg
+from . import core, engine, files, guide, lockers, search
 from . import jev as jev_client
 from . import llm as llm_client
 
@@ -16,7 +16,7 @@ def _wrap(func, *, needs_runner=False, needs_jev=False, needs_llm=False):
     def call(args, *, config, runner=None, jev=None, llm=None):
         kwargs = dict(args, config=config)
         if needs_runner:
-            kwargs["runner"] = runner or zg.run
+            kwargs["runner"] = runner or engine.run
         if needs_jev:
             kwargs["jev"] = jev or jev_client.post
         if needs_llm:
@@ -66,7 +66,7 @@ OPS = {
            "Answer a question with an LLM from the top accepted files across lockers."),
     "doctor": (_wrap(core.doctor),
               _schema({}, []),
-              "Report whether zg, age, OPENROUTER_API_KEY, TYPESAFE_API_KEY and lockers are present."),
+              "Report whether zjm-engine, age, OPENROUTER_API_KEY, TYPESAFE_API_KEY and lockers are present."),
     "help": (_wrap(guide.help),
             _schema({}, []),
             "Explain how to use zjm and what this instance allows: workflow, keys, egress, allowed source paths and lockers. Call this first."),

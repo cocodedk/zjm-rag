@@ -1,6 +1,6 @@
 ---
 name: zjm-rag
-description: Search a project's documents by meaning with zjm-rag (zg finds, Jev ranks), or set it up in a new project. Use to find every document that states a rule, to locate where something is written, or to answer a question from the documents with citations.
+description: Search a project's documents by meaning with zjm-rag (zjm-engine finds, Jev ranks), or set it up in a new project. Use to find every document that states a rule, to locate where something is written, or to answer a question from the documents with citations.
 ---
 
 # zjm-rag
@@ -29,7 +29,7 @@ Write `zjm-project.json` at the project root and commit it, so every session use
   `_files/<path>`, so no folder may be named `_files`. You need at least one of `folders` and `files`.
   Absolute paths, `..` and symlinks are refused in both lists.
 - `exclude`: files and folders (trailing `/`) left out by name.
-- `send`: off unless the project's owner decides otherwise. Off, nothing leaves the machine: searches list zg's
+- `send`: off unless the project's owner decides otherwise. Off, nothing leaves the machine: searches list zjm-engine's
   candidates unranked and `ask` is refused. On, ranking and `ask` send the text of matching files to TypeSafe (Jev)
   and OpenRouter (`TYPESAFE_API_KEY` and `OPENROUTER_API_KEY` in the shell), so index only what may leave. `llm` picks the answer model among those
   OpenRouter offers.
@@ -42,7 +42,7 @@ warning. Untracked git-ignored files, files named like secrets (zjm's floor: `.e
 an ordinary document is indexed, and sent if `send` is on. Keep scratch folders git-ignored and untracked: a
 tracked file stays eligible even when `.gitignore` matches it. Index from
 a checkout that stays (the main folder after a pull), not a temporary worktree. Add `.zvec-grep/` to `.gitignore`:
-zg leaves that folder where it runs directly; zjm itself writes nothing in the project. Then run
+an earlier search tool left that folder in the project; zjm itself writes nothing there. Then run
 `scripts/zjm-project reindex`.
 
 ## Refresh

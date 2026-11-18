@@ -54,7 +54,7 @@ class CliTest(unittest.TestCase):
                             "--min-score", "0.7", "--sort", "path", "--type", "py"],
                            runner=runner, jev=fake_jev([0.9, 0.8, 0.1]))
         self.assertEqual(code, 0)
-        self.assertEqual(runner.calls[0][0][-4:], ["-t", "py", "--", "q"])
+        self.assertEqual(runner.calls[0][0][-3:-1], ["--type", "py"])
         r = json.loads(out)
         self.assertEqual((r["min_score"], r["sort"]), (0.7, "path"))
         self.assertEqual([h["path"] for h in r["accepted"]], ["proj/a.py", "proj/b.md"])
@@ -92,16 +92,16 @@ class CliTest(unittest.TestCase):
             self.assertEqual(code, 0)
             r = json.loads(out)
             self.assertEqual(r["ok"], True)
-            self.assertEqual(r["checks"], {"zg": True, "age": True, "openrouter_key": True,
+            self.assertEqual(r["checks"], {"engine": True, "age": True, "openrouter_key": True,
                                            "typesafe_key": False})
             human = run(["doctor", "--config", self.config_path])
         self.assertEqual(human[0], 0)
-        self.assertTrue(human[1].startswith("ok zg\nok age\nok openrouter_key\n"))
+        self.assertTrue(human[1].startswith("ok engine\nok age\nok openrouter_key\n"))
         self.assertNotIn("secret-value", out + err + human[1] + human[2])
         with mock.patch.dict(os.environ, {"ZJM_IN_CONTAINER": "1"}, clear=True), \
                 mock.patch("shutil.which", return_value=None):
             code, out, _ = run(["doctor", "--config", self.config_path])
-        self.assertEqual((code, out.splitlines()[0]), (1, "missing zg"))
+        self.assertEqual((code, out.splitlines()[0]), (1, "missing engine"))
 
 
     def test_doctor_needs_a_ranking_key_for_rank_and_openrouter_for_answer(self):

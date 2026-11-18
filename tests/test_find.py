@@ -6,9 +6,9 @@ import unittest
 import urllib.error
 from unittest import mock
 
-from fakes import OLD_INDEX_ERR, PATHS, FakeRunner, fake_jev, make_config, make_locker
+from fakes import PATHS, FakeRunner, fake_jev, make_config, make_locker
 
-from zjm_rag import ZjmError, find, jev
+from zjm_rag import ZjmError, engine, find, jev
 from zjm_rag import lockers as lockers_mod
 
 
@@ -25,8 +25,10 @@ class FindTest(unittest.TestCase):
             return fake_jev([0.9, 0.2, 0.5])(payload)
 
         r = find("q", ["lib"], file_types=["py", "md"], runner=runner, jev=jev, config=self.cfg)
-        self.assertEqual(runner.calls[0][0], ["zg", "--preview", "none", "--limit", "40",
-                                              "--mode", "direct", "-t", "py", "-t", "md", "--", "q"])
+        ldir = lockers_mod.locker_dir(self.cfg, "lib")
+        self.assertEqual(runner.calls[0][0], ["zjm-engine", "query", "--model", "/opt/zjm/models/m", "--limit", "40",
+                                              "--type", "py", "--type", "md", str(ldir / "engine.idx")])
+        self.assertEqual(json.loads(runner.calls[0][3]), {"question": "q", "translations": []})
         self.assertEqual(list(payloads[0]["questions"]), ["f1", "f2", "f3"])
         self.assertEqual(payloads[0]["state"]["evidence"][0]["path"], "lib/proj/b.md")
         self.assertEqual(payloads[0]["questions"]["f1"]["instructions"],
@@ -39,21 +41,25 @@ class FindTest(unittest.TestCase):
         self.assertEqual(r["accepted"][0]["score"], 0.9)
         self.assertEqual((r["sort"], r["min_score"]), ("score", 0.5))
 
-    def test_find_on_incompatible_index_names_the_locker(self):
+    def test_find_on_an_older_index_names_the_locker(self):
+        message = "locker lib has an index from an older version; re-run a file operation"
         calls = []
 
-        def older_zg(argv, *, cwd, env, input, consume=None):
-            calls.append((argv, cwd))
-            return 1, "", f"{OLD_INDEX_ERR}\n{cwd}"
+        def older_engine(argv, *, cwd, env, input, consume=None):
+            calls.append(argv)
+            return engine.FORMAT_EXIT, "", f"index for another model\n{cwd}"
 
         with self.assertRaises(ZjmError) as caught:
-            find("q", ["lib"], runner=older_zg, jev=fake_jev([]), config=self.cfg)
-        message = str(caught.exception)
-        self.assertEqual(message, "locker lib was indexed by an older zg; re-run a file operation")
+            find("q", ["lib"], runner=older_engine, jev=fake_jev([]), config=self.cfg)
+        self.assertEqual(str(caught.exception), message)
         self.assertNotIn(self.cfg["home"], message)
-        self.assertNotIn(calls[0][1], message)
         self.assertEqual(len(calls), 1)
-        self.assertNotIn("--rebuild", calls[0][0])
+
+        (lockers_mod.locker_dir(self.cfg, "lib") / "engine.idx").unlink()  # a locker made before the engine: no engine.idx
+        with self.assertRaises(ZjmError) as caught:
+            find("q", ["lib"], runner=older_engine, jev=fake_jev([]), config=self.cfg)
+        self.assertEqual(str(caught.exception), message)
+        self.assertEqual(len(calls), 1)  # refused without running the engine
 
     def test_sort_keys(self):
         jev = fake_jev([0.7, 0.9, 0.8])
