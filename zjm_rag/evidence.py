@@ -1,6 +1,6 @@
-"""Evidence: turn zg hits into full chunks, read inside the locker's session (spec 09).
+"""Evidence: turn zjm-engine hits into full chunks, read inside the locker's session (spec 09).
 
-Candidates are the first `limit` distinct hit paths, in zg order, that are keys of the locker's
+Candidates are the first `limit` distinct hit paths, in zjm-engine order, that are keys of the locker's
 manifest. Every hit on a candidate is kept, whatever its rank; hits on any other path are ignored
 and that file is never read. Each candidate's passages are its hit ranges, widened and merged.
 `ask` additionally keeps small candidates whole. All reads happen here, while the locker's session
@@ -14,7 +14,7 @@ ASK_CHARS = 200000
 
 def select_candidates(hits, manifest_files, limit, *, by_path=None):
     """(new candidate paths introduced by `hits`, {path: [hits]}): the first `limit` distinct hit
-    paths that are manifest keys, each carrying every hit on it, in zg order. Passing in a
+    paths that are manifest keys, each carrying every hit on it, in zjm-engine order. Passing in a
     `by_path` from an earlier call (spec 10) merges this call's hits into any path that is already
     a key there too, without adding it to the returned order a second time (a candidate's passages
     come from all its hits, in every query)."""

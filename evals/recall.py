@@ -1,8 +1,8 @@
 """Recall eval: does zjm put the text that answers a question in front of Jev and the answer model?
 
-It runs the real zg (and, with --jev, the real Jev) over evals/corpus plus a generated long
+It runs the real zjm-engine (and, with --jev, the real Jev) over evals/corpus plus a generated long
 runbook. The answer model is never called: its prompt is captured instead. This is not part of
-the unit suite, because it needs zg and, with --jev, the network.
+the unit suite, because it needs zjm-engine and, with --jev, the network.
 
     python3 evals/recall.py [--limit N] [--min-score S] [--jev] [--multilingual | --embedding M] [--verbose]
 
@@ -22,9 +22,9 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent))
 import zjm_rag  # noqa: E402
 from zjm_rag import llm as llm_client  # noqa: E402
-from zjm_rag import zg  # noqa: E402
+from zjm_rag import engine  # noqa: E402
 
-TOOLS = {"zg", "git", "age", "age-keygen"}
+TOOLS = {"zjm-engine", "git", "age", "age-keygen"}
 BIRDS = ["wren", "finch", "robin", "swift", "crane", "egret", "ibis", "lark", "heron", "kestrel"]
 NOUNS = ["gate", "relay", "store", "queue", "index", "sync", "cache", "feed", "vault", "watch"]
 TEAMS = ["Atlas", "Beacon", "Comet", "Delta", "Ember", "Falcon", "Granite", "Harbor"]
@@ -61,7 +61,7 @@ def main():
     ap.add_argument("--jev", action="store_true", help="rank with the real Jev (network, costs)")
     ap.add_argument("--translate", action="store_true", help="turn on egress.translate (network, costs)")
     ap.add_argument("--multilingual", action="store_true")
-    ap.add_argument("--embedding", help="any zg local model, e.g. local/multilingual-e5-small")
+    ap.add_argument("--embedding", help="any local model baked into the image, e.g. local/multilingual-e5-small")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
     golden = json.loads((ROOT / "golden.json").read_text())
@@ -85,7 +85,7 @@ def main():
 
         def runner(argv, *, cwd, env, input=None, consume=None):
             if argv[0] in TOOLS:
-                return zg.run(argv, cwd=cwd, env=env, input=input, consume=consume)
+                return engine.run(argv, cwd=cwd, env=env, input=input, consume=consume)
             prompts.append(input or "")
             return 0, "", ""
 

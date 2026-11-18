@@ -13,7 +13,7 @@ class AskTest(unittest.TestCase):
         runner = FakeRunner()
         llm = fake_llm()
         r = ask("q", ["lib"], runner=runner, jev=fake_jev([0.1, 0.2, 0.3]), llm=llm, config=self.cfg)
-        self.assertEqual([c[0][0] for c in runner.calls], ["zg"])
+        self.assertEqual([c[0][0] for c in runner.calls], ["zjm-engine"])
         self.assertEqual((r["answer"], r["reason"], r["files"]), (None, "no file passed the threshold", []))
         self.assertEqual(len(r["find"]["rejected"]), 3)
         self.assertEqual(llm.calls, [])

@@ -6,7 +6,7 @@ The lean loop reads the first indented line under each of the three headings bel
 
     python3 -m unittest discover -s tests -q
 
-The suite runs in a sandbox with an empty home and no network. Tests must not call zg, Jev
+The suite runs in a sandbox with an empty home and no network. Tests must not call zjm-engine, Jev
 (OpenRouter) or any LLM for real: every external call goes through an injectable runner and the
 tests pass fakes.
 

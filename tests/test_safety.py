@@ -153,7 +153,7 @@ class SafetyTest(unittest.TestCase):
             ask("q", ["lib"], runner=runner, jev=fake_jev([0.9, 0.8, 0.1]), llm=llm, config=cfg)
         self.assertEqual(len(llm.calls), 1)
         self.assertTrue(runner.calls)
-        self.assertTrue(all(c[0][0] in ("zg", "git") for c in runner.calls))
+        self.assertTrue(all(c[0][0] in ("zjm-engine", "git") for c in runner.calls))
         _model, messages = llm.calls[0]
         self.assertNotIn("sk-should-not-leak", json.dumps(messages))
 

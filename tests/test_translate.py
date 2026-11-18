@@ -7,9 +7,9 @@ from unittest import mock
 from fakes import PATHS, FakeRunner, fake_jev, make_config, make_locker, make_multi_locker
 from zjm_rag import ZjmError, doctor, find
 from zjm_rag import config as config_module
+from zjm_rag import engine
 from zjm_rag import lockers as lockers_mod
 from zjm_rag import translate as translate_module
-from zjm_rag import zg
 
 
 class TranslateTest(unittest.TestCase):
@@ -46,8 +46,9 @@ class TranslateTest(unittest.TestCase):
         for lang in languages:
             self.assertIn(lang, messages[0]["content"])
 
-        argv = zg.query_argv_translations(translations)
-        self.assertIn("--hybrid=-flag-like translation", argv)
+        stdin = json.loads(engine.query_input(query, translations))
+        self.assertEqual(stdin["translations"], translations)
+        self.assertNotIn("-flag-like translation", " ".join(engine.query_argv("local/m", "i")))
 
     def test_translate_failure_never_raises(self):
         def raising_llm(model, messages, reasoning=True):
@@ -94,22 +95,32 @@ class TranslateTest(unittest.TestCase):
         self.assertIsNone(r2["translate_error"])
 
     def test_translations_only_add_candidates(self):
-        original_out = ("#1 proj/b.md:1\n1\tb line1\n"
-                        "\n#2 proj/a.py:1\n1\ta line1\n")
-        translated_out = ("#1 proj/c.txt:1\n1\tc line1\n"
-                          "\n#2 proj/b.md:3\n3\tb line3\n"
-                          "\n#3 proj/d.md:1\n1\td line1\n")
+        r, _calls = self._find_with_translations()
+        self.assertEqual([(h["path"], h["via"]) for h in r["accepted"]],
+                         [("proj/b.md", "query"), ("proj/a.py", "query"),
+                          ("proj/c.txt", "translation"), ("proj/d.md", "translation")])
+        self.assertEqual(r["rejected"], [])
+
+    def test_find_makes_one_engine_call_with_translations(self):
+        _r, calls = self._find_with_translations()
+        self.assertEqual(len(calls), 1)
+        argv, stdin = calls[0]
+        self.assertNotIn("when?", " ".join(argv))
+        self.assertEqual(json.loads(stdin), {"question": "when?",
+                                             "translations": ["kaffeemaschine frage", "kaffe maskine spoergsmaal"]})
+
+    def _find_with_translations(self):
+        group = lambda paths: [{"path": p, "start": 1, "end": 1, "rank": i} for i, p in enumerate(paths, 1)]
+        out = json.dumps({"query": group(["proj/b.md", "proj/a.py"]),
+                          "translation": group(["proj/c.txt", "proj/d.md"])})
         cfg = make_config(self, egress={"rank": False, "answer": False, "translate": True})
-        make_multi_locker(cfg, "lib", {"proj/b.md": "b line1\nb line2\nb line3\nb line4\n",
-                                       "proj/a.py": "a line1\n", "proj/c.txt": "c line1\n",
-                                       "proj/d.md": "d line1\n"})
+        make_multi_locker(cfg, "lib", {"proj/b.md": "b line1\nb line2\n", "proj/a.py": "a line1\n",
+                                       "proj/c.txt": "c line1\n", "proj/d.md": "d line1\n"})
         calls = []
 
         def runner(argv, *, cwd, env, input=None):
-            calls.append(argv)
-            if any(a.startswith("--hybrid=") for a in argv):
-                return 0, translated_out, ""
-            return 0, original_out, ""
+            calls.append((argv, input))
+            return 0, out, ""
 
         def llm(model, messages, reasoning=True):
             return json.dumps({"German": "kaffeemaschine frage", "Danish": "kaffe maskine spoergsmaal"})
@@ -117,35 +128,25 @@ class TranslateTest(unittest.TestCase):
         def jev_fail(payload):
             raise AssertionError("jev should not be called")
 
-        r = find("q", ["lib"], limit=2, runner=runner, jev=jev_fail, llm=llm, config=cfg)
-        self.assertEqual([(h["path"], h["via"]) for h in r["accepted"]],
-                         [("proj/b.md", "query"), ("proj/a.py", "query"),
-                          ("proj/c.txt", "translation"), ("proj/d.md", "translation")])
-        self.assertEqual(r["rejected"], [])
-        b_hit = r["accepted"][0]
-        self.assertEqual({(p["start"], p["end"]) for p in b_hit["passages"]}, {(1, 1), (3, 3)})
-
-        self.assertEqual(calls[0][-2:], ["--", "q"])
-        self.assertEqual(calls[1], ["zg", "--hybrid=kaffeemaschine frage", "--hybrid=kaffe maskine spoergsmaal",
-                                    "--fuse", "--preview", "none", "--limit", str(zg.ZG_HITS), "--mode", "direct"])
+        return find("when?", ["lib"], limit=2, runner=runner, jev=jev_fail, llm=llm, config=cfg), calls
 
     def test_merge_query_candidates_first(self):
         cfg = make_config(self, egress={"rank": False, "answer": False, "translate": True})
         make_multi_locker(cfg, "lib1", {"q1a.md": "qa1\n", "q1b.md": "qa2\n", "t1a.md": "ta1\n",
                                         "t1b.md": "ta2\n"})
         make_multi_locker(cfg, "lib2", {"q2a.md": "qb1\n", "t2a.md": "tb1\n"})
-        lib1_corpus = str(lockers_mod.locker_dir(cfg, "lib1") / "corpus")
-        lib2_corpus = str(lockers_mod.locker_dir(cfg, "lib2") / "corpus")
+
+        def hits(paths):
+            return [{"path": p, "start": 1, "end": 1, "rank": i} for i, p in enumerate(paths, 1)]
+
         outs = {
-            (lib1_corpus, False): "#1 q1a.md:1\n1\tqa1\n\n#2 q1b.md:1\n1\tqa2\n",
-            (lib1_corpus, True): "#1 t1a.md:1\n1\tta1\n\n#2 t1b.md:1\n1\tta2\n",
-            (lib2_corpus, False): "#1 q2a.md:1\n1\tqb1\n",
-            (lib2_corpus, True): "#1 t2a.md:1\n1\ttb1\n",
+            str(lockers_mod.locker_dir(cfg, "lib1")): {"query": hits(["q1a.md", "q1b.md"]),
+                                                       "translation": hits(["t1a.md", "t1b.md"])},
+            str(lockers_mod.locker_dir(cfg, "lib2")): {"query": hits(["q2a.md"]), "translation": hits(["t2a.md"])},
         }
 
         def runner(argv, *, cwd, env, input=None):
-            is_translated = any(a.startswith("--hybrid=") for a in argv)
-            return 0, outs[(cwd, is_translated)], ""
+            return 0, json.dumps(outs[cwd]), ""
 
         def llm(model, messages, reasoning=True):
             return json.dumps({"German": "frage"})

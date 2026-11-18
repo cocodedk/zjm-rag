@@ -1,23 +1,29 @@
-"""Per-locker zg queries and cross-locker merging for `find`/`ask` (specs 06, 08, 09 and 10):
-runs the original and (when there are translations) the translated zg query inside each locker's
+"""Per-locker engine queries and cross-locker merging for `find`/`ask` (specs 06, 08, 09, 10 and 14):
+makes one engine call per locker, carrying the question and any translations, inside its
 sealed session, then interleaves the "query" and "translation" candidates across lockers, the
 query's always first. Split out of search.py to keep it under 200 lines.
 """
-from . import evidence
+from . import engine, evidence
 from . import lockers as lockers_mod
 from . import sealed
-from . import zg
 from .errors import ZjmError
 
 
-def _run_zg_query(argv, corpus, ldir, runner, name):
-    code, out, err = runner(argv, cwd=str(corpus), env=lockers_mod.zg_env(ldir), input=None)
-    zg.raise_if_timed_out(code, "zg query")
+def _run_query(embedding, ldir, file_types, query, translations, runner, name):
+    """{"query": [hit], "translation": [hit]} from one engine call. A locker with no engine.idx, or an
+    index the engine refuses as another version, is read-only until a file operation rebuilds it."""
+    index = ldir / engine.INDEX_FILE
+    older = ZjmError(f"locker {name} has an index from an older version; re-run a file operation")
+    if not index.exists():
+        raise older
+    code, out, err = runner(engine.query_argv(embedding, index, file_types), cwd=str(ldir),
+                            env=engine.child_env(), input=engine.query_input(query, translations))
+    engine.raise_if_timed_out(code, "engine query")
+    if code == engine.FORMAT_EXIT:
+        raise older
     if code != 0:
-        if zg.incompatible(err):
-            raise ZjmError(f"locker {name} was indexed by an older zg; re-run a file operation")
-        raise ZjmError(f"zg query failed: {err.strip()}")
-    return zg.parse(out)
+        raise ZjmError(f"engine query failed: {err.strip()}")
+    return engine.parse(out)
 
 
 def gather(cfg, names, keys, query, file_types, limit, translations, runner, *, want_text):
@@ -42,11 +48,8 @@ def gather(cfg, names, keys, query, file_types, limit, translations, runner, *, 
                 if not manifest["indexed"]:
                     raise ZjmError(f"locker {name} is not indexed; re-run a file operation")
                 corpus = ldir / "corpus"
-                hits = _run_zg_query(zg.query_argv(query, file_types), corpus, ldir, runner, name)
-                translated_hits = None
-                if translations:
-                    argv = zg.query_argv_translations(translations, file_types)
-                    translated_hits = _run_zg_query(argv, corpus, ldir, runner, name)
+                found = _run_query(manifest["embedding"], ldir, file_types, query, translations, runner, name)
+                hits, translated_hits = found["query"], (found["translation"] if translations else None)
                 record = evidence.read_candidates(hits, manifest["files"], corpus, limit, want_text=want_text,
                                                   translated_hits=translated_hits)
                 for path, rec in record.items():

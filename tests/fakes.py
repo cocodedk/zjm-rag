@@ -1,4 +1,4 @@
-"""A locker with three files, a resolved config, and a fake runner that plays zg, git, age and the LLM."""
+"""A locker with three files, a resolved config, and a fake runner that plays zjm-engine, git, age and the LLM."""
 import hashlib
 import io
 import json
@@ -6,9 +6,11 @@ import os
 import tempfile
 from pathlib import Path
 
-PATHS = ["proj/b.md", "proj/a.py", "proj/c.txt"]  # zg order
-ZG_OUT = "\n".join(f"#{i} {p}:1-2\n1\tbody of {p}\n" for i, p in enumerate(PATHS, 1))
-OLD_INDEX_ERR = "Error: This index is incompatible with the current version of zg."  # then the corpus path
+from zjm_rag.engine import INDEX_FILE
+
+PATHS = ["proj/b.md", "proj/a.py", "proj/c.txt"]  # engine order
+ENGINE_OUT = json.dumps({"query": [{"path": p, "start": 1, "end": 2, "rank": i} for i, p in enumerate(PATHS, 1)],
+                         "translation": []})
 TEST_KEY = "AGE-SECRET-KEY-1" + "Q" * 58
 OTHER_KEY = "AGE-SECRET-KEY-1" + "Z" * 58
 AGE_MARKER = b"FAKE-AGEv1\n"
@@ -34,12 +36,12 @@ def make_config(test, *, allow=None, egress=None, home=None, **extra):
 
 
 def make_locker(test, cfg, name="lib", *, embedding="m"):
-    """A plain locker under cfg["home"]/lockers/<name> with three indexed files, without calling zg."""
+    """A plain locker under cfg["home"]/lockers/<name> with three indexed files, without calling the engine."""
     from zjm_rag import lockers
 
     ldir = lockers._locations(cfg, name)[1]
     (ldir / "corpus").mkdir(parents=True)
-    (ldir / "zghome").mkdir(parents=True)
+    (ldir / INDEX_FILE).write_text("index")
     files = {}
     for mtime, p in zip((300, 100, 200), PATHS):
         f = ldir / "corpus" / p
@@ -57,7 +59,7 @@ def make_multi_locker(cfg, name, files):
 
     ldir = lockers.locker_dir(cfg, name)
     (ldir / "corpus").mkdir(parents=True)
-    (ldir / "zghome").mkdir(parents=True)
+    (ldir / INDEX_FILE).write_text("index")
     manifest_files = {}
     for rel, text in files.items():
         p = ldir / "corpus" / rel
@@ -87,8 +89,11 @@ class FakeRunner:
             return self._age_keygen(argv)
         if argv[0] == "age":
             return self._age(argv, input, consume)
-        if argv[0] == "zg":
-            return 0, ZG_OUT, ""
+        if argv[0] == "zjm-engine":
+            if argv[1] == "index":  # the index is the last argument, as the real engine takes it
+                Path(argv[-1]).write_text("index")
+                return 0, '{"chunks": 3}', ""
+            return 0, ENGINE_OUT, ""
         if argv[0] == "git":
             if not self.ignored:
                 return 1, "", ""

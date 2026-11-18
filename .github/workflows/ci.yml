@@ -32,7 +32,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       # Same sandbox as the lean loop's gate (profile-python.md): an empty HOME, and the
-      # tests inject fakes for zg, Jev and the LLM, so nothing here touches the network.
+      # tests inject fakes for zjm-engine, Jev and the LLM, so nothing here touches the network.
       # unittest exits 0 on "Ran 0 tests" under 3.10, so an empty discovery is failed here.
       - name: unittest
         shell: bash

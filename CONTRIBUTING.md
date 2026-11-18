@@ -4,8 +4,8 @@
 
 1. Clone the repo and `cd` into it.
 2. Python 3.10 or newer. There is nothing to install for the tests: the package is stdlib-only.
-3. To run it for real you also need [zg](https://www.npmjs.com/package/@zvec/zvec-grep)
-   (`npm install -g @zvec/zvec-grep`) and an `OPENROUTER_API_KEY` for Jev ranking and OpenRouter
+3. To run it for real you also need the `zjm-engine` binary
+   (`cargo build --release --locked` in `engine/`; it needs the model files from the Dockerfile) and an `OPENROUTER_API_KEY` for Jev ranking and OpenRouter
    answers. See the README for what the current proof of concept expects.
 
 ## Install git hooks
@@ -59,8 +59,8 @@ the ruff check above. Its fan-in job `verify` is the one check `main` requires.
 
 ## Coding style
 
-- **Stdlib only**, Python 3.10+. No runtime dependency besides the external `zg` binary.
-- **Tests never call zg, Jev or an LLM for real** and never open a network connection. Every
+- **Stdlib only**, Python 3.10+. No runtime dependency besides the external `zjm-engine` binary.
+- **Tests never call zjm-engine, Jev or an LLM for real** and never open a network connection. Every
   external call goes through an injectable `runner` or `jev` argument; tests pass fakes.
 - Each spec in `docs/lean/` states the exact test count the suite must report. Keep it true.
 - Keep files small and focused.
@@ -83,7 +83,7 @@ Human branches use kebab-case with a prefix matching the Conventional Commit typ
 | `fix/` | `fix:` | `fix/empty-store-message` |
 | `docs/` | `docs:` | `docs/mcp-example` |
 | `chore/` | `chore:` | `chore/bump-actions` |
-| `refactor/` | `refactor:` | `refactor/split-zg-parser` |
+| `refactor/` | `refactor:` | `refactor/split-zjm-engine-parser` |
 | `ci/` | `ci:` | `ci/add-python-3-14` |
 
 ## Why everything goes through a pull request
@@ -96,7 +96,7 @@ can self-merge. `enforce_admins` is `false`, so an admin's direct push to `main`
 ## PR checklist
 
 - [ ] `python3 -m unittest discover -s tests -q` passes with the count the spec states.
-- [ ] No test makes a live zg, Jev or LLM call or opens a network connection.
+- [ ] No test makes a live zjm-engine, Jev or LLM call or opens a network connection.
 - [ ] No new runtime dependency.
 - [ ] README updated if behaviour visible to a user changed.
 - [ ] Commit messages follow Conventional Commits.

@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 from . import config as config_module
-from . import lockers, sealed, zg
+from . import engine, lockers, sealed
 from .copying import _floor_excluded, _gitignored, check_source_allowed, copy_tree
 from .errors import ZjmError
 
@@ -91,7 +91,7 @@ def _add_files(ldir, manifest, reals, cfg, runner):
     return {"added": added, "replaced": replaced, "excluded": excluded}
 
 
-def file_add(locker, paths, key=None, *, config=None, runner=zg.run, jev=None):
+def file_add(locker, paths, key=None, *, config=None, runner=engine.run, jev=None):
     cfg = config_module.resolve(config)
     reals = [check_source_allowed(p, cfg) for p in paths]
     with sealed.open_locker(cfg, locker, key, write=True, runner=runner) as ldir:
@@ -99,7 +99,7 @@ def file_add(locker, paths, key=None, *, config=None, runner=zg.run, jev=None):
         return _add_files(ldir, manifest, reals, cfg, runner)
 
 
-def file_put(locker, name, text, key=None, *, config=None, runner=zg.run, jev=None):
+def file_put(locker, name, text, key=None, *, config=None, runner=engine.run, jev=None):
     cfg = config_module.resolve(config)
     data = text.encode("utf-8")
     if len(data) > MAX_PUT_BYTES:
@@ -120,7 +120,7 @@ def file_put(locker, name, text, key=None, *, config=None, runner=zg.run, jev=No
     return {"added": [] if existed else [name], "replaced": [name] if existed else []}
 
 
-def file_remove(locker, names, key=None, *, config=None, runner=zg.run, jev=None):
+def file_remove(locker, names, key=None, *, config=None, runner=engine.run, jev=None):
     cfg = config_module.resolve(config)
     with sealed.open_locker(cfg, locker, key, write=True, runner=runner) as ldir:
         manifest = lockers.read_manifest(ldir)
@@ -149,7 +149,7 @@ def file_remove(locker, names, key=None, *, config=None, runner=zg.run, jev=None
 
 def file_list(locker, key=None, *, config=None, runner=None, jev=None):
     cfg = config_module.resolve(config)
-    with sealed.open_locker(cfg, locker, key, write=False, runner=runner or zg.run) as ldir:
+    with sealed.open_locker(cfg, locker, key, write=False, runner=runner or engine.run) as ldir:
         manifest = lockers.read_manifest(ldir)
     files = [{"name": k, "source": v["source"], "size": v["size"], "sha256": v["sha256"], "added": v["added"]}
              for k, v in manifest["files"].items()]

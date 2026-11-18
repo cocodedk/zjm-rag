@@ -61,7 +61,7 @@ class HttpTest(unittest.TestCase):
             thread.join(5)
         self.assertEqual(code, 200)
         self.assertEqual(set(r), {"ok", "checks", "config", "home", "egress", "lockers"})
-        self.assertEqual(set(r["checks"]), {"zg", "age", "openrouter_key", "typesafe_key"})
+        self.assertEqual(set(r["checks"]), {"engine", "age", "openrouter_key", "typesafe_key"})
         self.assertEqual(servers[1], 0)
 
     def test_find_roundtrip(self):
@@ -72,7 +72,7 @@ class HttpTest(unittest.TestCase):
         code, r = self.call("/find", {"query": "q", "lockers": ["lib"], "min_score": 0.7, "sort": "path",
                                       "file_types": ["py"]})
         self.assertEqual(code, 200)
-        self.assertEqual(runner.calls[0][0][-4:], ["-t", "py", "--", "q"])
+        self.assertEqual(runner.calls[0][0][-3:-1], ["--type", "py"])
         self.assertEqual(set(r), {"query", "min_score", "sort", "accepted", "rejected", "translations",
                                   "translate_error", "returned_model"})
         self.assertEqual((r["min_score"], r["sort"]), (0.7, "path"))
