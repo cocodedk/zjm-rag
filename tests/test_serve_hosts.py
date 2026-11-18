@@ -38,7 +38,8 @@ class ServeHostsTest(unittest.TestCase):
         server.serve_forever.side_effect = KeyboardInterrupt
         with mock.patch.dict(os.environ, {"ZJM_IN_CONTAINER": "1"}), \
                 mock.patch("zjm_rag.http.make_server", return_value=server) as fake:
-            code, _, err = _run_cli(["serve", "--allow-host", "zjm", "--allow-host", "db"])
+            code, _, err = _run_cli(["serve", "--allow-host", "zjm", "--allow-host", "db",
+                                     "--config", make_config(self)["path"]])
         self.assertEqual(code, 0, err)
         self.assertEqual(set(fake.call_args.kwargs["allow_hosts"]), {"zjm", "db"})
 

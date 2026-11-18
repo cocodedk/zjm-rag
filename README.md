@@ -342,8 +342,9 @@ For `serve`, `--port` selects the container port and defaults the published host
 `ZJM_PORT` overrides the host port only; the container bind host must remain `0.0.0.0`,
 while the published host port stays loopback-only.
 For a caller in another container, run the image on that private network yourself (for example
-as a compose service, with no published port) and add `--allow-host NAME` with the service name
-the caller uses: a bare host name, no port, matched exactly. Through the launcher it has no use,
+as a compose service, with no published port) with
+`serve --host 0.0.0.0 --port 8765 --allow-host NAME`, where NAME is the service name the caller
+uses: a bare host name, no port, matched exactly. Through the launcher it has no use,
 since the launcher publishes only to the host's loopback.
 
 ## Questions in other languages
