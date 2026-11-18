@@ -91,9 +91,9 @@ def ident(text: str) -> list:
 
 
 def reindex(s: dict, root: Path, state: Path) -> None:
-    dirs, missing, files = [], set(), []
+    dirs, missing, files, mounts = [], set(), [], []
     for f in s.get("folders", []):
-        d = mirror.inside(root, f)
+        d = mirror.inside(root, f, folder=True)
         if not d.exists():
             print(f"{f} does not exist; indexed as empty", file=sys.stderr)
             missing.add(d)
@@ -101,13 +101,14 @@ def reindex(s: dict, root: Path, state: Path) -> None:
             die(f"{d} is not a folder: index folders only")
         mirror.floor_check(d)
         dirs.append(d)
+        mounts.append(Path(f).name if mirror.linked(root, f) else d.name)  # a linked folder mounts under the link's name
     for f in s.get("files", []):
         p = mirror.inside(root, f)
         if not p.is_file():
             die(f"{f} is not a regular file")
         mirror.floor_check(p.parent)
         files.append(p)
-    names = [d.name for d in dirs] + (["_files"] if files else [])
+    names = mounts + (["_files"] if files else [])
     if "_files" in names[:len(dirs)]:
         die("a folder named _files is refused: that mount holds the files list")
     if len(set(names)) < len(names):

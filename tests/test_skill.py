@@ -40,6 +40,55 @@ class SkillTest(SkillBase):
         self.assertEqual(r.returncode, 2)
         self.assertIn("is a symlink", r.stderr)
 
+    def notes(self, name="proj"):
+        d = self.tmp / "vaults" / name
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    def reindex_linked(self, target, link="memory", folders=None):
+        (self.project / link).symlink_to(target)
+        return self.run_script("reindex", settings={"locker": "mine", "folders": folders or [link]})
+
+    def test_a_folder_linked_into_the_notes_root_is_indexed_under_the_links_name(self):
+        notes = self.notes()
+        git = ["git", "-C", str(notes), "-c", "user.name=t", "-c", "user.email=t@t"]
+        (notes / "note.md").write_text("tracked")
+        (notes / ".gitignore").write_text("secret.md\n")
+        (notes / "secret.md").write_text("ignored")
+        for cmd in (["init", "-q"], ["add", "note.md", ".gitignore"], ["commit", "-qm", "x"]):
+            subprocess.run(git + cmd, env=CLEAN, check=True, timeout=30)
+        r = self.reindex_linked(notes)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self.seen(), ["memory/.gitignore", "memory/note.md"])  # the ignored file is absent
+        self.assertIn("/sources/memory", self.configs()[-1]["allow"])
+
+    def test_a_link_outside_the_notes_root_is_refused(self):
+        outside = self.tmp / "outside"
+        outside.mkdir()
+        r = self.reindex_linked(outside)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("is a symlink", r.stderr)
+
+    def test_a_link_to_the_notes_root_itself_is_refused(self):
+        r = self.reindex_linked(self.notes().parent)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("is a symlink", r.stderr)
+
+    def test_a_link_deeper_in_the_path_is_refused(self):
+        (self.project / "docs/linked").symlink_to(self.notes())
+        r = self.run_script("reindex", settings={"locker": "mine", "folders": ["docs/linked"]})
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("is a symlink", r.stderr)
+
+    def test_a_changed_linked_note_makes_find_stale(self):
+        notes = self.notes()
+        (notes / "note.md").write_text("one")
+        self.assertEqual(self.reindex_linked(notes).returncode, 0)
+        self.assertNotIn("STALE", self.run_script("find", "q", settings={"locker": "mine", "folders": ["memory"]}).stderr)
+        future = (notes / "note.md").stat().st_mtime + 100
+        os.utime(notes / "note.md", (future, future))
+        self.assertIn("STALE", self.run_script("find", "q", settings={"locker": "mine", "folders": ["memory"]}).stderr)
+
     def test_a_dangling_symlink_does_not_break_a_search(self):
         (self.project / "docs/gone").symlink_to(self.tmp / "missing")
         self.assertEqual(self.run_script("reindex").returncode, 0)

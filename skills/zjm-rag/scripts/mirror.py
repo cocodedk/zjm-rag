@@ -20,6 +20,7 @@ FLOOR_DIRS = {".git", "node_modules", ".venv", "__pycache__", ".zvec-grep", ".zj
 FLOOR_FILES = {".env*", "*.pem", "*.key", "*.p12", "*.pfx", "*.kdbx", "id_rsa*", "id_dsa*", "id_ecdsa*",
                "id_ed25519*", ".npmrc", ".pypirc", ".netrc", ".git-credentials", "credentials*", ".git"}  # a worktree's .git is a file
 MAX_BYTES = 1 << 20
+NOTES_ROOT = (Path.home() / "vaults").resolve()  # the private notes repo: one subfolder per project
 
 
 def redact(text: str) -> str:
@@ -35,17 +36,25 @@ def refuse(msg: str) -> None:
     sys.exit(2)
 
 
-def inside(root: Path, f: str) -> Path:
-    """The real path of a configured entry; refuses anything that could leave the project."""
+def linked(root: Path, f: str) -> bool:
+    return (root / f).is_symlink()
+
+
+def inside(root: Path, f: str, folder: bool = False) -> Path:
+    """The real path of a configured entry; refuses anything that could leave the project.
+
+    A folder entry that is itself a symlink to a subfolder of NOTES_ROOT is accepted (a top-level entry only, so "docs/linked" is refused): its target is the real path."""
     p = Path(f)
     if p.is_absolute() or ".." in p.parts:
         refuse(f"{f} must be a path inside the project, without ..")
     here = root
     for part in p.parts:  # a symlink anywhere on the way would index its target instead
         here = here / part
-        if here.is_symlink():
-            refuse(f"{here} is a symlink: index the real path")
+        if here.is_symlink() and not (folder and len(p.parts) == 1 and NOTES_ROOT in here.resolve().parents):
+            refuse(f"{here} is a symlink outside {NOTES_ROOT}/<project>: index the real path")
     real = (root / p).resolve()
+    if linked(root, f):
+        return real
     if real != root and root not in real.parents:
         refuse(f"{f} is outside the project")
     return real
