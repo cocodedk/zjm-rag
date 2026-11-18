@@ -445,7 +445,8 @@ zjm-engine, Jev or the answer model. See [CONTRIBUTING.md](CONTRIBUTING.md).
 `evals/recall.py` measures whether zjm keeps the text that answers a question, from zjm-engine's hits
 through to the answer model's prompt, over `evals/corpus` plus a generated runbook. It runs the
 real `zjm-engine` (offline; no network), captures the answer prompt instead of calling the model, and is
-not part of the unit suite:
+not part of the unit suite. It runs inside the image, where the engine and its models are, for example
+`docker run --rm --read-only --tmpfs /tmp --network none --entrypoint python3 -w /src zjm-rag evals/recall.py`:
 
 ```sh
 python3 evals/recall.py                                # ranking off (no network)

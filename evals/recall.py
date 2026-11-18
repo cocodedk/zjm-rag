@@ -61,7 +61,7 @@ def main():
     ap.add_argument("--jev", action="store_true", help="rank with the real Jev (network, costs)")
     ap.add_argument("--translate", action="store_true", help="turn on egress.translate (network, costs)")
     ap.add_argument("--multilingual", action="store_true")
-    ap.add_argument("--embedding", help="any local model baked into the image, e.g. local/multilingual-e5-small")
+    ap.add_argument("--embedding", help="a model baked into the image, e.g. local/potion-multilingual-128m")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
     golden = json.loads((ROOT / "golden.json").read_text())
