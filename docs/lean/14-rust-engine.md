@@ -118,7 +118,10 @@ hold documents. The eval's code rows are the check that code search still finds 
 
 1. `zjm_rag/zg.py` becomes `zjm_rag/engine.py`: argv builders, `HITS = 40`, a JSON parser that
    raises `ZjmError("engine returned bad output")` on anything else, and the model folder for a
-   manifest's `embedding`.
+   manifest's `embedding`. The process helpers other modules import from `zg` (`run`, `child_env`,
+   `raise_if_timed_out`; used by `copying`, `files`, `gather`, `keys`, `lockers`, `ops`, `sealed` and
+   `search`) move with it unchanged, except that `child_env` drops zg's variables
+   (`ZVEC_GREP_HOME`, `ZVEC_GREP_MODEL_CACHE`) from its allowlist.
 2. `lockers.run_index` runs `zjm-engine index`; on failure `indexed` stays false, as today. It
    removes `zghome` and `corpus/.zvec-grep` before it calls the engine, so they are never indexed. `zg_env` goes, and `locker_create`
    no longer makes `zghome`.
@@ -167,7 +170,7 @@ Rust, exactly **19** tests:
 `unknown_type_is_refused`, `question_comes_from_stdin_not_the_command_line`, `bad_stdin_is_refused`,
 `damaged_index_is_refused_exactly`.
 
-Python: exactly **133** tests (131 today). Tests of zg argv, output, `zghome` or the zg cache are
+Python: exactly **150** tests (148 today, after specs 15 and 16). Tests of zg argv, output, `zghome` or the zg cache are
 rewritten for the engine, not added. `test_incompatible_index_is_rebuilt_on_write` is deleted:
 every write builds the index from scratch. New:
 `test_find_makes_one_engine_call_with_translations`, `test_write_removes_zg_leftovers`,
@@ -194,6 +197,9 @@ Two pull requests, in order:
    | `--multilingual` | 34/38 | 30/38 | 34/38 | 34/38 |
 
    The bar is the ALL row of each run; the per-kind rows may move by one question either way.
+   One exception, the owner's decision of 2026-11-18: in the `--multilingual` run's ALL row, `cand`,
+   `acc` and `ctx` may be 33/38 until the cause of the missed cross-language question is known
+   (#54). Every other column of both runs, `evid` included, stays no worse than zg.
 
 3. By hand, once, through the `zjm` launcher (uid 10001, read-only root, no network, 2 GB), on a
    2,010-file multilingual locker, rank and translate off: report a `find`'s time and
