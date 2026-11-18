@@ -27,7 +27,10 @@ Write `zjm-project.json` at the project root and commit it, so every session use
   not exist yet is indexed as empty, with a warning; it shows `STALE:` once it appears.
 - `files`: single files to index too, such as `CLAUDE.md`, relative to the root. They appear in hits under
   `_files/<path>`, so no folder may be named `_files`. You need at least one of `folders` and `files`.
-  Absolute paths, `..` and symlinks are refused in both lists.
+  Absolute paths, `..` and symlinks are refused in both lists, with one exception: a top-level `folders` entry that is a
+  symlink into `~/vaults/<project>` (the private notes repo) is indexed from its target, under the link's name. The vault
+  folder must have the same name as the project's checkout folder: a worktree or clone under another folder name is refused,
+  with a message naming the expected folder.
 - `exclude`: files and folders (trailing `/`) left out by name.
 - `send`: off unless the project's owner decides otherwise. Off, nothing leaves the machine: searches list zjm-engine's
   candidates unranked and `ask` is refused. On, ranking and `ask` send the text of matching files to TypeSafe (Jev)
