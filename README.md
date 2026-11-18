@@ -450,11 +450,11 @@ not part of the unit suite. It runs inside the image, where the engine and its m
 ```sh
 # ranking off (no network)
 docker run --rm --read-only --tmpfs /tmp --network none --entrypoint python3 -w /src zjm-rag evals/recall.py
-# also ranks with the real decision models, Jev included (network, costs)
+# also ranks with the decision models (network, costs)
 docker run --rm --read-only --tmpfs /tmp -e OPENROUTER_API_KEY -e TYPESAFE_API_KEY \
   --entrypoint python3 -w /src zjm-rag evals/recall.py --jev
 docker run --rm --read-only --tmpfs /tmp --network none --entrypoint python3 -w /src \
-  zjm-rag evals/recall.py --limit 20 --min-score 0.7 --multilingual --verbose
+  zjm-rag evals/recall.py --limit 20 --multilingual --verbose
 ```
 
 Per question it reports whether the expected file was a candidate (`cand`), whether the answer
