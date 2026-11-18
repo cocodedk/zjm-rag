@@ -56,6 +56,8 @@ class FilesTest(SkillBase):
                   ".aws/notes.md"):
             r = self.run_script("reindex", settings=self.cfg(folders=["docs"], files=[f]))
             self.assertEqual(r.returncode, 2, f)
+            if f in ("link.md", "dirlink/in.md"):
+                self.assertIn("is a symlink: index the real path", r.stderr)
         self.assertFalse((self.tmp / "configs").exists())
 
     def test_a_folder_entry_may_not_leave_the_project(self):

@@ -40,7 +40,7 @@ class SkillTest(SkillBase):
         self.assertEqual(r.returncode, 2)
         self.assertIn("is a symlink", r.stderr)
 
-    def notes(self, name="proj"):
+    def notes(self, name="project"):  # the project folder is named "project"
         d = self.tmp / "vaults" / name
         d.mkdir(parents=True, exist_ok=True)
         return d
@@ -68,6 +68,32 @@ class SkillTest(SkillBase):
         r = self.reindex_linked(outside)
         self.assertEqual(r.returncode, 2)
         self.assertIn("is a symlink", r.stderr)
+
+    def test_a_link_to_another_projects_notes_is_refused(self):
+        r = self.reindex_linked(self.notes("other"))
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("is a symlink", r.stderr)
+        self.assertIn("vaults/project", r.stderr)
+
+    def test_a_link_loop_is_refused_cleanly(self):
+        (self.project / "memory").symlink_to("memory")
+        r = self.run_script("reindex", settings={"locker": "mine", "folders": ["memory"]})
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("is a symlink", r.stderr)
+        self.assertNotIn("Traceback", r.stderr)
+
+    def test_a_removed_or_repointed_link_makes_find_stale(self):
+        notes = self.notes()
+        (notes / "note.md").write_text("one")
+        mem = {"locker": "mine", "folders": ["memory"]}
+        self.assertEqual(self.reindex_linked(notes).returncode, 0)
+        (self.project / "memory").unlink()
+        self.assertIn("STALE", self.run_script("find", "q", settings=mem).stderr)
+        (self.project / "memory").symlink_to(notes)
+        self.assertNotIn("STALE", self.run_script("find", "q", settings=mem).stderr)
+        (self.project / "memory").unlink()
+        (self.project / "memory").symlink_to(self.notes("project/sub"))
+        self.assertIn("STALE", self.run_script("find", "q", settings=mem).stderr)
 
     def test_a_link_to_the_notes_root_itself_is_refused(self):
         r = self.reindex_linked(self.notes().parent)
