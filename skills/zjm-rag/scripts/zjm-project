@@ -9,7 +9,7 @@ Settings live in zjm-project.json at the project root (the git top level, else t
     {"locker": "myproj", "folders": ["docs", "memory"], "files": ["CLAUDE.md"], "exclude": ["*.pdf", "drafts/"],
      "send": false, "llm": "deepseek/deepseek-v4-flash", "multilingual": false}
 "locker" and at least one of "folders" and "files" (relative paths, nothing outside the project) are required. Nothing leaves the machine unless "send" is true; then ranking and ask
-send file text to OpenRouter, and "llm" picks the answer model among the providers OpenRouter offers.
+send file text to TypeSafe (Jev) and OpenRouter, and "llm" picks the answer model among the providers OpenRouter offers.
 ZJM_FORCE=1 replaces a locker of the same name built from other folders.
 """
 import json
@@ -192,7 +192,7 @@ def main() -> None:
         die(f"no locker {s['locker']} built by zjm-project: reindex first")
     check_options(cmd, rest[0], rest[1:])
     if cmd == "ask" and s.get("send") is not True:
-        die('ask sends file text to OpenRouter: set "send": true in zjm-project.json first')
+        die('ask sends file text to TypeSafe (Jev) and OpenRouter: set "send": true in zjm-project.json first')
     for d in stale(state):  # warn, never block: a stale locker misses new text and still shows removed text
         print(f"STALE: {d} changed since the last reindex; run reindex before trusting this search", file=sys.stderr)
     with tempfile.TemporaryDirectory() as tmp:
