@@ -6,7 +6,8 @@
 2. Python 3.10 or newer. There is nothing to install for the tests: the package is stdlib-only.
 3. To run it for real, build the image (`docker build -t zjm-rag .`): it builds `zjm-engine` and holds the
    models, which the engine reads from `/opt/zjm/models`. Jev ranking and OpenRouter answers also need an
-   `OPENROUTER_API_KEY`. The engine's own tests run on the host: `cargo test --locked` in `engine/`.
+   `OPENROUTER_API_KEY`. The engine's own tests run on the host, `cargo test --locked` in `engine/`, and are part
+   of the lean loop's suite (`profile-python.md`).
 
 ## Install git hooks
 
