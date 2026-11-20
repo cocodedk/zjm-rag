@@ -72,8 +72,8 @@ def _resolve_rank_sort(cfg, rank, sort):
 
 
 def _translate_query(cfg, query, translate, llm):
-    """(translations, translate_error): the one translation call per find/ask, before any locker
-    session opens (spec 10). `([], None)` when translation is off or no language is configured."""
+    """(translations, translate_error): the one translation per find/ask (asked for once more
+    when the reply is not usable, spec 20), before any locker session opens (spec 10). `([], None)` when translation is off or no language is configured."""
     if translate and not cfg["egress"]["translate"]:
         raise ZjmError(f'translating sends the question to OpenRouter; set egress.translate in {cfg["path"]}')
     effective_translate = cfg["egress"]["translate"] if translate is None else translate
