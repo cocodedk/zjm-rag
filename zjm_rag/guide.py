@@ -38,7 +38,7 @@ means a lost locker.
 
 - `rank` sends the question, locker names, file paths and passages to Jev (TypeSafe; the other decision models via OpenRouter).
 - `answer` sends the question, locker names, file paths and file text to OpenRouter (`llm`).
-- `translate` sends only the question to OpenRouter (`translate_model`).
+- `translate` sends only the question to OpenRouter (`translate_model`), to be translated and reworded.
 
 Each switch is off unless the config turns it on. Per-call `rank`/`translate` can only turn a
 switch off, never on.

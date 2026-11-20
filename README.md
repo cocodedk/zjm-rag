@@ -190,8 +190,9 @@ print(reply["answer"], reply["files"])
   rank=None, translate=None, file_types=None)` searches one or more lockers at once (plain and
   encrypted mixed freely), interleaving their results; `rank=None` follows the config's
   `egress.rank`, and `rank=True` fails without it. `translate=None` follows `egress.translate` the
-  same way, and adds the question's translations into the configured `languages` as further
-  candidates (see [Questions in other languages](#questions-in-other-languages)). `keys` maps each
+  same way, and adds the question's translations into the configured `languages`, and a
+  rewording of it in each of them, its own included, as further candidates, so a question also finds
+  text that says the same thing in other words (see [Questions in other languages](#questions-in-other-languages)). `keys` maps each
   encrypted locker's name to its key.
 - `ask(..., top_k=None, llm=zjm_rag.llm.post)` fails unless the config's `egress.answer` is on.
   `top_k=None` (the default) sends every accepted file, still bounded by the context budget; an
@@ -355,7 +356,10 @@ An English question finds the Danish, German, Norwegian or Swedish text that ans
 they share no words, and a question in any language finds text in the configured `languages`. zjm
 translates the **question**, never the files, into each configured language and searches the
 translations in addition to the original; the translations can only **add** candidate files (up to `limit` more), never
-displace one the original question already found, and no language detection is needed.
+displace one the original question already found, and no language detection is needed. The same
+call also rewords the question in each language, its own included, with synonyms and the terms a
+formal document would use, so a question finds text that says the same thing in other words; the
+rewordings are searched, and reported in `translations`, exactly like the translations.
 
 Measured (`evals/recall.py`, 38 questions, potion-code index; prototype):
 
