@@ -187,13 +187,16 @@ print(reply["answer"], reply["files"])
   `file_list(locker, key=None)` lists what is there. `key` is required exactly when the locker is
   encrypted.
 - `find(query, lockers, keys=None, limit=8, min_score=0.5, sort="score"|"zg"|"mtime"|"path",
-  rank=None, translate=None, file_types=None)` searches one or more lockers at once (plain and
+  rank=None, translate=None, file_types=None, names=None)` searches one or more lockers at once (plain and
   encrypted mixed freely), interleaving their results; `rank=None` follows the config's
   `egress.rank`, and `rank=True` fails without it. `translate=None` follows `egress.translate` the
   same way, and adds the question's translations into the configured `languages`, and a
   rewording of it in each of them, its own included, as further candidates, so a question also finds
   text that says the same thing in other words (see [Questions in other languages](#questions-in-other-languages)). `keys` maps each
-  encrypted locker's name to its key.
+  encrypted locker's name to its key. `names` searches only those locker files or folders: a file is
+  searched when its path equals an entry or starts with it followed by `/` (`"a"` picks `a/x.md`, not
+  `ab/y.md`; plain prefixes, not globs), and combines with `file_types` as AND. An empty list, or an
+  entry that is empty, absolute or holds a `.` or `..` part, is refused.
 - `ask(..., top_k=None, llm=zjm_rag.llm.post)` fails unless the config's `egress.answer` is on.
   `top_k=None` (the default) sends every accepted file, still bounded by the context budget; an
   integer still caps the count. `llm` is injectable, like `jev`, for tests.
@@ -220,8 +223,8 @@ zjm file-add LOCKER PATH... [--key-file KEY]
 zjm file-put LOCKER NAME [--key-file KEY]     # reads the text from stdin
 zjm file-remove LOCKER NAME... [--key-file KEY]
 zjm file-list LOCKER [--key-file KEY]
-zjm find "which linter checks CSS files" -l LOCKER [-l LOCKER]... [--key-file KEYS.json] [--limit N] [--type py]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank] [--no-translate]
-zjm ask "which linter checks CSS files" -l LOCKER --lang da [--key-file KEYS.json] [--top-k 3] [--no-translate]
+zjm find "which linter checks CSS files" -l LOCKER [-l LOCKER]... [--key-file KEYS.json] [--limit N] [--type py]... [--name FILE_OR_FOLDER]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank] [--no-translate]
+zjm ask "which linter checks CSS files" -l LOCKER --lang da [--key-file KEYS.json] [--name FILE_OR_FOLDER]... [--top-k 3] [--no-translate]
 zjm doctor                                   # zjm-engine, age, OPENROUTER_API_KEY, TYPESAFE_API_KEY, config, home, egress, lockers
 zjm help                                     # the workflow guide and this instance's settings; changes nothing
 ```

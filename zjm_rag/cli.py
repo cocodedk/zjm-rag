@@ -54,6 +54,7 @@ def _parser():
         p.add_argument("--key-file", metavar="PATH")
         p.add_argument("--limit", type=int, default=8)
         p.add_argument("--type", action="append", dest="types", metavar="T")
+        p.add_argument("--name", action="append", dest="names", metavar="N")
         p.add_argument("--min-score", type=float, default=0.5)
         if name == "find":
             p.add_argument("--sort", choices=list(search.SORTS))
@@ -99,6 +100,8 @@ def _args_to_body(cmd, args):
         body["model"] = args.model
     if args.types:
         body["file_types"] = args.types
+    if args.names:
+        body["names"] = args.names
     if args.no_rank:
         body["rank"] = False
     if args.no_translate:

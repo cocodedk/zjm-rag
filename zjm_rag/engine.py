@@ -115,9 +115,12 @@ def query_argv(embedding, index, file_types=None):
     return argv + [str(index)]
 
 
-def query_input(question, translations):
-    """The JSON object the engine reads on stdin."""
-    return json.dumps({"question": question, "translations": list(translations or [])})
+def query_input(question, translations, names=None):
+    """The JSON object the engine reads on stdin; `names` (locker files or folders) only when given."""
+    body = {"question": question, "translations": list(translations or [])}
+    if names is not None:
+        body["names"] = list(names)
+    return json.dumps(body)
 
 
 def _hits(items):
