@@ -56,11 +56,11 @@ pub fn run(args: &[String]) -> Res<String> {
         "query" => {
             pos(1)?;
             let (model_dir, limit) = (a.model.as_deref().ok_or_else(usage)?, a.limit.ok_or_else(usage)?);
-            let texts = request::read_texts(std::io::stdin())?;
+            let (texts, names) = request::read(std::io::stdin())?;
             let filters = a.types.iter().map(|t| types::parse(t)).collect::<Res<Vec<_>>>()?;
             let model = Model::open(model_dir)?;
             let idx = index::read(Path::new(&a.positional[0]), &model.name)?;
-            let (query, translation) = search::search(&model, &idx, &filters, &texts, limit)?;
+            let (query, translation) = search::search(&model, &idx, &filters, names.as_deref(), &texts, limit)?;
             Ok(json!({"query": hits(&query), "translation": hits(&translation)}).to_string())
         }
         _ => Err(usage()),

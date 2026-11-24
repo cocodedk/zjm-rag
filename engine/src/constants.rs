@@ -19,6 +19,7 @@ pub const FORMAT_VERSION: u64 = 1;
 
 pub const QUESTION_KEY: &str = "question";
 pub const TRANSLATIONS_KEY: &str = "translations";
+pub const NAMES_KEY: &str = "names";
 /// Bytes of a chunk record with an empty path, no vector and no token pairs: three u32 and a count.
 pub const CHUNK_FIXED_BYTES: usize = 16;
 pub const TOKEN_PAIR_BYTES: usize = 8;

@@ -28,12 +28,17 @@ pub fn group(model: &Model, chunks: &[&Chunk], texts: &[String], limit: usize) -
         .collect())
 }
 
-/// Hits for the question and for its translations, over the chunks whose file passes `filters`.
-pub fn search(model: &Model, index: &Index, filters: &[Filter], texts: &[String], limit: usize) -> Res<(Vec<Hit>, Vec<Hit>)> {
+/// A path is named when it equals a name or lies under it as a folder; `None` names every path.
+fn named(names: Option<&[String]>, path: &str) -> bool {
+    names.map_or(true, |list| list.iter().any(|n| path.strip_prefix(n.as_str()).is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))))
+}
+
+/// Hits for the question and for its translations, over the chunks whose file passes `filters` and `names`.
+pub fn search(model: &Model, index: &Index, filters: &[Filter], names: Option<&[String]>, texts: &[String], limit: usize) -> Res<(Vec<Hit>, Vec<Hit>)> {
     if index.dim != model.table.dim {
         return Err(Fail::format("index has another vector size than the model"));
     }
-    let chunks: Vec<&Chunk> = index.chunks.iter().filter(|c| crate::types::any_matches(filters, &c.path)).collect();
+    let chunks: Vec<&Chunk> = index.chunks.iter().filter(|c| crate::types::any_matches(filters, &c.path) && named(names, &c.path)).collect();
     let (question, translations) = texts.split_at(1.min(texts.len()));
     let translated = if translations.is_empty() { Vec::new() } else { group(model, &chunks, translations, limit)? };
     Ok((group(model, &chunks, question, limit)?, translated))

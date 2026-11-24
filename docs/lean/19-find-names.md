@@ -8,22 +8,24 @@ narrow the chunks the engine ranks, as `--type` does (`engine/src/search.rs`, `s
 
 ## Behaviour
 
-- `find(...)` and `ask(...)` take `names=None`: locker files or folders, the same key and meaning
-  `file_remove` already uses. `None` searches every file, as today.
+- `find(...)` and `ask(...)` take `names=None`: locker files or folders, the key `file_remove` already uses.
+  `None` searches every file, as today.
 - A file is searched when its locker path **equals** one of `names` **or starts with it followed by `/`**
   (`file_remove`'s rule, `zjm_rag/files.py`). `"a"` picks `a` and `a/x.md`, not `ab/y.md`. One trailing
-  `/` on an entry is dropped first. These are plain prefixes, not globs.
+  `/` on an entry is dropped first, which `file_remove` does not do. These are plain prefixes, not globs.
 - `names` and `file_types` combine with AND: a file must match a name (when `names` is given) and a type
   (when `file_types` is given).
-- Each of these is refused with a `ZjmError` at the start of `find`/`ask`, before the translation call and
-  before any locker is opened:
+- Each of these is refused with a `ZjmError` in `find` and `ask` right after `_check_cap`, before the config is
+  read. So an over-cap `limit` or `top_k` is refused first, and a bad `names` before `egress.answer`, the
+  no-lockers check, the translation call and any locker is opened:
   - an empty list. An empty selection must never search the whole locker.
   - an entry that is not a string.
   - an entry that, after the trailing `/` is dropped, is empty, starts with `/`, or has an empty, `.` or
     `..` component (`""`, `"/a"`, `"."`, `"./a"`, `"a//b"`, `"a/../b"`).
 - An entry that matches no file is not an error: it yields no hits.
 - The names go to the engine in the stdin JSON, beside the question and the translations
-  (`{"question", "translations", "names"}`), never on argv. File names are locker content, and argv is
+  (`{"question", "translations", "names"}`), never on argv: `engine.query_input` gains the `names` key, only
+  when names are given, and `engine.query_argv` is unchanged. File names are locker content, and argv is
   readable in `/proc`. `names` absent or `null` in the JSON means every file. The engine refuses, with a
   non-zero exit and the stdin error style of `request.rs`:
   - a `names` that is not an array of strings.
@@ -36,6 +38,7 @@ narrow the chunks the engine ranks, as `--type` does (`engine/src/search.rs`, `s
   - the HTTP and MCP `find` and `ask` schemas (`ops._FIND_PROPS`), as `names`, an array of strings.
   - the CLI `find` and `ask`, as `--name N`, repeatable.
   - the README's `find` and `ask` lines.
+- `CLAUDE.md`'s suite line gives `profile-python.md`'s suite command, both suites, not only unittest.
 
 ## Acceptance tests
 
@@ -45,11 +48,11 @@ Python (`tests/`, through the fake runner):
    puts no `names` key. The argv carries no name in either case.
 2. `ask(names=[...])` passes them the same way.
 3. `names=[]`, `[""]`, `["/a"]`, `["."]`, `["./a"]`, `["a//b"]`, `["a/../b"]` and `[3]` each raise
-   `ZjmError`. Neither the runner nor the translation `llm` is called.
-4. HTTP `find` with `names` reaches `search.find` with them. A `names` that is not an array of strings is
-   refused by the schema.
+   `ZjmError`, through `find` and through `ask`. Neither the runner nor the translation `llm` is called.
+4. HTTP `find` and `ask` with `names` reach `search.find` and `search.ask` with them. A `names` that is not
+   an array of strings is refused by the schema.
 5. The MCP `find` and `ask` tools list `names` in their input schema.
-6. `zjm find ... --name a --name b` sends `["a", "b"]`.
+6. `zjm find ... --name a --name b` and `zjm ask ... --name a --name b` each send `["a", "b"]`.
 
 Engine (`engine/tests/`):
 
@@ -63,7 +66,8 @@ Engine (`engine/tests/`):
 4. With `names` given, the translation hits are filtered the same way as the question's.
 
 The profile's suite runs both: the unittest count is the count on main when the build starts, plus 6. The
-engine's `cargo test` total is its count on main when the build starts, plus 4.
+engine's `cargo test` total, the sum of the counts `cargo test -q` prints per test binary, is that sum on main
+when the build starts, plus 4.
 
 ## Out of scope
 
@@ -72,6 +76,8 @@ engine's `cargo test` total is its count on main when the build starts, plus 4.
   and keeps its own option list. It gains no `--name`.
 - `file_list`, `file_remove` and the other file operations: they are unchanged.
 - Any change to translation, ranking, `limit`, `min_score` or the engine's index format.
+- `.githooks/pre-commit` and `.github/pull_request_template.md`, which run or name only the Python suite: the lean
+  gate and CI's `engine` job run the engine's tests.
 
 ## Decisions
 
@@ -83,3 +89,8 @@ engine's `cargo test` total is its count on main when the build starts, plus 4.
 - runner (2026-11-20): names travel on stdin, not argv, for the same reason the question does (`request.rs`).
 - runner (2026-11-20): an empty list is refused, in Python and in the engine, rather than read as "every file", so a
   caller whose selection came out empty never searches the whole locker.
+- runner (2026-11-24): inside the package the builder may give the new parameter another name where it meets
+  `gather(cfg, names, ...)`, whose `names` are locker names; the public key stays `names`.
+- runner (2026-11-24): the names check sits right after `_check_cap`, so both pure input checks run before the config
+  and every egress or locker check.
+- person (2026-11-24): "prefixes are enough, go ahead" (asked whether plain file-or-folder prefixes are enough, with no globs).
