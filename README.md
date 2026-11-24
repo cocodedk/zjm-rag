@@ -183,7 +183,8 @@ print(reply["answer"], reply["files"])
   fails with neither. The library's `locker_create` needs either `key` or `plain=True`.
 - `file_add(locker, paths, key=None)` copies files or directories in (spec 05's
   allow/deny/exclude/gitignore rules apply); `file_put(locker, name, text, key=None)` writes text
-  directly; `file_remove(locker, names, key=None)` removes files or whole directory prefixes;
+  directly; `file_put_many(locker, files, key=None, remove=())` writes many `{"name", "text"}` files
+  and removes `remove`'s names (a missing one is skipped) in one session with one index run; `file_remove(locker, names, key=None)` removes files or whole directory prefixes;
   `file_list(locker, key=None)` lists what is there. `key` is required exactly when the locker is
   encrypted.
 - `find(query, lockers, keys=None, limit=8, min_score=0.5, sort="score"|"zg"|"mtime"|"path",
@@ -221,6 +222,7 @@ zjm locker-drop NAME [--key-file KEY]
 zjm locker-encrypt NAME --key-file KEY        # one-way: plain -> encrypted
 zjm file-add LOCKER PATH... [--key-file KEY]
 zjm file-put LOCKER NAME [--key-file KEY]     # reads the text from stdin
+zjm file-put-many LOCKER [--key-file KEY] [--remove NAME]...   # reads a JSON array of {"name", "text"} from stdin
 zjm file-remove LOCKER NAME... [--key-file KEY]
 zjm file-list LOCKER [--key-file KEY]
 zjm find "which linter checks CSS files" -l LOCKER [-l LOCKER]... [--key-file KEYS.json] [--limit N] [--type py]... [--name FILE_OR_FOLDER]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank] [--no-translate]
@@ -246,7 +248,7 @@ curl -s localhost:8765/find -H 'Content-Type: application/json' -d '{"query": "w
 
 `GET /health` returns the `doctor` dict; `POST /<op>` (one per row in `zjm_rag/ops.py`'s `OPS`
 table: `locker_create`, `locker_list`, `locker_drop`, `locker_encrypt`, `file_add`, `file_put`,
-`file_remove`, `file_list`, `find`, `ask`, `doctor`, `help`) takes the library's keyword arguments as a
+`file_put_many`, `file_remove`, `file_list`, `find`, `ask`, `doctor`, `help`) takes the library's keyword arguments as a
 JSON body (`home`, `store` and `config` are the server's and cannot be set), including `key` /
 `keys` where a key is needed, and returns its result. Errors are `{"error": "..."}`: `400` bad
 body, `404`, `405`, `413` over 1 MiB, `422` from the library.

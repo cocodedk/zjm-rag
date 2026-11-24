@@ -52,6 +52,11 @@ OPS = {
     "file_put": (_wrap(files.file_put, needs_runner=True),
                 _schema({"locker": _STR, "key": _STR, "name": _STR, "text": _STR}, ["locker", "name", "text"]),
                 "Write text as a file in a locker and index it."),
+    "file_put_many": (_wrap(files.file_put_many, needs_runner=True),
+                      _schema({"locker": _STR, "key": _STR, "remove": _STR_ARR,
+                               "files": {"type": "array", "items": _schema({"name": _STR, "text": _STR},
+                                                                           ["name", "text"])}}, ["locker"]),
+                      "Write many texts as files in a locker, and remove files, with one index run."),
     "file_remove": (_wrap(files.file_remove, needs_runner=True),
                    _schema({"locker": _STR, "key": _STR, "names": _STR_ARR}, ["locker", "names"]),
                    "Remove files or directory prefixes from a locker."),
@@ -87,6 +92,9 @@ def _type_ok(value, spec):
         ok = isinstance(value, list) and all(_type_ok(x, spec["items"]) for x in value)
         if ok and "minItems" in spec:
             ok = len(value) >= spec["minItems"]
+    elif t == "object" and "properties" in spec:
+        ok = isinstance(value, dict) and set(value) <= set(spec["properties"]) and \
+            set(spec["required"]) <= set(value) and all(_type_ok(v, spec["properties"][k]) for k, v in value.items())
     elif t == "object":
         ok = isinstance(value, dict) and all(isinstance(k, str) for k in value) and \
             all(_type_ok(v, spec["additionalProperties"]) for v in value.values())

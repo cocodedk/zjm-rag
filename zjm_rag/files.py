@@ -1,4 +1,5 @@
-"""file_add, file_put, file_remove, file_list: files inside a locker (specs 06 and 08)."""
+"""file_add, file_put, file_remove, file_list: files inside a locker (specs 06 and 08); file_put_many (spec 21,
+in puts.py) is re-exported here, and file_put calls it."""
 import hashlib
 import os
 import shutil
@@ -10,8 +11,12 @@ from . import config as config_module
 from . import engine, lockers, sealed
 from .copying import _floor_excluded, _gitignored, check_source_allowed, copy_tree
 from .errors import ZjmError
-
-MAX_PUT_BYTES = 1 << 20
+from .puts import (  # noqa: F401  (MAX_PUT_BYTES: guide.py)
+    MAX_PUT_BYTES,
+    _delete,
+    _matching,
+    file_put_many,
+)
 
 
 def _entry(source, path):
@@ -19,17 +24,8 @@ def _entry(source, path):
     return {"source": source, "size": len(data), "sha256": hashlib.sha256(data).hexdigest(), "added": time.time()}
 
 
-def _check_put_name(name, cfg):
-    if not name or os.path.isabs(name) or "\\" in name:
-        raise ZjmError(f"bad file name: {name!r}")
-    segs = name.split("/")
-    for i, seg in enumerate(segs):
-        if seg in ("", ".", "..") or _floor_excluded(seg, i < len(segs) - 1, cfg["exclude"]):
-            raise ZjmError(f"bad file name: {name!r}")
-
-
 def _prune(manifest, name):
-    for k in [k for k in manifest["files"] if k == name or k.startswith(name + "/")]:
+    for k in _matching(manifest, name):
         del manifest["files"][k]
 
 
@@ -100,49 +96,21 @@ def file_add(locker, paths, key=None, *, config=None, runner=engine.run, jev=Non
 
 
 def file_put(locker, name, text, key=None, *, config=None, runner=engine.run, jev=None):
-    cfg = config_module.resolve(config)
-    data = text.encode("utf-8")
-    if len(data) > MAX_PUT_BYTES:
-        raise ZjmError(f"text for {name!r} exceeds 1 MiB")
-    _check_put_name(name, cfg)
-    with sealed.open_locker(cfg, locker, key, write=True, runner=runner) as ldir:
-        manifest = lockers.read_manifest(ldir)
-        corpus = ldir / "corpus"
-        dest = corpus / name
-        if dest.is_dir() or any(p.exists() and not p.is_dir() for p in list(dest.parents)[:name.count("/")]):
-            raise ZjmError(f"{name!r} clashes with a file or folder already in locker {locker}")
-        existed = name in manifest["files"]
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(data)
-        manifest["files"][name] = {"source": None, "size": len(data), "sha256": hashlib.sha256(data).hexdigest(),
-                                   "added": time.time()}
-        lockers.run_index(ldir, manifest, runner)
-    return {"added": [] if existed else [name], "replaced": [name] if existed else []}
+    if not isinstance(name, str):
+        raise ZjmError(f"bad file name: {name!r}")
+    r = file_put_many(locker, [{"name": name, "text": text}], key, config=config, runner=runner, jev=jev)
+    return {"added": r["added"], "replaced": r["replaced"]}
 
 
 def file_remove(locker, names, key=None, *, config=None, runner=engine.run, jev=None):
     cfg = config_module.resolve(config)
     with sealed.open_locker(cfg, locker, key, write=True, runner=runner) as ldir:
         manifest = lockers.read_manifest(ldir)
-        matches, missing = {}, []
-        for name in names:
-            hit = [k for k in manifest["files"] if k == name or k.startswith(name + "/")]
-            if hit:
-                matches[name] = hit
-            else:
-                missing.append(name)
+        matches = {name: _matching(manifest, name) for name in names}
+        missing = [name for name in names if not matches[name]]
         if missing:
             raise ZjmError(f"no such file(s) in locker {locker}: {', '.join(missing)}")
-        corpus = ldir / "corpus"
-        for k in sorted({k for ks in matches.values() for k in ks}):
-            path = corpus / k
-            if path.exists():
-                path.unlink()
-            del manifest["files"][k]
-            for parent in path.parents:
-                if parent == corpus or not parent.is_dir() or any(parent.iterdir()):
-                    break
-                parent.rmdir()
+        _delete(ldir, manifest, {k for ks in matches.values() for k in ks})
         lockers.run_index(ldir, manifest, runner)
     return {"removed": list(matches)}
 

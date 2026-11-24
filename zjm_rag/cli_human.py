@@ -45,6 +45,8 @@ def human(cmd, r):
         if cmd == "file-add" and r["excluded"]:
             lines.append(f"excluded {r['excluded']} entries")
         return lines
+    if cmd == "file-put-many":
+        return [f"{verb} {n}" for verb in ("added", "replaced", "removed") for n in r[verb]]
     if cmd == "file-remove":
         return [f"removed {n}" for n in r["removed"]]
     if cmd == "file-list":
