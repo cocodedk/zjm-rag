@@ -360,6 +360,7 @@ displace one the original question already found, and no language detection is n
 call also rewords the question in each language, its own included, with synonyms and the terms a
 formal document would use, so a question finds text that says the same thing in other words; the
 rewordings are searched, and reported in `translations`, exactly like the translations.
+A reply zjm cannot use is asked for once more before `translate_error` is set.
 
 Measured (`evals/recall.py`, 38 questions, potion-code index; prototype):
 

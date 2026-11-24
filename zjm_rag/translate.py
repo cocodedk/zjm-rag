@@ -8,6 +8,7 @@ key can ever leak into results.
 import json
 
 MAX_LEN = 500
+MAX_ATTEMPTS = 2
 TRANSLATION_KEY = "translation"
 REWORDED_KEY = "reworded"
 TEXTS_PER_LANGUAGE = 2
@@ -68,15 +69,19 @@ def _parse(reply, query, languages):
 
 def translate(query, languages, model, *, llm):
     """(translations, error): error is None on success, else one of the two fixed strings below.
-    Makes exactly one call: `llm(model, messages, reasoning=False)`."""
+    Makes at most MAX_ATTEMPTS calls, each `llm(model, messages, reasoning=False)` with the same
+    messages: an unusable reply is asked for once more, a failed request is not (spec 20)."""
     messages = [{"role": "system", "content": _system_message(languages)},
                 {"role": "user", "content": query}]
-    try:
-        reply = llm(model, messages, reasoning=False)
-    except Exception:
-        return [], "translation request failed"
-    try:
-        result = _parse(reply, query, languages)
-    except Exception:
-        result = None
-    return (result, None) if result else ([], "translation reply not usable")
+    for _ in range(MAX_ATTEMPTS):
+        try:
+            reply = llm(model, messages, reasoning=False)
+        except Exception:
+            return [], "translation request failed"
+        try:
+            result = _parse(reply, query, languages)
+        except Exception:
+            result = None
+        if result:
+            return result, None
+    return [], "translation reply not usable"
