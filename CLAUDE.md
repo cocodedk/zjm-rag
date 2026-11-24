@@ -2,7 +2,7 @@
 
 Find the file that holds the answer: zjm-engine finds candidate files, Jev ranks them, an LLM answers.
 
-- Gate profile: [profile-python.md](profile-python.md). Suite: `python3 -m unittest discover -s tests -q`.
+- Gate profile: [profile-python.md](profile-python.md). Suite: `python3 -m unittest discover -s tests -q && cd engine && cargo test --locked --offline -q`.
 - Stdlib-only Python 3.10+. No runtime dependency besides the external `zjm-engine` binary.
 - Tests never make live zjm-engine, Jev or LLM calls; inject fakes. Each spec states its expected test count.
 - Specs for the lean loop live in `docs/lean/`.

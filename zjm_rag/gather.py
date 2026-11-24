@@ -9,7 +9,7 @@ from . import sealed
 from .errors import ZjmError
 
 
-def _run_query(embedding, ldir, file_types, query, translations, runner, name):
+def _run_query(embedding, ldir, file_types, query, translations, runner, name, file_names):
     """{"query": [hit], "translation": [hit]} from one engine call. A locker with no engine.idx, or an
     index the engine refuses as another version, is read-only until a file operation rebuilds it."""
     index = ldir / engine.INDEX_FILE
@@ -17,7 +17,7 @@ def _run_query(embedding, ldir, file_types, query, translations, runner, name):
     if not index.exists():
         raise older
     code, out, err = runner(engine.query_argv(embedding, index, file_types), cwd=str(ldir),
-                            env=engine.child_env(), input=engine.query_input(query, translations))
+                            env=engine.child_env(), input=engine.query_input(query, translations, file_names))
     engine.raise_if_timed_out(code, "engine query")
     if code == engine.FORMAT_EXIT:
         raise older
@@ -26,9 +26,10 @@ def _run_query(embedding, ldir, file_types, query, translations, runner, name):
     return engine.parse(out)
 
 
-def gather(cfg, names, keys, query, file_types, limit, translations, runner, *, want_text):
+def gather(cfg, names, keys, query, file_types, limit, translations, runner, *, want_text, file_names=None):
     """Query each locker in turn, inside its own sealed session; {locker: {path: record}}. Each
-    record's "via" is "query" or "translation" (spec 10)."""
+    record's "via" is "query" or "translation" (spec 10). `file_names` narrows the search to those
+    locker files or folders (spec 19); `None` searches every file."""
     keys = keys or {}
     for name in names:
         kind = sealed.locker_kind(cfg, name)
@@ -48,7 +49,8 @@ def gather(cfg, names, keys, query, file_types, limit, translations, runner, *, 
                 if not manifest["indexed"]:
                     raise ZjmError(f"locker {name} is not indexed; re-run a file operation")
                 corpus = ldir / "corpus"
-                found = _run_query(manifest["embedding"], ldir, file_types, query, translations, runner, name)
+                found = _run_query(manifest["embedding"], ldir, file_types, query, translations, runner, name,
+                                   file_names)
                 hits, translated_hits = found["query"], (found["translation"] if translations else None)
                 record = evidence.read_candidates(hits, manifest["files"], corpus, limit, want_text=want_text,
                                                   translated_hits=translated_hits)

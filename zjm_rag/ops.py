@@ -27,7 +27,7 @@ def _wrap(func, *, needs_runner=False, needs_jev=False, needs_llm=False):
 
 _FIND_PROPS = {"query": _STR, "model": _STR, "lockers": {**_STR_ARR, "minItems": 1}, "keys": _KEYS,
               "limit": {"type": "integer", "minimum": 1, "maximum": search.MAX_LIMIT},
-              "file_types": _STR_ARR, "min_score": {"type": "number", "minimum": 0, "maximum": 1},
+              "file_types": _STR_ARR, "names": _STR_ARR, "min_score": {"type": "number", "minimum": 0, "maximum": 1},
               "sort": {"type": "string", "enum": list(search.SORTS)}, "rank": {"type": "boolean"},
               "translate": {"type": "boolean"}}
 _ASK_PROPS = {**_FIND_PROPS, "top_k": {"type": "integer", "minimum": 1, "maximum": search.MAX_LIMIT}, "answer_language": _STR}
