@@ -120,7 +120,7 @@ The commands below use `~/.claude/skills/zjm-rag/scripts/zjm-project`. If you se
      the skill's project setup; direct use follows the config's `egress` instead.
    - `llm`: the OpenRouter model that writes answers. It is used only when `send` is `true`.
    - `multilingual`: `true` for documents that are not in English.
-3. Add `.zvec-grep/` to `.gitignore`, on its own line. Expected: a folder an earlier search tool left in the project stays out of git.
+3. Add `.zvec-grep/` to `.gitignore`, on its own line. Expected: `.zvec-grep/` stays out of git. It is zg's (zvec-grep's) own index, and zjm writes nothing there.
 4. Commit `zjm-project.json` and `.gitignore`. Expected: git lists both as committed.
 5. Build the index:
 
