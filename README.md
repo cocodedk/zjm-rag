@@ -347,7 +347,7 @@ zjm find "office hours" -l demo --no-rank
 The launcher treats `--config PATH` and `--key-file PATH` as host paths and mounts the selected
 files read-only from a private host temporary directory, removed when Docker exits, so the
 container can read private files without changing their original permissions; `--key-file -`
-still reads stdin and cannot accompany `file-put`.
+still reads stdin and cannot accompany `file-put` or `file-put-many`.
 For `serve`, `--port` selects the container port and defaults the published host port;
 `ZJM_PORT` overrides the host port only; the container bind host must remain `0.0.0.0`,
 while the published host port stays loopback-only.

@@ -64,11 +64,11 @@ today's `file_remove` refuses a missing name (`zjm_rag/files.py`).
 
 ## Acceptance tests
 
-`python3 -m unittest discover -s tests -q` runs **exactly 172 tests plus the new ones**, the 172 earlier ones
-unchanged but one, the new ones in `tests/test_file_put_many.py`. The one is `tests/test_mcp.py`'s
+`python3 -m unittest discover -s tests -q` runs **exactly 185 tests**: the 172 earlier ones unchanged but one, and
+13 new ones in `tests/test_file_put_many.py` (5 of them went to `tests/test_file_put_many_surfaces.py`). The one is `tests/test_mcp.py`'s
 `test_initialize_and_list`, whose exact set of tool names gains `zjm_file_put_many`, and nothing else in it
-changes. `tests/test_ops.py`'s `test_surfaces_match_ops` passes unedited, because the CLI gains the command. The
-builder states the final count. Should any other earlier test fail, the builder reports it and does not edit it.
+changes. `tests/test_ops.py`'s `test_surfaces_match_ops` passes unedited, because the CLI gains the command. Should
+any other earlier test fail, the builder reports it and does not edit it.
 
 1. **One session.** Three files put into an encrypted locker, through the fake runner, make exactly one index run and
    one seal. `file_list` then holds all three with their sizes and sha256, and the result lists them as `added`, in
@@ -105,6 +105,8 @@ eval locker: 2,878 files put in calls of up to 1 MiB, against `file_add`'s 2.4 s
 
 ## Decisions
 
+- runner (2026-11-25): the exact count, 185, written in after the build (CodeRabbit on #64); the spec had stated only
+  the 172 earlier tests.
 - runner (2026-11-24): a new op instead of a new shape for `file_put`. The CLI's `file-put`, fits-api's eval and
   any MCP client keep the one-file call, the 172 tests stay unchanged, and `file_put` delegates, so there is one
   implementation.
