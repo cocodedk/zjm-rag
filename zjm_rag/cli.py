@@ -63,6 +63,7 @@ def _parser():
         p.add_argument("--no-rank", action="store_true")
         p.add_argument("--model", help="Decision model override (not the answer model)")
         p.add_argument("--no-translate", action="store_true")
+        p.add_argument("--translation", action="append", dest="translations", metavar="T")
         if name == "ask":
             p.add_argument("--top-k", type=int)
             p.add_argument("--lang")
@@ -113,6 +114,8 @@ def _args_to_body(cmd, args):
         body["rank"] = False
     if args.no_translate:
         body["translate"] = False
+    if args.translations:
+        body["translations"] = args.translations
     if cmd == "find" and args.sort:
         body["sort"] = args.sort
     if cmd == "ask":

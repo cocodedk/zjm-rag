@@ -188,7 +188,7 @@ print(reply["answer"], reply["files"])
   `file_list(locker, key=None)` lists what is there. `key` is required exactly when the locker is
   encrypted.
 - `find(query, lockers, keys=None, limit=8, min_score=0.5, sort="score"|"zg"|"mtime"|"path",
-  rank=None, translate=None, file_types=None, names=None)` searches one or more lockers at once (plain and
+  rank=None, translate=None, translations=None, file_types=None, names=None)` searches one or more lockers at once (plain and
   encrypted mixed freely), interleaving their results; `rank=None` follows the config's
   `egress.rank`, and `rank=True` fails without it. `translate=None` follows `egress.translate` the
   same way, and adds the question's translations into the configured `languages`, and a
@@ -197,8 +197,10 @@ print(reply["answer"], reply["files"])
   encrypted locker's name to its key. `names` searches only those locker files or folders: a file is
   searched when its path equals an entry or starts with it followed by `/` (`"a"` picks `a/x.md`, not
   `ab/y.md`; plain prefixes, not globs), and combines with `file_types` as AND. An empty list, or an
-  entry that is empty, absolute or holds a `.` or `..` part, is refused.
-- `ask(..., top_k=None, llm=zjm_rag.llm.post)` fails unless the config's `egress.answer` is on.
+  entry that is empty, absolute or holds a `.` or `..` part, is refused. `translations`, a list of at most 16
+  non-blank strings of at most 500 characters, is searched in place of zjm's own translations, so zjm makes
+  no translation call and needs no `egress.translate`; it cannot be given with `translate=True`.
+- `ask(..., top_k=None, llm=zjm_rag.llm.post)` takes `find`'s arguments, `names` and `translations` included, and fails unless the config's `egress.answer` is on.
   `top_k=None` (the default) sends every accepted file, still bounded by the context budget; an
   integer still caps the count. `llm` is injectable, like `jev`, for tests.
 - `file_add` prepares the whole batch before replacing existing content, so copy errors leave
@@ -225,8 +227,8 @@ zjm file-put LOCKER NAME [--key-file KEY]     # reads the text from stdin
 zjm file-put-many LOCKER [--key-file KEY] [--remove NAME]...   # reads a JSON array of {"name", "text"} from stdin
 zjm file-remove LOCKER NAME... [--key-file KEY]
 zjm file-list LOCKER [--key-file KEY]
-zjm find "which linter checks CSS files" -l LOCKER [-l LOCKER]... [--key-file KEYS.json] [--limit N] [--type py]... [--name FILE_OR_FOLDER]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank] [--no-translate]
-zjm ask "which linter checks CSS files" -l LOCKER --lang da [--key-file KEYS.json] [--name FILE_OR_FOLDER]... [--top-k 3] [--no-translate]
+zjm find "which linter checks CSS files" -l LOCKER [-l LOCKER]... [--key-file KEYS.json] [--limit N] [--type py]... [--name FILE_OR_FOLDER]... [--min-score 0.5] [--sort score|zg|mtime|path] [--no-rank] [--no-translate] [--translation T]...
+zjm ask "which linter checks CSS files" -l LOCKER --lang da [--key-file KEYS.json] [--name FILE_OR_FOLDER]... [--top-k 3] [--no-translate] [--translation T]...
 zjm doctor                                   # zjm-engine, age, OPENROUTER_API_KEY, TYPESAFE_API_KEY, config, home, egress, lockers
 zjm help                                     # the workflow guide and this instance's settings; changes nothing
 ```
@@ -366,6 +368,7 @@ call also rewords the question in each language, its own included, with synonyms
 formal document would use, so a question finds text that says the same thing in other words; the
 rewordings are searched, and reported in `translations`, exactly like the translations.
 A reply zjm cannot use is asked for once more before `translate_error` is set.
+A caller can send its own translations (`translations`, or `--translation` on the CLI), and zjm then makes no translation call.
 
 Measured (`evals/recall.py`, 38 questions, potion-code index; prototype):
 
