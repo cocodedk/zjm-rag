@@ -21,7 +21,8 @@ from the accepted files and asks it to cite them. The calling app decides who ma
 
 1. `help` (this call) explains the workflow, keys, egress and what this instance allows.
 2. `locker_create` (with `key`, or `plain=true` for no encryption).
-3. `file_add` (paths under `instance.allow`) or `file_put` (text).
+3. `file_add` (paths under `instance.allow`) or `file_put` (text); `file_put_many` for many texts or
+   removals in one session.
 4. `find` or `ask`.
 5. `file_list`, `file_remove`, `locker_list`, `locker_drop` and `locker_encrypt` manage lockers.
 6. `doctor` checks the instance.

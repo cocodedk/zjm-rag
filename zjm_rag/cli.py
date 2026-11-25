@@ -36,7 +36,7 @@ def _parser():
         p.add_argument("name")
         p.add_argument("--key-file", metavar="PATH", required=name == "locker-encrypt")
 
-    for name in ("file-add", "file-put", "file-remove", "file-list"):
+    for name in ("file-add", "file-put", "file-put-many", "file-remove", "file-list"):
         p = _common(sub.add_parser(name))
         p.add_argument("locker")
         p.add_argument("--key-file", metavar="PATH")
@@ -44,6 +44,8 @@ def _parser():
             p.add_argument("paths", nargs="+", metavar="PATH")
         elif name == "file-put":
             p.add_argument("name")
+        elif name == "file-put-many":
+            p.add_argument("--remove", action="append", default=[], metavar="NAME")
         elif name == "file-remove":
             p.add_argument("names", nargs="+", metavar="NAME")
 
@@ -91,6 +93,11 @@ def _args_to_body(cmd, args):
         return {"locker": args.locker, "paths": args.paths}
     if cmd == "file-put":
         return {"locker": args.locker, "name": args.name, "text": sys.stdin.read()}
+    if cmd == "file-put-many":
+        files = json.loads(sys.stdin.read() or "[]")
+        if not isinstance(files, list):
+            raise ZjmError("stdin must be a JSON array of {\"name\", \"text\"} objects")
+        return {"locker": args.locker, "files": files, "remove": args.remove}
     if cmd == "file-remove":
         return {"locker": args.locker, "names": args.names}
     if cmd == "file-list":

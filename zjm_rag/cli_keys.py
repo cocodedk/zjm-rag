@@ -2,7 +2,7 @@
 import json
 import sys
 
-KEY_CMDS = {"locker-create", "locker-drop", "file-add", "file-put", "file-remove", "file-list"}
+KEY_CMDS = {"locker-create", "locker-drop", "file-add", "file-put", "file-put-many", "file-remove", "file-list"}
 KEYS_CMDS = {"find", "ask"}
 
 
@@ -15,8 +15,8 @@ def _read(path):
 
 def usage_error(cmd, key_file):
     """A message to print and exit 2 on, or None."""
-    if cmd == "file-put" and key_file == "-":
-        return "--key-file - cannot be combined with file-put's stdin text"
+    if cmd in ("file-put", "file-put-many") and key_file == "-":
+        return f"--key-file - cannot be combined with {cmd}'s stdin text"
     return None
 
 
