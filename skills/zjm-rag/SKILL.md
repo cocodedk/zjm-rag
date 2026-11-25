@@ -9,6 +9,7 @@ Repo: https://github.com/cocodedk/zjm-rag (its README is the full guide). Runs o
 `install.sh` builds it, puts `zjm` on `~/.local/bin` and installs this skill. `scripts/zjm-project` (in this
 skill's folder) indexes and searches from the project root; `scripts/mirror.py` makes the redacted copies it
 indexes. Run them; don't read them.
+A project without a `zjm-project.json` names its own search and reindex commands in its CLAUDE.md; use those there.
 
 ## Set up a project once
 
@@ -44,8 +45,8 @@ warning. Untracked git-ignored files, files named like secrets (zjm's floor: `.e
 ...) and anything reached through a symlink are never copied. File contents are not scanned: a secret pasted into
 an ordinary document is indexed, and sent if `send` is on. Keep scratch folders git-ignored and untracked: a
 tracked file stays eligible even when `.gitignore` matches it. Index from
-a checkout that stays (the main folder after a pull), not a temporary worktree. Add `.zvec-grep/` to `.gitignore`:
-an earlier search tool left that folder in the project; zjm itself writes nothing there. Then run
+a checkout that stays (the main folder after a pull), not a temporary worktree. Keep `.zvec-grep/` out of git: it is zg's (zvec-grep's) own index, and zjm itself writes nothing there.
+Then run
 `scripts/zjm-project reindex`.
 
 ## Refresh
